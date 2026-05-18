@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0058)file:///Users/jorgecalix/Downloads/laroca_cobranza_17.html -->
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La Roca — Cobranza</title>
 <style>
@@ -284,6 +284,36 @@ tr:hover td { background: #f5f8ff; }
 .copy-btn { margin-top: 4px; font-family: var(--mono); font-size: 10px; color: var(--text3); background: transparent; border: none; cursor: pointer; transition: color .15s; }
 .copy-btn:hover { color: var(--green); }
 
+/* ALERTAS */
+.alert-banner{
+  position:fixed;bottom:20px;right:20px;max-width:340px;z-index:999;
+  background:#fff;border:1px solid var(--border2);border-radius:var(--r);
+  box-shadow:var(--shadow2);padding:14px 16px;animation:slideIn .3s ease;
+}
+@keyframes slideIn{from{transform:translateX(120%)}to{transform:translateX(0)}}
+.alert-banner.tipo-info   {border-left:4px solid var(--blue);}
+.alert-banner.tipo-urgente{border-left:4px solid var(--red);}
+.alert-banner.tipo-animo  {border-left:4px solid #22a050;}
+.alert-title{font-weight:600;font-size:13px;margin-bottom:4px}
+.alert-msg  {font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.4}
+.alert-meta {font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px}
+.alert-confirm{
+  width:100%;padding:7px;background:var(--green);color:#fff;
+  border:none;border-radius:var(--r2);font-size:12px;font-weight:500;
+  cursor:pointer;transition:all .15s;
+}
+.alert-confirm:hover{background:var(--green);}
+.alert-img{width:100%;border-radius:var(--r2);margin-bottom:8px;max-height:160px;object-fit:cover}
+
+/* Admin alerts panel */
+.alerts-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.alerts-panel-title{font-family:var(--mono);font-size:11px;font-weight:600;margin-bottom:12px;color:var(--text2)}
+.alert-item{padding:10px;border:1px solid var(--border);border-radius:var(--r2);margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.alert-item-left{flex:1}
+.alert-item-name{font-size:13px;font-weight:500;margin-bottom:2px}
+.alert-item-detail{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.read-count{font-family:var(--mono);font-size:10px;padding:2px 7px;background:var(--greenbg);color:var(--green);border-radius:20px;white-space:nowrap}
+
 /* ACTIONS */
 .act-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 10px; }
 .act-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 13px; box-shadow: var(--shadow); }
@@ -298,30 +328,30 @@ tr:hover td { background: #f5f8ff; }
 <body>
 
 <!-- ── LOGIN ── -->
-<div id="login-screen">
+<div id="login-screen" style="display: none;">
   <div class="login-card">
     <div class="login-mark">LR</div>
     <div class="login-title">La Roca Cobranza</div>
     <div class="login-sub">Ingresa tu código de acceso</div>
     <div class="login-pin" id="pin-display">
-      <div class="pin-dot" id="p0"></div>
-      <div class="pin-dot" id="p1"></div>
-      <div class="pin-dot" id="p2"></div>
-      <div class="pin-dot" id="p3"></div>
-      <div class="pin-dot" id="p4"></div>
+      <div class="pin-dot filled" id="p0">●</div>
+      <div class="pin-dot filled" id="p1">●</div>
+      <div class="pin-dot filled" id="p2">●</div>
+      <div class="pin-dot filled" id="p3">●</div>
+      <div class="pin-dot filled" id="p4">●</div>
     </div>
     <div class="pin-numpad">
-      <button class="pin-btn" onclick="pinPress('1')">1</button>
-      <button class="pin-btn" onclick="pinPress('2')">2</button>
-      <button class="pin-btn" onclick="pinPress('3')">3</button>
-      <button class="pin-btn" onclick="pinPress('4')">4</button>
-      <button class="pin-btn" onclick="pinPress('5')">5</button>
-      <button class="pin-btn" onclick="pinPress('6')">6</button>
-      <button class="pin-btn" onclick="pinPress('7')">7</button>
-      <button class="pin-btn" onclick="pinPress('8')">8</button>
-      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn" onclick="pinPress(&#39;1&#39;)">1</button>
+      <button class="pin-btn" onclick="pinPress(&#39;2&#39;)">2</button>
+      <button class="pin-btn" onclick="pinPress(&#39;3&#39;)">3</button>
+      <button class="pin-btn" onclick="pinPress(&#39;4&#39;)">4</button>
+      <button class="pin-btn" onclick="pinPress(&#39;5&#39;)">5</button>
+      <button class="pin-btn" onclick="pinPress(&#39;6&#39;)">6</button>
+      <button class="pin-btn" onclick="pinPress(&#39;7&#39;)">7</button>
+      <button class="pin-btn" onclick="pinPress(&#39;8&#39;)">8</button>
+      <button class="pin-btn" onclick="pinPress(&#39;9&#39;)">9</button>
       <button class="pin-btn del" onclick="pinDel()">⌫</button>
-      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn" onclick="pinPress(&#39;0&#39;)">0</button>
       <button class="pin-btn enter" onclick="pinEnter()">✓</button>
     </div>
     <div class="login-error" id="login-err"></div>
@@ -329,45 +359,90 @@ tr:hover td { background: #f5f8ff; }
 </div>
 
 <!-- ── HEADER ── -->
-<header id="main-header" style="display:none">
+<header id="main-header" style="display: flex;">
   <div class="logo"><div class="logo-m">LR</div>LA ROCA COBRANZA</div>
   <div class="hright">
-    <span class="conn-dot" id="conn-dot"></span>
-    <span id="conn-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)"></span>
+    <span class="conn-dot on" id="conn-dot"></span>
+    <span id="conn-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)">Conectado</span>
     <button class="sync-btn" onclick="syncNow()">🔄 Sincronizar</button>
-    <div class="hdate" id="hdate"></div>
+    <div class="hdate" id="hdate">LUN, 18 MAY 2026</div>
     <div class="user-chip" id="user-chip" onclick="doLogout()">
-      <span id="user-lbl">—</span><span style="color:var(--text3);margin-left:2px">✕</span>
+      <span id="user-lbl">👤 Administrador</span><span style="color:var(--text3);margin-left:2px">✕</span>
     </div>
     <button class="btn btn-ghost btn-sm" id="back-btn" style="display:none" onclick="goHome()">↩ Inicio</button>
   </div>
 </header>
 
 <!-- ── HOME ── -->
-<div id="home-zone" style="display:none">
+<div id="home-zone" style="display: block;">
   <p class="home-eyebrow">Sistema de cobranza</p>
   <h1 class="home-title">Cartera <strong>La Roca</strong></h1>
   <p class="home-sub">Subí el PDF del día para actualizar la cartera. Las promesas se conservan siempre.</p>
 
-  <div id="role-note" class="role-note"></div>
+  <div id="role-note" class="role-note" style="background: var(--greenbg); color: var(--green); border: 1px solid rgba(26, 122, 60, 0.2); border-radius: 5px; padding: 9px 13px; font-family: var(--mono); font-size: 11px; margin-bottom: 16px;">👑 Administrador — acceso completo · Puede subir PDFs y borrar carteras</div>
 
   <div class="drop-zone" id="drop-zone" onclick="dropClick()">
     <span class="drop-icon">📄</span>
     <p class="drop-label" id="drop-label">Arrastrá el PDF aquí o hacé clic</p>
     <p class="drop-hint">Solo archivos .pdf del sistema</p>
-    <input type="file" id="file-input" accept=".pdf" multiple>
+    <input type="file" id="file-input" accept=".pdf" multiple="">
   </div>
-  <div class="prog-wrap" id="prog-wrap">
-    <div class="prog-bg"><div class="prog-fill" id="prog-fill"></div></div>
-    <p class="prog-lbl" id="prog-lbl">Procesando...</p>
+  <div class="prog-wrap" id="prog-wrap" style="display: none;">
+    <div class="prog-bg"><div class="prog-fill" id="prog-fill" style="width: 100%;"></div></div>
+    <p class="prog-lbl" id="prog-lbl">¡Listo!</p>
   </div>
   <div class="err-box" id="err-box"></div>
 
-  <div id="cart-list-section" style="display:none">
+  <div id="cart-list-section" style="display: block;">
     <div class="list-header">
       <span class="list-title">Carteras</span>
     </div>
-    <div id="cart-list"></div>
+    <div id="cart-list"><div class="cart-item" onclick="openCartera(&#39;SU_MUEBLE&#39;)">
+      <div>
+        <div class="cart-name">Su Mueble</div>
+        <div class="cart-meta">Última carga: 18/05/2026 · 100 clientes · 0 promesas · 1 actualización(es)</div>
+      </div>
+      <div class="cart-actions">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MUEBLE&#39;)">🗑</button>
+      </div>
+    </div><div class="cart-item" onclick="openCartera(&#39;SU_MOTO_DANL•••&#39;)">
+      <div>
+        <div class="cart-name">Su Moto ( Danl••• )</div>
+        <div class="cart-meta">Última carga: 18/05/2026 · 72 clientes · 0 promesas · 1 actualización(es)</div>
+      </div>
+      <div class="cart-actions">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MOTO_DANL•••&#39;)">🗑</button>
+      </div>
+    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)">
+      <div>
+        <div class="cart-name">La Roca Motors ( La Libertad ) #2</div>
+        <div class="cart-meta">Última carga: 18/05/2026 · 64 clientes · 1 promesas · 1 actualización(es)</div>
+      </div>
+      <div class="cart-actions">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)">🗑</button>
+      </div>
+    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)">
+      <div>
+        <div class="cart-name">La Roca Motors ( Barrio Arriba ) #1</div>
+        <div class="cart-meta">Última carga: 18/05/2026 · 61 clientes · 0 promesas · 1 actualización(es)</div>
+      </div>
+      <div class="cart-actions">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)">🗑</button>
+      </div>
+    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_COMERCIAL_1&#39;)">
+      <div>
+        <div class="cart-name">La Roca Comercial #1</div>
+        <div class="cart-meta">Última carga: 18/05/2026 · 166 clientes · 1 promesas · 1 actualización(es)</div>
+      </div>
+      <div class="cart-actions">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_COMERCIAL_1&#39;)">🗑</button>
+      </div>
+    </div></div>
   </div>
 </div>
 
@@ -387,12 +462,48 @@ tr:hover td { background: #f5f8ff; }
   <div id="tabs-content"></div>
 </div>
 
+<!-- ── ALERTAS ── -->
+<div id="alert-container"></div>
+
+<!-- ── MODAL ALERTA (Admin) ── -->
+<div class="overlay" id="modal-alerta">
+  <div class="modal-card">
+    <button class="modal-x" onclick="document.getElementById(&#39;modal-alerta&#39;).classList.remove(&#39;show&#39;)">×</button>
+    <div class="modal-title">📣 Nueva alerta para el equipo</div>
+    <div class="modal-sub">Todos los usuarios activos la verán y deben confirmar</div>
+    <div class="form-row">
+      <label class="form-lbl">Tipo</label>
+      <select class="form-inp" id="a-tipo">
+        <option value="animo">💪 Mensaje de ánimo</option>
+        <option value="info">📋 Información importante</option>
+        <option value="urgente">🚨 Urgente</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-lbl">Título</label>
+      <input type="text" class="form-inp" id="a-titulo" placeholder="Ej: ¡Gran trabajo equipo!">
+    </div>
+    <div class="form-row">
+      <label class="form-lbl">Mensaje</label>
+      <textarea class="form-inp" id="a-mensaje" rows="3" placeholder="Escribe tu mensaje aquí..."></textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-lbl">Cliente relacionado (opcional)</label>
+      <input type="text" class="form-inp" id="a-cliente" placeholder="Nombre del cliente...">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById(&#39;modal-alerta&#39;).classList.remove(&#39;show&#39;)">Cancelar</button>
+      <button class="btn btn-primary" onclick="enviarAlerta()">📣 Enviar alerta</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── MODAL PROMESA ── -->
 <div class="overlay" id="modal-overlay">
   <div class="modal-card">
     <button class="modal-x" onclick="closeModal()">×</button>
     <div class="modal-title" id="modal-cliente">—</div>
-    <div class="modal-sub"  id="modal-info">—</div>
+    <div class="modal-sub" id="modal-info">—</div>
     <div class="form-row">
       <label class="form-lbl">Estado</label>
       <select class="form-inp" id="p-estado" onchange="togglePromesaFields()">
@@ -424,8 +535,8 @@ tr:hover td { background: #f5f8ff; }
 </div>
 
 <!-- ── SCRIPTS ── -->
-<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="./index_files/pdf.min.js"></script>
+<script src="./index_files/supabase-js@2"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -437,6 +548,72 @@ window.addEventListener('load', function() {
   document.getElementById('home-zone').style.display    = 'none';
   document.getElementById('dash-zone').style.display    = 'none';
 });
+
+// ── AUTO-SYNC cada 3 segundos ──
+var autoSyncInterval = null;
+
+function startAutoSync() {
+  stopAutoSync();
+  autoSyncInterval = setInterval(async function() {
+    if (!USER || !DB_OK) return;
+    try {
+      // Silently fetch latest promesas from Supabase
+      var result = await supa.from('promesas').select('*');
+      if (result.error) return;
+      if (!result.data) return;
+
+      var changed = false;
+      result.data.forEach(function(p) {
+        var key = p.cartera_id+'::'+p.cliente_nombre;
+        var existing = PROMESAS[key];
+        var newTs = p.updated_at||'';
+        var oldTs = existing?.ts||'';
+        // Update only if Supabase has newer data
+        if (newTs > oldTs) {
+          PROMESAS[key] = {
+            estado: p.estado, fecha: p.fecha,
+            monto: p.monto, nota: p.nota,
+            mora_pendiente: p.mora_pendiente||false,
+            ts: p.updated_at
+          };
+          changed = true;
+        }
+      });
+
+      // Also check for new carteras
+      var cartResult = await supa.from('carteras').select('id,empresa,fecha_emision,updated_at');
+      if (cartResult.data) {
+        cartResult.data.forEach(function(c) {
+          if (!CARTERAS[c.id]) {
+            // New cartera found - reload full data
+            changed = true;
+          }
+        });
+      }
+
+      if (changed) {
+        var dot = document.getElementById('conn-dot');
+        if (dot) { dot.style.background='#22a050'; }
+        if (CURRENT && CARTERAS[CURRENT]) {
+          renderDash(CURRENT);
+        } else {
+          renderHome();
+        }
+      }
+      // Check for new alerts
+      await checkAlertas();
+    } catch(e) {
+      // Silent fail
+    }
+  }, 3000);
+}
+
+function stopAutoSync() {
+  if (autoSyncInterval) {
+    clearInterval(autoSyncInterval);
+    autoSyncInterval = null;
+  }
+}
 
 // ══════════════════════════════════════════
 // CONFIGURACIÓN
@@ -504,10 +681,16 @@ function pinEnter() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-header').style.display  = 'flex';
   document.getElementById('user-lbl').textContent = '👤 ' + u.nombre;
-  initApp();
+  initApp().then(function() { startAutoSync(); addAlertButton(); });
 }
 function doLogout() {
   if (!confirm('¿Cerrar sesión?')) return;
+  stopAutoSync();
+  // Remove admin alert button
+  var btn = document.getElementById('alert-admin-btn');
+  if (btn) btn.parentNode.removeChild(btn);
+  // Reset shown alerts for next session
+  shownAlerts = {};
   USER=null; CARTERAS={}; PROMESAS={}; CURRENT=null;
   // Reset PIN
   pinVal='';
@@ -1065,23 +1248,44 @@ function buildHoy(cartId,cl,G) {
   const hoyD=HOY.getDate();
   const todStr=HOY.toISOString().split('T')[0];
 
-  // Pagan hoy: dia_pago === hoy y no han pagado este mes
+  // Helper: did client pay this month and no mora_pendiente?
+  const yaPagoOk = c => pagoEsteMes(c.ultimo_pago) && !PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente;
+
+  // Pagan HOY: dia_pago === hoy y no han pagado este mes
   const paganHoy=cl.filter(c=>{
     if (c.tramo==='INACTIVO') return false;
     if (c.dia_pago!==hoyD) return false;
-    if (pagoEsteMes(c.ultimo_pago)) {
-      return PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente===true;
-    }
-    return true;
+    return !yaPagoOk(c);
   });
 
-  // Acumulados: dia_pago ya pasó este mes y no han pagado
+  // ACUMULADOS: cualquier cliente que debía pagar antes de hoy este mes y NO ha pagado
+  // Incluye: clientes con dia_pago < hoyD Y tramo VENCIDO/60/90/120/150
+  // También incluye clientes cuyo último pago fue el mes pasado o antes
   const acum=cl.filter(c=>{
     if (c.tramo==='INACTIVO') return false;
-    if (!c.dia_pago||c.dia_pago>=hoyD) return false;
-    if (pagoEsteMes(c.ultimo_pago)) return PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente===true;
-    return true;
-  }).sort((a,b)=>a.dia_pago-b.dia_pago);
+    if (yaPagoOk(c)) return false; // ya pagó este mes correctamente
+    if (c.dia_pago===hoyD) return false; // estos van en paganHoy
+
+    // Caso 1: tiene dia_pago registrado y ya pasó este mes
+    if (c.dia_pago>0 && c.dia_pago<hoyD) return true;
+
+    // Caso 2: tramo VENCIDO (calculado por el parser) - siempre mostrar
+    if (c.tramo==='VENCIDO') return true;
+
+    // Caso 3: mora 60/90/120/150 - su última fecha de pago fue antes de este mes
+    if (['60','90','120','150'].includes(c.tramo)) {
+      // Verificar si su dia_pago ya pasó este mes aunque sea de meses anteriores
+      if (c.dia_pago>0 && c.dia_pago<hoyD) return true;
+      // Si no tiene dia_pago claro, mostrar igual porque tiene mora
+      return true;
+    }
+
+    return false;
+  }).sort((a,b)=>{
+    // Sort: most overdue first (smallest dia_pago = waited longest)
+    const da=a.dia_pago||31, db=b.dia_pago||31;
+    return da-db;
+  });
 
   // Prometieron hoy
   const promHoy=cl.filter(c=>PROMESAS[cartId+'::'+c.nombre]?.fecha===todStr&&PROMESAS[cartId+'::'+c.nombre]?.estado==='promesa');
@@ -1533,6 +1737,105 @@ function exportCSV(){
 }
 
 // ══════════════════════════════════════════
+// ALERTAS
+// ══════════════════════════════════════════
+var lastAlertCheck = new Date().toISOString();
+var shownAlerts    = {};
+
+async function checkAlertas() {
+  if (!USER || !DB_OK) return;
+  try {
+    // Get ALL alerts from last 24 hours
+    var since = new Date(Date.now() - 24*60*60*1000).toISOString();
+    var result = await supa.from('alertas')
+      .select('*')
+      .gt('created_at', since)
+      .order('created_at', {ascending:true});
+    if (result.error || !result.data || !result.data.length) return;
+
+    // Get which ones this user already confirmed
+    var lResult = await supa.from('alertas_lecturas')
+      .select('alerta_id')
+      .eq('usuario', USER.nombre);
+    var leidas = new Set((lResult.data||[]).map(function(l){ return l.alerta_id; }));
+
+    result.data.forEach(function(a) {
+      // Show if not yet confirmed by this user AND not already shown in this session
+      if (!leidas.has(a.id) && !shownAlerts[a.id]) {
+        shownAlerts[a.id] = true;
+        showAlertBanner(a);
+      }
+    });
+  } catch(e) {}
+}
+
+function showAlertBanner(alerta) {
+  var container = document.getElementById('alert-container');
+  var div = document.createElement('div');
+  div.className = 'alert-banner tipo-' + (alerta.tipo||'info');
+  div.id = 'alert-' + alerta.id;
+  div.innerHTML = `
+    <div class="alert-title">${alerta.tipo==='animo'?'💪':alerta.tipo==='urgente'?'🚨':'📋'} ${esc2(alerta.titulo||'')}</div>
+    <div class="alert-msg">${esc2(alerta.mensaje||'')}</div>
+    ${alerta.cliente?`<div class="alert-meta">👤 Cliente: ${esc2(alerta.cliente)}</div>`:''}
+    <div class="alert-meta">De: ${esc2(alerta.autor||'Admin')} · ${new Date(alerta.created_at).toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'})}</div>
+    <button class="alert-confirm" onclick="confirmarAlerta('${alerta.id}',this.parentNode)">✓ Visto</button>
+  `;
+  container.appendChild(div);
+  // Auto-remove after 30 seconds if not confirmed
+  setTimeout(function() { if(div.parentNode) div.parentNode.removeChild(div); }, 30000);
+}
+
+async function confirmarAlerta(alertaId, el) {
+  try {
+    await supa.from('alertas_lecturas').insert({
+      alerta_id: alertaId,
+      usuario: USER?.nombre||'—',
+      leido_at: new Date().toISOString()
+    });
+  } catch(e) {}
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+async function enviarAlerta() {
+  var tipo    = document.getElementById('a-tipo').value;
+  var titulo  = document.getElementById('a-titulo').value.trim();
+  var mensaje = document.getElementById('a-mensaje').value.trim();
+  var cliente = document.getElementById('a-cliente').value.trim();
+  if (!titulo || !mensaje) { alert('Completa el título y mensaje'); return; }
+  try {
+    await supa.from('alertas').insert({
+      tipo, titulo, mensaje, cliente: cliente||null,
+      autor: USER?.nombre||'Admin',
+      created_at: new Date().toISOString()
+    });
+    document.getElementById('modal-alerta').classList.remove('show');
+    document.getElementById('a-titulo').value='';
+    document.getElementById('a-mensaje').value='';
+    document.getElementById('a-cliente').value='';
+    alert('✅ Alerta enviada a todos los usuarios activos');
+  } catch(e) { alert('Error al enviar: ' + e.message); }
+}
+
+function esc2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Add alert button to home for admins
+function addAlertButton() {
+  // Remove existing button first
+  var existing = document.getElementById('alert-admin-btn');
+  if (existing) existing.parentNode.removeChild(existing);
+  // Only admin can send alerts
+  if (!USER || USER.rol !== 'admin') return;
+  var btn = document.createElement('button');
+  btn.id = 'alert-admin-btn';
+  btn.className = 'btn btn-primary btn-sm';
+  btn.textContent = '📣 Enviar alerta';
+  btn.onclick = function() { document.getElementById('modal-alerta').classList.add('show'); };
+  btn.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:500;box-shadow:var(--shadow2);font-size:12px';
+  document.body.appendChild(btn);
+}
+
+// ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
 function fmt(n){ return Number(n).toLocaleString('es-HN'); }
@@ -1584,5 +1887,6 @@ function flt(tid,sid){
   });
 }
 </script>
-</body>
-</html>
+
+
+<button id="alert-admin-btn" class="btn btn-primary btn-sm" style="position: fixed; bottom: 20px; left: 20px; z-index: 500; box-shadow: var(--shadow2); font-size: 12px;">📣 Enviar alerta</button></body></html>
