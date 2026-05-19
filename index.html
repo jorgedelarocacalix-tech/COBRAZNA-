@@ -1,8 +1,12 @@
 <!DOCTYPE html>
-<!-- saved from url=(0058)file:///Users/jorgecalix/Downloads/laroca_cobranza_17.html -->
-<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="La Roca">
+<meta name="mobile-web-app-capable" content="yes">
 <title>La Roca — Cobranza</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
@@ -81,15 +85,19 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
   gap: 8px; margin-bottom: 14px;
 }
 .pin-btn {
-  padding: 14px; border: 1px solid var(--border2); border-radius: var(--r2);
-  background: var(--bg2); font-size: 18px; font-family: var(--mono);
+  padding: 16px; border: 1px solid var(--border2); border-radius: var(--r2);
+  background: var(--bg2); font-size: 20px; font-family: var(--mono);
   font-weight: 500; cursor: pointer; transition: all .12s; color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .pin-btn:hover  { background: var(--bg3); }
-.pin-btn:active { transform: scale(.95); }
-.pin-btn.del    { font-size: 14px; color: var(--text3); }
+.pin-btn:active { transform: scale(.95); background: var(--bg4); }
+.pin-btn.del    { font-size: 16px; color: var(--text3); }
 .pin-btn.enter  { background: var(--green); color: #fff; border-color: var(--green); }
-.pin-btn.enter:hover { background: #22a050; }
+.pin-btn.enter:active { background: #22a050; }
 .login-error { font-size: 12px; color: var(--red); font-family: var(--mono); min-height: 18px; margin-top: 4px; }
 
 /* ── HEADER ── */
@@ -284,6 +292,24 @@ tr:hover td { background: #f5f8ff; }
 .copy-btn { margin-top: 4px; font-family: var(--mono); font-size: 10px; color: var(--text3); background: transparent; border: none; cursor: pointer; transition: color .15s; }
 .copy-btn:hover { color: var(--green); }
 
+/* ECG CHART */
+.ecg-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
+.ecg-title { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+.ecg-status { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+.ecg-status.up   { background: var(--redbg);   color: var(--red);   }
+.ecg-status.down { background: var(--greenbg); color: var(--green); }
+.ecg-status.flat { background: var(--amberbg); color: var(--amber); }
+.ecg-svg { width: 100%; overflow: visible; }
+.ecg-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.ecg-leg { font-family: var(--mono); font-size: 9px; display: flex; align-items: center; gap: 4px; color: var(--text3); }
+.ecg-leg span { width: 20px; height: 3px; border-radius: 2px; display: inline-block; }
+.snap-detail { background: var(--bg3); border-radius: var(--r2); padding: 10px 12px; margin-top: 8px; font-size: 12px; }
+.snap-detail-title { font-family: var(--mono); font-size: 10px; font-weight: 600; margin-bottom: 6px; color: var(--text2); }
+.snap-client-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.snap-client { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); }
+.snap-client.entro { background: var(--redbg); color: var(--red); }
+.snap-client.salio { background: var(--greenbg); color: var(--green); }
+
 /* ALERTAS */
 .alert-banner{
   position:fixed;bottom:20px;right:20px;max-width:340px;z-index:999;
@@ -328,121 +354,76 @@ tr:hover td { background: #f5f8ff; }
 <body>
 
 <!-- ── LOGIN ── -->
-<div id="login-screen" style="display: none;">
+<div id="login-screen">
   <div class="login-card">
     <div class="login-mark">LR</div>
     <div class="login-title">La Roca Cobranza</div>
     <div class="login-sub">Ingresa tu código de acceso</div>
     <div class="login-pin" id="pin-display">
-      <div class="pin-dot filled" id="p0">●</div>
-      <div class="pin-dot filled" id="p1">●</div>
-      <div class="pin-dot filled" id="p2">●</div>
-      <div class="pin-dot filled" id="p3">●</div>
-      <div class="pin-dot filled" id="p4">●</div>
+      <div class="pin-dot" id="p0"></div>
+      <div class="pin-dot" id="p1"></div>
+      <div class="pin-dot" id="p2"></div>
+      <div class="pin-dot" id="p3"></div>
+      <div class="pin-dot" id="p4"></div>
     </div>
-    <div class="pin-numpad">
-      <button class="pin-btn" onclick="pinPress(&#39;1&#39;)">1</button>
-      <button class="pin-btn" onclick="pinPress(&#39;2&#39;)">2</button>
-      <button class="pin-btn" onclick="pinPress(&#39;3&#39;)">3</button>
-      <button class="pin-btn" onclick="pinPress(&#39;4&#39;)">4</button>
-      <button class="pin-btn" onclick="pinPress(&#39;5&#39;)">5</button>
-      <button class="pin-btn" onclick="pinPress(&#39;6&#39;)">6</button>
-      <button class="pin-btn" onclick="pinPress(&#39;7&#39;)">7</button>
-      <button class="pin-btn" onclick="pinPress(&#39;8&#39;)">8</button>
-      <button class="pin-btn" onclick="pinPress(&#39;9&#39;)">9</button>
-      <button class="pin-btn del" onclick="pinDel()">⌫</button>
-      <button class="pin-btn" onclick="pinPress(&#39;0&#39;)">0</button>
-      <button class="pin-btn enter" onclick="pinEnter()">✓</button>
+    <div class="pin-numpad" id="pin-numpad">
+      <button class="pin-btn" data-val="1">1</button>
+      <button class="pin-btn" data-val="2">2</button>
+      <button class="pin-btn" data-val="3">3</button>
+      <button class="pin-btn" data-val="4">4</button>
+      <button class="pin-btn" data-val="5">5</button>
+      <button class="pin-btn" data-val="6">6</button>
+      <button class="pin-btn" data-val="7">7</button>
+      <button class="pin-btn" data-val="8">8</button>
+      <button class="pin-btn" data-val="9">9</button>
+      <button class="pin-btn del" data-val="del">⌫</button>
+      <button class="pin-btn" data-val="0">0</button>
+      <button class="pin-btn enter" data-val="enter">✓</button>
     </div>
     <div class="login-error" id="login-err"></div>
   </div>
 </div>
 
 <!-- ── HEADER ── -->
-<header id="main-header" style="display: flex;">
+<header id="main-header" style="display:none">
   <div class="logo"><div class="logo-m">LR</div>LA ROCA COBRANZA</div>
   <div class="hright">
-    <span class="conn-dot on" id="conn-dot"></span>
-    <span id="conn-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)">Conectado</span>
+    <span class="conn-dot" id="conn-dot"></span>
+    <span id="conn-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)"></span>
     <button class="sync-btn" onclick="syncNow()">🔄 Sincronizar</button>
-    <div class="hdate" id="hdate">LUN, 18 MAY 2026</div>
+    <div class="hdate" id="hdate"></div>
     <div class="user-chip" id="user-chip" onclick="doLogout()">
-      <span id="user-lbl">👤 Administrador</span><span style="color:var(--text3);margin-left:2px">✕</span>
+      <span id="user-lbl">—</span><span style="color:var(--text3);margin-left:2px">✕</span>
     </div>
     <button class="btn btn-ghost btn-sm" id="back-btn" style="display:none" onclick="goHome()">↩ Inicio</button>
   </div>
 </header>
 
 <!-- ── HOME ── -->
-<div id="home-zone" style="display: block;">
+<div id="home-zone" style="display:none">
   <p class="home-eyebrow">Sistema de cobranza</p>
   <h1 class="home-title">Cartera <strong>La Roca</strong></h1>
   <p class="home-sub">Subí el PDF del día para actualizar la cartera. Las promesas se conservan siempre.</p>
 
-  <div id="role-note" class="role-note" style="background: var(--greenbg); color: var(--green); border: 1px solid rgba(26, 122, 60, 0.2); border-radius: 5px; padding: 9px 13px; font-family: var(--mono); font-size: 11px; margin-bottom: 16px;">👑 Administrador — acceso completo · Puede subir PDFs y borrar carteras</div>
+  <div id="role-note" class="role-note"></div>
 
   <div class="drop-zone" id="drop-zone" onclick="dropClick()">
     <span class="drop-icon">📄</span>
     <p class="drop-label" id="drop-label">Arrastrá el PDF aquí o hacé clic</p>
     <p class="drop-hint">Solo archivos .pdf del sistema</p>
-    <input type="file" id="file-input" accept=".pdf" multiple="">
+    <input type="file" id="file-input" accept=".pdf" multiple>
   </div>
-  <div class="prog-wrap" id="prog-wrap" style="display: none;">
-    <div class="prog-bg"><div class="prog-fill" id="prog-fill" style="width: 100%;"></div></div>
-    <p class="prog-lbl" id="prog-lbl">¡Listo!</p>
+  <div class="prog-wrap" id="prog-wrap">
+    <div class="prog-bg"><div class="prog-fill" id="prog-fill"></div></div>
+    <p class="prog-lbl" id="prog-lbl">Procesando...</p>
   </div>
   <div class="err-box" id="err-box"></div>
 
-  <div id="cart-list-section" style="display: block;">
+  <div id="cart-list-section" style="display:none">
     <div class="list-header">
       <span class="list-title">Carteras</span>
     </div>
-    <div id="cart-list"><div class="cart-item" onclick="openCartera(&#39;SU_MUEBLE&#39;)">
-      <div>
-        <div class="cart-name">Su Mueble</div>
-        <div class="cart-meta">Última carga: 18/05/2026 · 100 clientes · 0 promesas · 1 actualización(es)</div>
-      </div>
-      <div class="cart-actions">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MUEBLE&#39;)">🗑</button>
-      </div>
-    </div><div class="cart-item" onclick="openCartera(&#39;SU_MOTO_DANL•••&#39;)">
-      <div>
-        <div class="cart-name">Su Moto ( Danl••• )</div>
-        <div class="cart-meta">Última carga: 18/05/2026 · 72 clientes · 0 promesas · 1 actualización(es)</div>
-      </div>
-      <div class="cart-actions">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MOTO_DANL•••&#39;)">🗑</button>
-      </div>
-    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)">
-      <div>
-        <div class="cart-name">La Roca Motors ( La Libertad ) #2</div>
-        <div class="cart-meta">Última carga: 18/05/2026 · 64 clientes · 1 promesas · 1 actualización(es)</div>
-      </div>
-      <div class="cart-actions">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)">🗑</button>
-      </div>
-    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)">
-      <div>
-        <div class="cart-name">La Roca Motors ( Barrio Arriba ) #1</div>
-        <div class="cart-meta">Última carga: 18/05/2026 · 61 clientes · 0 promesas · 1 actualización(es)</div>
-      </div>
-      <div class="cart-actions">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)">🗑</button>
-      </div>
-    </div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_COMERCIAL_1&#39;)">
-      <div>
-        <div class="cart-name">La Roca Comercial #1</div>
-        <div class="cart-meta">Última carga: 18/05/2026 · 166 clientes · 1 promesas · 1 actualización(es)</div>
-      </div>
-      <div class="cart-actions">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_COMERCIAL_1&#39;)">🗑</button>
-      </div>
-    </div></div>
+    <div id="cart-list"></div>
   </div>
 </div>
 
@@ -468,7 +449,7 @@ tr:hover td { background: #f5f8ff; }
 <!-- ── MODAL ALERTA (Admin) ── -->
 <div class="overlay" id="modal-alerta">
   <div class="modal-card">
-    <button class="modal-x" onclick="document.getElementById(&#39;modal-alerta&#39;).classList.remove(&#39;show&#39;)">×</button>
+    <button class="modal-x" onclick="document.getElementById('modal-alerta').classList.remove('show')">×</button>
     <div class="modal-title">📣 Nueva alerta para el equipo</div>
     <div class="modal-sub">Todos los usuarios activos la verán y deben confirmar</div>
     <div class="form-row">
@@ -492,7 +473,7 @@ tr:hover td { background: #f5f8ff; }
       <input type="text" class="form-inp" id="a-cliente" placeholder="Nombre del cliente...">
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost" onclick="document.getElementById(&#39;modal-alerta&#39;).classList.remove(&#39;show&#39;)">Cancelar</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-alerta').classList.remove('show')">Cancelar</button>
       <button class="btn btn-primary" onclick="enviarAlerta()">📣 Enviar alerta</button>
     </div>
   </div>
@@ -503,7 +484,7 @@ tr:hover td { background: #f5f8ff; }
   <div class="modal-card">
     <button class="modal-x" onclick="closeModal()">×</button>
     <div class="modal-title" id="modal-cliente">—</div>
-    <div class="modal-sub" id="modal-info">—</div>
+    <div class="modal-sub"  id="modal-info">—</div>
     <div class="form-row">
       <label class="form-lbl">Estado</label>
       <select class="form-inp" id="p-estado" onchange="togglePromesaFields()">
@@ -535,18 +516,23 @@ tr:hover td { background: #f5f8ff; }
 </div>
 
 <!-- ── SCRIPTS ── -->
-<script src="./index_files/pdf.min.js"></script>
-<script src="./index_files/supabase-js@2"></script>
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 // Show login screen on load
 window.addEventListener('load', function() {
+  // ALWAYS start with PIN screen - never skip it
+  // This prevents freeze and confusion when session is stale
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('main-header').style.display  = 'none';
   document.getElementById('home-zone').style.display    = 'none';
   document.getElementById('dash-zone').style.display    = 'none';
+  // Clear any stale session to force fresh PIN entry
+  // session already cleared on load
+  initPinPad();
 });
 
 // ── AUTO-SYNC cada 3 segundos ──
@@ -653,6 +639,25 @@ document.getElementById('hdate').textContent =
 // ══════════════════════════════════════════
 var pinVal = '';
 
+// Handle PIN numpad - works on both desktop and mobile/PWA
+function initPinPad() {
+  var pad = document.getElementById('pin-numpad');
+  if (!pad) return;
+  function handlePin(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var btn = e.target.closest('[data-val]');
+    if (!btn) return;
+    var val = btn.getAttribute('data-val');
+    if      (val === 'del')   pinDel();
+    else if (val === 'enter') pinEnter();
+    else                      pinPress(val);
+  }
+  // Both click and touchend for maximum compatibility
+  pad.addEventListener('click',    handlePin, {passive:false});
+  pad.addEventListener('touchend', handlePin, {passive:false});
+}
+
 function pinPress(d) {
   if (pinVal.length >= 5) return;
   pinVal += d;
@@ -689,7 +694,8 @@ function doLogout() {
   // Remove admin alert button
   var btn = document.getElementById('alert-admin-btn');
   if (btn) btn.parentNode.removeChild(btn);
-  // Reset shown alerts for next session
+  // Clear session
+  // session already cleared on load
   shownAlerts = {};
   USER=null; CARTERAS={}; PROMESAS={}; CURRENT=null;
   // Reset PIN
@@ -713,8 +719,9 @@ async function initApp() {
   setConn(null,'Conectando...');
   try {
     // Load carteras
-    const { data: carts, error: ce } = await supa.from('carteras').select('*');
-    if (ce) throw ce;
+    var { data: carts, error: ce } = await supa.from('carteras').select('*');
+    if (ce) { console.error('Load carteras error:', ce); throw ce; }
+    console.log('Loaded', (carts||[]).length, 'carteras from Supabase');
     CARTERAS = {};
     carts.forEach(c => {
       CARTERAS[c.id] = {
@@ -765,19 +772,32 @@ function setConn(ok, lbl) {
 // SUPABASE — GUARDADO
 // ══════════════════════════════════════════
 async function dbSaveCartera(id) {
-  if (!DB_OK) return;
-  const c = CARTERAS[id];
-  if (!c) return;
+  if (!DB_OK) { console.warn('DB not ready - cannot save cartera'); return; }
+  var c = CARTERAS[id];
+  if (!c) { console.warn('Cartera not found:', id); return; }
   try {
-    await supa.from('carteras').upsert({
-      id, empresa: c.empresa,
+    var payload = {
+      id: id,
+      empresa: c.empresa,
       fecha_emision: c.fecha_emision,
       clientes: c.clientes,
       load_history: c.load_history||[],
-      prev_saldos: c.prev_saldos||{},
       updated_at: new Date().toISOString()
-    },{onConflict:'id'});
-  } catch(e){ console.warn('saveCartera',e); }
+    };
+    console.log('Saving cartera to Supabase:', id);
+    var result = await supa.from('carteras').upsert(payload, {onConflict:'id'});
+    if (result.error) {
+      console.error('Supabase save error:', result.error);
+      showErr('Error guardando cartera: ' + result.error.message);
+    } else {
+      console.log('Cartera saved OK:', id);
+      setConn(true, 'Guardado ✓');
+      setTimeout(function(){ setConn(true,'Conectado'); }, 2000);
+    }
+  } catch(e){ 
+    console.error('saveCartera exception:', e);
+    showErr('Error: ' + e.message);
+  }
 }
 
 async function dbSavePromesa(cartId, nombre) {
@@ -1058,12 +1078,40 @@ async function processPDF(file) {
     // Update load history
     const hist = [...new Set([...(CARTERAS[id]?.load_history||[]), data.fecha_emision])].slice(-60);
 
-    CARTERAS[id] = { ...data, id, load_history:hist, prev_saldos:{} };
-    // Store current saldos as prev for next load
-    data.clientes.forEach(c=>{ CARTERAS[id].prev_saldos[c.nombre]=c.saldo; });
+    // Store prev saldos in memory only (not in Supabase)
+    var prevSaldosMemory = {};
+    data.clientes.forEach(function(c){ prevSaldosMemory[c.nombre]=c.saldo; });
+    CARTERAS[id] = { ...data, id, load_history:hist, prev_saldos: prevSaldosMemory };
 
     await dbSaveCartera(id);
+    await saveSnapshot(id);
   } catch(e) { showErr('Error: '+e.message); console.error(e); }
+}
+
+async function saveSnapshot(cartId) {
+  if (!DB_OK) return;
+  const c = CARTERAS[cartId];
+  if (!c || !c.clientes) return;
+  try {
+    // Count clients per tramo
+    const tramos = {MES:0, VENCIDO:0, '60':0, '90':0, '120':0, '150':0, INACTIVO:0};
+    const clientesPorTramo = {MES:[], VENCIDO:[], '60':[], '90':[], '120':[], '150':[], INACTIVO:[]};
+    c.clientes.forEach(cl => {
+      const t = cl.tramo || 'MES';
+      if (tramos[t] !== undefined) {
+        tramos[t]++;
+        clientesPorTramo[t].push({ nombre: cl.nombre, saldo: cl.saldo, cuota: cl.cuota });
+      }
+    });
+    await supa.from('snapshots').insert({
+      cartera_id: cartId,
+      fecha: c.fecha_emision || HOY.toLocaleDateString('es-HN'),
+      tramos,
+      clientes_por_tramo: clientesPorTramo,
+      created_at: new Date().toISOString()
+    });
+    console.log('Snapshot saved for', cartId);
+  } catch(e) { console.warn('saveSnapshot error', e); }
 }
 
 function getCanonicalId(empresa) {
@@ -1211,6 +1259,7 @@ function renderDash(id) {
     {id:'CAL',     lbl:'🗓 Calendario'},
     {id:'MSG',     lbl:'💬 WhatsApp'},
     {id:'ACT',     lbl:'📋 Plan del día'},
+    {id:'ECG',     lbl:'📈 Pulso de cartera'},
   ];
 
   document.getElementById('tabs-row').innerHTML=TABS.map((t,i)=>
@@ -1228,6 +1277,7 @@ function renderDash(id) {
     else if (t.id==='PROMESAS_TAB') d.innerHTML=buildPromeTab(id,cl);
     else if (t.id==='MSG')          d.innerHTML=buildMsg(id,G);
     else if (t.id==='ACT')          d.innerHTML=buildAct(G);
+    else if (t.id==='ECG')          { d.innerHTML='<div class="empty">Cargando pulso...</div>'; buildECG(cartId, d); }
     else if (t.id==='PAGARON')      d.innerHTML=buildPagaron(id,G.PAGARON);
     else                             d.innerHTML=buildTbl(id,G[t.id]||[],t.cls||'b-gray',t.note||'');
     tc.appendChild(d);
@@ -1435,11 +1485,18 @@ function buildPromeTab(cartId,cl) {
     const pa=PROMESAS[cartId+'::'+a.nombre],pb=PROMESAS[cartId+'::'+b.nombre];
     return (pa.fecha||'').localeCompare(pb.fecha||'');
   });
-  return `<div class="tbl-wrap"><table>
+  const adminBtns = USER?.rol==='admin' ? `
+    <div style="margin-bottom:10px">
+      <button class="btn btn-red btn-sm" onclick="borrarTodasPromesas('${cartId}')">🗑️ Borrar todas las promesas</button>
+    </div>` : '';
+  return adminBtns + `<div class="tbl-wrap"><table>
     <thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Estado</th><th>Fecha</th><th>Monto</th><th>Nota</th><th></th></tr></thead>
     <tbody>
       ${sorted.map((r,i)=>{
         const p=PROMESAS[cartId+'::'+r.nombre];
+        const delBtn = USER?.rol==='admin'
+          ? `<button class="btn btn-red btn-sm" style="font-size:10px;padding:2px 7px" onclick="borrarPromesa('${cartId}','${esc(r.nombre)}')">🗑</button>`
+          : '';
         return `<tr>
           <td class="mono">${i+1}</td>
           <td class="td-name">${r.nombre}</td>
@@ -1449,12 +1506,38 @@ function buildPromeTab(cartId,cl) {
           <td class="mono">${p.fecha||'—'}</td>
           <td class="mono">${p.monto?'L '+fmt(p.monto):'—'}</td>
           <td style="max-width:150px;white-space:normal;font-size:11px;color:var(--text2)">${p.nota||'—'}</td>
-          <td><span class="add-p" onclick="openModal('${cartId}','${esc(r.nombre)}',${r.cuota},${r.saldo})">✏️</span></td>
+          <td style="display:flex;gap:4px">
+            <span class="add-p" onclick="openModal('${cartId}','${esc(r.nombre)}',${r.cuota},${r.saldo})">✏️</span>
+            ${delBtn}
+          </td>
         </tr>`;
       }).join('')}
     </tbody>
   </table></div>`;
 }
+
+async function borrarPromesa(cartId, nombre) {
+  if (!confirm('¿Borrar la promesa de ' + nombre + '?')) return;
+  const key = cartId+'::'+nombre;
+  delete PROMESAS[key];
+  await dbSavePromesa(cartId, nombre);
+  if (CURRENT) renderDash(CURRENT);
+}
+
+async function borrarTodasPromesas(cartId) {
+  if (!confirm('¿Borrar TODAS las promesas de esta cartera?\nEsta acción no se puede deshacer.')) return;
+  const keys = Object.keys(PROMESAS).filter(k=>k.startsWith(cartId+'::'));
+  keys.forEach(k=>{ delete PROMESAS[k]; });
+  if (DB_OK) {
+    try {
+      await supa.from('promesas').delete().eq('cartera_id', cartId);
+      setConn(true,'Promesas borradas ✓');
+      setTimeout(()=>setConn(true,'Conectado'), 2000);
+    } catch(e) { console.error('Error borrando promesas:', e); }
+  }
+  if (CURRENT) renderDash(CURRENT);
+}
+
 
 // ══════════════════════════════════════════
 // CALENDAR
@@ -1737,6 +1820,175 @@ function exportCSV(){
 }
 
 // ══════════════════════════════════════════
+// ECG — PULSO DE CARTERA
+// ══════════════════════════════════════════
+const TRAMOS_ECG = [
+  { id:'VENCIDO', label:'Este mes', color:'#e87030' },
+  { id:'60',      label:'60 días',  color:'#e8a830' },
+  { id:'90',      label:'90 días',  color:'#e86030' },
+  { id:'120',     label:'120 días', color:'#e84040' },
+  { id:'150',     label:'150 días', color:'#b01020' },
+];
+
+var ECG_DATA = {}; // Global store for ECG point data
+
+async function buildECG(cartId, container) {
+  try {
+    const { data: snapsRaw, error } = await supa.from('snapshots')
+      .select('*')
+      .eq('cartera_id', cartId)
+      .limit(60);
+
+    // Sort by actual date (DD/MM/YYYY) chronologically
+    const snaps = (snapsRaw||[]).sort((a,b)=>{
+      const pa = (a.fecha||'').split('/');
+      const pb = (b.fecha||'').split('/');
+      const da = pa.length===3 ? new Date(+pa[2],+pa[1]-1,+pa[0]) : new Date(a.created_at);
+      const db = pb.length===3 ? new Date(+pb[2],+pb[1]-1,+pb[0]) : new Date(b.created_at);
+      return da - db;
+    });
+
+    // Remove duplicate dates - keep latest for same fecha
+    const seen = {};
+    const uniqueSnaps = [];
+    snaps.forEach(s => {
+      seen[s.fecha] = s; // last one wins
+    });
+    Object.values(seen).sort((a,b)=>{
+      const pa=(a.fecha||'').split('/'), pb=(b.fecha||'').split('/');
+      const da=pa.length===3?new Date(+pa[2],+pa[1]-1,+pa[0]):new Date(a.created_at);
+      const db=pb.length===3?new Date(+pb[2],+pb[1]-1,+pb[0]):new Date(b.created_at);
+      return da-db;
+    }).forEach(s=>uniqueSnaps.push(s));
+
+    // Use uniqueSnaps as the working set
+    if (error || uniqueSnaps.length < 2) {
+
+      container.innerHTML = `<div class="empty">
+        📊 Sube al menos 2 PDFs para ver el pulso de la cartera.<br>
+        <span style="font-size:11px;color:var(--text3)">Cada carga genera un punto en la gráfica.</span>
+      </div>`;
+      return;
+    }
+    // Use uniqueSnaps for all rendering
+    const finalSnaps = uniqueSnaps;
+
+    let html = '';
+
+    // Build one ECG per tramo
+    TRAMOS_ECG.forEach(tr => {
+      const vals = finalSnaps.map(s => ({ 
+        fecha: s.fecha, 
+        count: (s.tramos && s.tramos[tr.id]) || 0,
+        clientes: (s.clientes_por_tramo && s.clientes_por_tramo[tr.id]) || []
+      }));
+
+      const maxVal = Math.max(...vals.map(v => v.count), 1);
+      const minVal = 0;
+      const W = 600, H = 80, PAD = 30;
+      const stepX = vals.length > 1 ? (W - PAD*2) / (vals.length - 1) : W - PAD*2;
+
+      // Calculate trend
+      const first = vals[0].count;
+      const last  = vals[vals.length-1].count;
+      const trend = last > first ? 'up' : last < first ? 'down' : 'flat';
+      const trendLabel = trend==='up' ? `📈 +${last-first} clientes` : trend==='down' ? `📉 -${first-last} clientes` : '➡️ Sin cambio';
+      const trendClass = trend;
+
+      // Build SVG path
+      const points = vals.map((v, i) => {
+        const x = PAD + i * stepX;
+        const y = H - PAD - ((v.count - minVal) / (maxVal - minVal || 1)) * (H - PAD*2);
+        return { x, y, ...v };
+      });
+
+      // Gradient fill
+      const pathD = points.map((p,i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+      const fillD = pathD + ` L${points[points.length-1].x.toFixed(1)},${H} L${PAD},${H} Z`;
+
+      // Color based on trend and value
+      const lineColor = trend==='up' ? '#e84040' : trend==='down' ? '#22a050' : '#e8a830';
+      const fillColor = trend==='up' ? 'rgba(232,64,64,0.08)' : trend==='down' ? 'rgba(34,160,80,0.08)' : 'rgba(232,168,48,0.08)';
+
+      html += `<div class="ecg-wrap">
+        <div class="ecg-title">
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="width:12px;height:12px;border-radius:50%;background:${tr.color};display:inline-block"></span>
+            Mora <strong>${tr.label}</strong>
+          </span>
+          <span class="ecg-status ${trendClass}">${trendLabel}</span>
+        </div>
+        <svg class="ecg-svg" viewBox="0 0 ${W} ${H}" style="height:${H}px">
+          <defs>
+            <linearGradient id="g${tr.id}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- Fill area -->
+          <path d="${fillD}" fill="url(#g${tr.id})"/>
+          <!-- Line -->
+          <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <!-- Grid lines -->
+          ${[0,1,2].map(i=>{
+            const y = H - PAD - (i/2)*(H-PAD*2);
+            const val = Math.round(minVal + (i/2)*(maxVal-minVal));
+            return `<line x1="${PAD}" y1="${y.toFixed(1)}" x2="${W-PAD}" y2="${y.toFixed(1)}" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+                    <text x="${PAD-4}" y="${(y+4).toFixed(1)}" font-size="9" fill="rgba(0,0,0,0.3)" text-anchor="end" font-family="monospace">${val}</text>`;
+          }).join('')}
+          <!-- Points and labels -->
+          ${points.map((p, i) => {
+            const prev = i > 0 ? points[i-1].count : p.count;
+            const diff = p.count - prev;
+            const dotColor = i===0 ? lineColor : diff>0 ? '#e84040' : diff<0 ? '#22a050' : '#e8a830';
+            const uid = `ecg_${tr.id}_${i}`;
+            // Store data in global for safe onclick reference
+            const ecgKey = cartId+'_'+tr.id+'_'+i;
+            ECG_DATA[ecgKey] = { fecha: p.fecha, count: p.count, clientes: p.clientes };
+            return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" 
+              fill="${dotColor}" stroke="white" stroke-width="2"
+              style="cursor:pointer"
+              onclick="showSnapDetail('${ecgKey}','${tr.id}')"/>
+            <text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" font-size="9" fill="${dotColor}" text-anchor="middle" font-family="monospace" font-weight="bold">${p.count}</text>
+            <text x="${p.x.toFixed(1)}" y="${(H-8).toFixed(1)}" font-size="8" fill="rgba(0,0,0,0.4)" text-anchor="middle" font-family="monospace">${p.fecha.substring(0,5)}</text>`;
+          }).join('')}
+        </svg>
+        <div id="snap_${tr.id}" class="snap-detail" style="display:none"></div>
+      </div>`;
+    });
+
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = `<div class="empty">Error cargando datos: ${e.message}</div>`;
+    console.error('buildECG error:', e);
+  }
+}
+
+function showSnapDetail(ecgKey, tramoId) {
+  const data = ECG_DATA[ecgKey];
+  if (!data) return;
+  const detailEl = document.getElementById('snap_' + tramoId);
+  if (!detailEl) return;
+
+  if (detailEl.style.display !== 'none' && detailEl.dataset.key === ecgKey) {
+    detailEl.style.display = 'none';
+    return;
+  }
+  detailEl.dataset.key = ecgKey;
+  detailEl.style.display = 'block';
+
+  const clientes = data.clientes || [];
+  const clientesList = clientes.length > 0
+    ? clientes.map(c => `<span class="snap-client entro">${c.nombre} — L ${fmt(c.saldo||0)}</span>`).join('')
+    : '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin clientes en este tramo</span>';
+
+  detailEl.innerHTML = `
+    <div class="snap-detail-title">📅 ${data.fecha} — ${data.count} cliente${data.count!==1?'s':''} en este tramo</div>
+    <div class="snap-client-list">${clientesList}</div>
+  `;
+}
+
+// ══════════════════════════════════════════
 // ALERTAS
 // ══════════════════════════════════════════
 var lastAlertCheck = new Date().toISOString();
@@ -1887,6 +2139,5 @@ function flt(tid,sid){
   });
 }
 </script>
-
-
-<button id="alert-admin-btn" class="btn btn-primary btn-sm" style="position: fixed; bottom: 20px; left: 20px; z-index: 500; box-shadow: var(--shadow2); font-size: 12px;">📣 Enviar alerta</button></body></html>
+</body>
+</html>
