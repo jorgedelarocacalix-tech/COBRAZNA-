@@ -1837,7 +1837,7 @@ async function buildECG(cartId, container) {
     const { data: snapsRaw, error } = await supa.from('snapshots')
       .select('*')
       .eq('cartera_id', cartId)
-      .limit(60);
+      .limit(250);
 
     // Sort by actual date (DD/MM/YYYY) chronologically
     const snaps = (snapsRaw||[]).sort((a,b)=>{
