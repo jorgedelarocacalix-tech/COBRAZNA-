@@ -719,7 +719,7 @@ async function initApp() {
   setConn(null,'Conectando...');
   try {
     // Load carteras
-    var { data: carts, error: ce } = await supa.from('carteras').select('*');
+    var { data: carts, error: ce } = await supa.from('carteras').select('*').range(0, 4000);
     if (ce) { console.error('Load carteras error:', ce); throw ce; }
     console.log('Loaded', (carts||[]).length, 'carteras from Supabase');
     CARTERAS = {};
