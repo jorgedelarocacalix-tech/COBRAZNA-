@@ -292,6 +292,28 @@ tr:hover td { background: #f5f8ff; }
 .copy-btn { margin-top: 4px; font-family: var(--mono); font-size: 10px; color: var(--text3); background: transparent; border: none; cursor: pointer; transition: color .15s; }
 .copy-btn:hover { color: var(--green); }
 
+/* HISTORIAL */
+.hist-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; box-shadow: var(--shadow); }
+.hist-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+.hist-item:last-child { border-bottom: none; }
+.hist-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
+.hist-icon.promesa  { background: var(--purplebg); }
+.hist-icon.pago     { background: var(--greenbg); }
+.hist-icon.visita   { background: var(--bluebg); }
+.hist-icon.abono    { background: var(--amberbg); }
+.hist-icon.nota     { background: var(--bg4); }
+.hist-body { flex: 1; }
+.hist-title { font-size: 13px; font-weight: 500; }
+.hist-meta  { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
+.hist-nota  { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+/* VISITA AGENDA */
+.visita-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.visita-name { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.visita-meta { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+.visita-dates { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.visita-date { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--bluebg); color: var(--blue); }
+
 /* ECG CHART */
 .ecg-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
 .ecg-title { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
@@ -479,6 +501,44 @@ tr:hover td { background: #f5f8ff; }
   </div>
 </div>
 
+<!-- ── MODAL HISTORIAL ── -->
+<div class="overlay" id="modal-hist">
+  <div class="modal-card">
+    <button class="modal-x" onclick="document.getElementById('modal-hist').classList.remove('show')">×</button>
+    <div class="modal-title" id="hist-cliente-nombre">—</div>
+    <div class="modal-sub"  id="hist-cliente-info">Registrar acción</div>
+    <div class="form-row">
+      <label class="form-lbl">Tipo de acción</label>
+      <select class="form-inp" id="h-tipo" onchange="toggleHistFields()">
+        <option value="promesa">📅 Nueva promesa de pago</option>
+        <option value="posponer">⏭ Posponer promesa</option>
+        <option value="pago">✅ Registrar pago</option>
+        <option value="abono">💰 Abono parcial</option>
+        <option value="visita_agenda">🗓 Agendar visita</option>
+        <option value="visita_realizada">🚗 Marcar visita realizada</option>
+        <option value="no_contesta">📵 No contesta</option>
+        <option value="nota">📝 Nota general</option>
+      </select>
+    </div>
+    <div class="form-row" id="h-row-fecha">
+      <label class="form-lbl" id="h-fecha-lbl">Fecha</label>
+      <input type="date" class="form-inp" id="h-fecha">
+    </div>
+    <div class="form-row" id="h-row-monto">
+      <label class="form-lbl">Monto (L)</label>
+      <input type="number" class="form-inp" id="h-monto" placeholder="0.00">
+    </div>
+    <div class="form-row">
+      <label class="form-lbl">Nota</label>
+      <input type="text" class="form-inp" id="h-nota" placeholder="Observaciones...">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-hist').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveHistorial()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── MODAL PROMESA ── -->
 <div class="overlay" id="modal-overlay">
   <div class="modal-card">
@@ -516,22 +576,28 @@ tr:hover td { background: #f5f8ff; }
 </div>
 
 <!-- ── SCRIPTS ── -->
-<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+// Placeholder - libraries loaded dynamically below
 
 // Show login screen on load
-window.addEventListener('load', function() {
-  // ALWAYS start with PIN screen - never skip it
-  // This prevents freeze and confusion when session is stale
+window.addEventListener('load', async function() {
+  // Load PDF.js and Supabase dynamically for reliability on GitHub/Netlify
+  await loadLibraries();
+
+  // Init Supabase after libraries load
+  if (typeof supabase !== 'undefined') {
+    supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+    console.log('Supabase client initialized');
+  } else {
+    console.error('Supabase library not available');
+  }
+
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('main-header').style.display  = 'none';
   document.getElementById('home-zone').style.display    = 'none';
   document.getElementById('dash-zone').style.display    = 'none';
-  // Clear any stale session to force fresh PIN entry
-  // session already cleared on load
+  try { localStorage.removeItem('lr_session'); } catch(e) {}
   initPinPad();
 });
 
@@ -606,7 +672,7 @@ function stopAutoSync() {
 // ══════════════════════════════════════════
 var SUPA_URL = 'https://ixskgawbpwwxdjnkiixt.supabase.co';
 var SUPA_KEY = 'sb_publishable_-JUaSYPPkq8n4wJIKPtXGw_XMyj3EE7';
-var supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+var supa = null; // initialized after libraries load
 
 // USUARIOS — Para agregar: 'codigo': { nombre, rol, carteras[] }
 // rol 'admin'    → sube PDFs, ve todo, borra
@@ -624,7 +690,8 @@ var HOY = new Date(); HOY.setHours(0,0,0,0);
 var USER     = null;
 var CARTERAS = {};
 var PROMESAS = {};
-var CURRENT  = null;
+var CURRENT     = null;
+var CURRENT_TAB = null;
 var DB_OK    = false;
 var CAL_Y    = HOY.getFullYear();
 var CAL_M    = HOY.getMonth();
@@ -719,7 +786,7 @@ async function initApp() {
   setConn(null,'Conectando...');
   try {
     // Load carteras
-    var { data: carts, error: ce } = await supa.from('carteras').select('*').range(0, 4000);
+    var { data: carts, error: ce } = await supa.from('carteras').select('*');
     if (ce) { console.error('Load carteras error:', ce); throw ce; }
     console.log('Loaded', (carts||[]).length, 'carteras from Supabase');
     CARTERAS = {};
@@ -772,7 +839,7 @@ function setConn(ok, lbl) {
 // SUPABASE — GUARDADO
 // ══════════════════════════════════════════
 async function dbSaveCartera(id) {
-  if (!DB_OK) { console.warn('DB not ready - cannot save cartera'); return; }
+  if (!supa) { console.warn('DB not ready - cannot save cartera'); return; }
   var c = CARTERAS[id];
   if (!c) { console.warn('Cartera not found:', id); return; }
   try {
@@ -801,7 +868,7 @@ async function dbSaveCartera(id) {
 }
 
 async function dbSavePromesa(cartId, nombre) {
-  if (!DB_OK) return;
+  if (!supa) return;
   const key = cartId+'::'+nombre;
   const p   = PROMESAS[key];
   try {
@@ -1060,17 +1127,33 @@ async function processPDF(file) {
 
       data.clientes.forEach(c => {
         const prevSaldo = prevSaldos[c.nombre];
-        const key = id+'::'+c.nombre;
+        const key  = id+'::'+c.nombre;
         const prom = PROMESAS[key];
-        if (prom && prevSaldo!==undefined && c.saldo < prevSaldo) {
-          // Client paid (saldo went down) → clear promesa
-          delete PROMESAS[key];
-          dbSavePromesa(id, c.nombre); // delete from Supabase
-        }
-        // If client has mora_pendiente but now saldo is lower → also clear
-        if (prom?.mora_pendiente && prevSaldo!==undefined && c.saldo < prevSaldo) {
-          delete PROMESAS[key];
-          dbSavePromesa(id, c.nombre);
+        if (prevSaldo!==undefined && c.saldo < prevSaldo) {
+          const abonado  = prevSaldo - c.saldo;
+          const cuota    = c.cuota || 0;
+          // Log payment to historial
+          const tipo = c.saldo === 0 ? 'pago' : abonado >= cuota*0.9 ? 'pago' : 'abono';
+          supa.from('historial_clientes').insert({
+            cartera_id: id, cliente_nombre: c.nombre,
+            tipo, monto: abonado,
+            nota: tipo==='pago' ? 'Pago detectado automáticamente al subir PDF' : `Abono parcial de L ${fmt(abonado)} (cuota: L ${fmt(cuota)})`,
+            fecha_accion: HOY.toISOString().split('T')[0],
+            gestor: 'Sistema',
+            created_at: new Date().toISOString()
+          }).then(()=>{}).catch(()=>{});
+
+          if (prom) {
+            if (tipo === 'pago') {
+              // Paid full cuota → mark as paid, keep for reference
+              PROMESAS[key] = { ...prom, estado:'pago', ts: new Date().toISOString() };
+              dbSavePromesa(id, c.nombre);
+            } else {
+              // Partial payment → keep promesa active, add note
+              PROMESAS[key] = { ...prom, nota: `Abonó L ${fmt(abonado)} — quedan L ${fmt(c.saldo)}`, ts: new Date().toISOString() };
+              dbSavePromesa(id, c.nombre);
+            }
+          }
         }
       });
     }
@@ -1089,7 +1172,7 @@ async function processPDF(file) {
 }
 
 async function saveSnapshot(cartId) {
-  if (!DB_OK) return;
+  if (!supa) return;
   const c = CARTERAS[cartId];
   if (!c || !c.clientes) return;
   try {
@@ -1185,959 +1268,3 @@ function getVisibles() {
     });
   });
 }
-
-function openCartera(id) {
-  if (!CARTERAS[id]) return;
-  CURRENT=id;
-  document.getElementById('home-zone').style.display='none';
-  document.getElementById('dash-zone').style.display='block';
-  document.getElementById('back-btn').style.display='inline-block';
-  renderDash(id);
-}
-function goHome() { CURRENT=null; renderHome(); }
-
-async function delCart(id) {
-  if (!confirm('¿Eliminar esta cartera y todas sus promesas?')) return;
-  delete CARTERAS[id];
-  Object.keys(PROMESAS).forEach(k=>{ if(k.startsWith(id+'::')) delete PROMESAS[k]; });
-  if (DB_OK) {
-    await supa.from('promesas').delete().eq('cartera_id',id);
-    await supa.from('carteras').delete().eq('id',id);
-  }
-  renderHome();
-}
-
-// ══════════════════════════════════════════
-// DASHBOARD
-// ══════════════════════════════════════════
-function renderDash(id) {
-  const data=CARTERAS[id]; if(!data) return;
-  const cl=data.clientes;
-
-  document.getElementById('dash-empresa').innerHTML=`<span>${data.empresa}</span>`;
-  document.getElementById('dash-meta').textContent=
-    `Emisión: ${data.fecha_emision} · Hoy: ${HOY.toLocaleDateString('es-HN')} · ${cl.length} clientes`;
-
-  // Group clients
-  const G={MES:[],VENCIDO:[],60:[],90:[],120:[],150:[],INACTIVO:[],PAGARON:[]};
-  cl.forEach(c=>{
-    const prom=PROMESAS[id+'::'+c.nombre];
-    const pagado=pagoEsteMes(c.ultimo_pago)&&!prom?.mora_pendiente;
-    if (pagado) { G.PAGARON.push(c); return; }
-    const t=c.tramo||'MES';
-    if (G[t]) G[t].push(c);
-    else G.MES.push(c);
-  });
-
-  const activos=cl.filter(c=>c.tramo!=='INACTIVO');
-  const sAct=activos.reduce((s,c)=>s+(c.saldo||0),0);
-  const nProm=cl.filter(c=>PROMESAS[id+'::'+c.nombre]?.estado==='promesa').length;
-
-  // KPIs
-  document.getElementById('kpi-row').innerHTML=[
-    {l:'Clientes',    v:cl.length,           s:'Total',          c:'color:var(--text)'},
-    {l:'Saldo activo',v:'L '+fmt(sAct),       s:'A cobrar',       c:'color:var(--blue)'},
-    {l:'Vencidos hoy',v:G.VENCIDO.length,     s:'Cobrar hoy',     c:'color:var(--orange)'},
-    {l:'Pagaron',     v:G.PAGARON.length,      s:'Este mes',       c:'color:var(--green)'},
-    {l:'Promesas',    v:nProm,                 s:'Comprometidos',  c:'color:var(--purple)'},
-    {l:'Mora 60-90d', v:G[60].length+G[90].length, s:'Llamar',    c:'color:var(--amber)'},
-    {l:'Mora 120-150d',v:G[120].length+G[150].length,s:'Visitar', c:'color:var(--red)'},
-    {l:'Inactivos',   v:G.INACTIVO.length,     s:'+180 días',      c:'color:var(--text3)'},
-  ].map(k=>`<div class="kpi-card"><div class="kpi-l">${k.l}</div><div class="kpi-v" style="${k.c}">${k.v}</div><div class="kpi-s">${k.s}</div></div>`).join('');
-
-  const TABS=[
-    {id:'HOY',     lbl:`📅 Hoy (${G.VENCIDO.length+G.MES.filter(c=>c.dia_pago===HOY.getDate()).length})`},
-    {id:'VENCIDO', lbl:`🟠 Este mes (${G.VENCIDO.length})`,     cls:'b-orange', note:'Día de pago ya pasó este mes y no han pagado. Llamar hoy.'},
-    {id:'MES',     lbl:`🟢 Al día (${G.MES.length})`,           cls:'b-green',  note:'Cuota corriente. Solo recordatorio.'},
-    {id:'60',      lbl:`🟡 60d (${G[60].length})`,              cls:'b-amber',  note:'1-2 meses. Llamar esta semana.'},
-    {id:'90',      lbl:`🟠 90d (${G[90].length})`,              cls:'b-orange', note:'2-3 meses. Llamada firme + visita.'},
-    {id:'120',     lbl:`🔴 120d (${G[120].length})`,            cls:'b-red',    note:'3-4 meses. Visita campo urgente.'},
-    {id:'150',     lbl:`⛔ 150d (${G[150].length})`,            cls:'b-red2',   note:'4-6 meses. Negociación urgente.'},
-    {id:'INACTIVO',lbl:`⚫ +180d (${G.INACTIVO.length})`,       cls:'b-gray',   note:'Más de 180 días. Gestión legal.'},
-    {id:'PAGARON', lbl:`✅ Pagaron (${G.PAGARON.length})`,      cls:'b-green',  note:'Abonaron este mes.'},
-    {id:'PROMESAS_TAB',lbl:`🟣 Promesas (${nProm})`},
-    {id:'CAL',     lbl:'🗓 Calendario'},
-    {id:'MSG',     lbl:'💬 WhatsApp'},
-    {id:'ACT',     lbl:'📋 Plan del día'},
-    {id:'ECG',     lbl:'📈 Pulso de cartera'},
-  ];
-
-  document.getElementById('tabs-row').innerHTML=TABS.map((t,i)=>
-    `<button class="tab-btn${i===0?' on':''}" onclick="swTab('${t.id}',this)">${t.lbl}</button>`
-  ).join('');
-
-  const tc=document.getElementById('tabs-content');
-  tc.innerHTML='';
-  TABS.forEach((t,i)=>{
-    const d=document.createElement('div');
-    d.className='tab-pane'+(i===0?' on':'');
-    d.id='tp-'+t.id;
-    if      (t.id==='HOY')          d.innerHTML=buildHoy(id,cl,G);
-    else if (t.id==='CAL')          d.innerHTML=buildCal(id,cl);
-    else if (t.id==='PROMESAS_TAB') d.innerHTML=buildPromeTab(id,cl);
-    else if (t.id==='MSG')          d.innerHTML=buildMsg(id,G);
-    else if (t.id==='ACT')          d.innerHTML=buildAct(G);
-    else if (t.id==='ECG')          { d.innerHTML='<div class="empty">Cargando pulso...</div>'; buildECG(cartId, d); }
-    else if (t.id==='PAGARON')      d.innerHTML=buildPagaron(id,G.PAGARON);
-    else                             d.innerHTML=buildTbl(id,G[t.id]||[],t.cls||'b-gray',t.note||'');
-    tc.appendChild(d);
-  });
-}
-
-function swTab(id,btn){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
-  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
-  btn.classList.add('on');
-  document.getElementById('tp-'+id)?.classList.add('on');
-}
-
-// ══════════════════════════════════════════
-// HOY — acumulativo
-// ══════════════════════════════════════════
-function buildHoy(cartId,cl,G) {
-  const hoyD=HOY.getDate();
-  const todStr=HOY.toISOString().split('T')[0];
-
-  // Helper: did client pay this month and no mora_pendiente?
-  const yaPagoOk = c => pagoEsteMes(c.ultimo_pago) && !PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente;
-
-  // Pagan HOY: dia_pago === hoy y no han pagado este mes
-  const paganHoy=cl.filter(c=>{
-    if (c.tramo==='INACTIVO') return false;
-    if (c.dia_pago!==hoyD) return false;
-    return !yaPagoOk(c);
-  });
-
-  // ACUMULADOS: cualquier cliente que debía pagar antes de hoy este mes y NO ha pagado
-  // Incluye: clientes con dia_pago < hoyD Y tramo VENCIDO/60/90/120/150
-  // También incluye clientes cuyo último pago fue el mes pasado o antes
-  const acum=cl.filter(c=>{
-    if (c.tramo==='INACTIVO') return false;
-    if (yaPagoOk(c)) return false; // ya pagó este mes correctamente
-    if (c.dia_pago===hoyD) return false; // estos van en paganHoy
-
-    // Caso 1: tiene dia_pago registrado y ya pasó este mes
-    if (c.dia_pago>0 && c.dia_pago<hoyD) return true;
-
-    // Caso 2: tramo VENCIDO (calculado por el parser) - siempre mostrar
-    if (c.tramo==='VENCIDO') return true;
-
-    // Caso 3: mora 60/90/120/150 - su última fecha de pago fue antes de este mes
-    if (['60','90','120','150'].includes(c.tramo)) {
-      // Verificar si su dia_pago ya pasó este mes aunque sea de meses anteriores
-      if (c.dia_pago>0 && c.dia_pago<hoyD) return true;
-      // Si no tiene dia_pago claro, mostrar igual porque tiene mora
-      return true;
-    }
-
-    return false;
-  }).sort((a,b)=>{
-    // Sort: most overdue first (smallest dia_pago = waited longest)
-    const da=a.dia_pago||31, db=b.dia_pago||31;
-    return da-db;
-  });
-
-  // Prometieron hoy
-  const promHoy=cl.filter(c=>PROMESAS[cartId+'::'+c.nombre]?.fecha===todStr&&PROMESAS[cartId+'::'+c.nombre]?.estado==='promesa');
-
-  // Promesas vencidas
-  const promVenc=cl.filter(c=>{
-    const p=PROMESAS[cartId+'::'+c.nombre];
-    return p?.estado==='promesa'&&p.fecha&&p.fecha<todStr&&!pagoEsteMes(c.ultimo_pago);
-  });
-
-  let html=`<div class="tbl-note">📅 ${HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long'})} — <strong>${acum.length+paganHoy.length}</strong> pendientes de cobro${promHoy.length?` · <strong style="color:var(--purple)">${promHoy.length} prometieron hoy</strong>`:''}${promVenc.length?` · <strong style="color:var(--red)">${promVenc.length} promesas vencidas</strong>`:''}</div>`;
-
-  if (paganHoy.length) {
-    html+=sectionCard('🔔 Les toca pagar HOY','var(--orange)',paganHoy.map(c=>clientRowHoy(cartId,c,hoyD)).join(''));
-  }
-  if (promHoy.length) {
-    html+=sectionCard('🤝 Prometieron pagar hoy','var(--purple)',promHoy.map(c=>clientRowHoy(cartId,c,hoyD)).join(''));
-  }
-  if (acum.length) {
-    html+=sectionCard(`⚠️ No pagaron en su fecha — ${acum.length} acumulados`,'var(--red)',acum.map(c=>{
-      const dias=hoyD-c.dia_pago;
-      const lbl=dias===1?'venció ayer':`venció hace ${dias}d (día ${c.dia_pago})`;
-      return clientRowHoy(cartId,c,hoyD,lbl);
-    }).join(''));
-  }
-  if (promVenc.length) {
-    html+=sectionCard('🚨 Prometieron y no pagaron','var(--red)',promVenc.map(c=>clientRowHoy(cartId,c,hoyD)).join(''));
-  }
-  if (!paganHoy.length&&!acum.length&&!promHoy.length&&!promVenc.length) {
-    html+='<div class="empty">🎉 ¡Todo al día! Sin cobros pendientes hoy.</div>';
-  }
-  return html;
-}
-
-function sectionCard(title,color,body) {
-  return `<div class="section-card" style="border-left:3px solid ${color};margin-bottom:12px">
-    <div class="section-card-title"><span style="color:${color}">${title}</span></div>
-    ${body}
-  </div>`;
-}
-
-function clientRowHoy(cartId,c,hoyD,diasLbl='') {
-  const p=PROMESAS[cartId+'::'+c.nombre];
-  const pBadge=p?promBadge(p):`<span class="add-p" onclick="openModal('${cartId}','${esc(c.nombre)}',${c.cuota},${c.saldo})">+ promesa</span>`;
-  return `<div class="client-row">
-    <div>
-      <div class="client-name">${c.nombre}${diasLbl?`<span style="font-family:var(--mono);font-size:10px;color:var(--red);margin-left:8px">⏰ ${diasLbl}</span>`:''}</div>
-      <div class="client-detail">Cuota: L ${fmt(c.cuota)} · Saldo: L ${fmt(c.saldo)}${p?.nota?` · ${p.nota}`:''}</div>
-    </div>
-    <div class="client-right">
-      ${pBadge}
-      <span class="add-p" onclick="openModal('${cartId}','${esc(c.nombre)}',${c.cuota},${c.saldo})">✏️</span>
-    </div>
-  </div>`;
-}
-
-// ══════════════════════════════════════════
-// TABLE
-// ══════════════════════════════════════════
-function buildTbl(cartId,rows,cls,note) {
-  if (!rows.length) return `<div class="empty">Sin clientes en este tramo.</div>`;
-  const sorted=[...rows].sort((a,b)=>(b.saldo||0)-(a.saldo||0));
-  const total=sorted.reduce((s,r)=>s+(r.saldo||0),0);
-  const uid='T'+cls.replace(/[^a-z]/gi,'');
-  return `
-    <div class="tbl-note">${note}</div>
-    <input class="tbl-search" id="S${uid}" onkeyup="flt('${uid}','S${uid}')" placeholder="Buscar...">
-    <div class="tbl-wrap"><table id="${uid}">
-      <thead><tr>
-        <th onclick="srt('${uid}',0)">#</th>
-        <th onclick="srt('${uid}',1)">Cliente ↕</th>
-        <th onclick="srt('${uid}',2)">Saldo ↕</th>
-        <th onclick="srt('${uid}',3)">Cuota</th>
-        <th onclick="srt('${uid}',4)">Días mora ↕</th>
-        <th>Último pago</th>
-        <th>Día pago</th>
-        <th>Tramo</th>
-        <th>Promesa</th>
-        <th></th>
-      </tr></thead>
-      <tbody>
-        ${sorted.map((r,i)=>{
-          const p=PROMESAS[cartId+'::'+r.nombre];
-          const tramolbl=r.tramo==='INACTIVO'?'+180d':r.tramo==='MES'?'Al día':r.tramo==='VENCIDO'?'Este mes':(r.tramo||'—')+'d';
-          return `<tr>
-            <td class="mono">${i+1}</td>
-            <td class="td-name">${r.nombre}</td>
-            <td class="mono" style="font-weight:600">L ${fmt(r.saldo||0)}</td>
-            <td class="mono">L ${fmt(r.cuota||0)}</td>
-            <td class="mono">${r.dias_mora!=null?r.dias_mora+'d':'—'}</td>
-            <td class="mono">${r.ultimo_pago||'—'}</td>
-            <td class="mono" style="text-align:center">${r.dia_pago||'—'}</td>
-            <td><span class="b ${cls}">${tramolbl}</span></td>
-            <td>${p?promBadge(p):`<span class="add-p" onclick="openModal('${cartId}','${esc(r.nombre)}',${r.cuota},${r.saldo})">+ agregar</span>`}</td>
-            <td><span class="add-p" onclick="openModal('${cartId}','${esc(r.nombre)}',${r.cuota},${r.saldo})">✏️</span></td>
-          </tr>`;
-        }).join('')}
-        <tr class="total-row">
-          <td colspan="2">TOTAL · ${sorted.length} clientes</td>
-          <td class="mono">L ${fmt(total)}</td>
-          <td colspan="7"></td>
-        </tr>
-      </tbody>
-    </table></div>`;
-}
-
-// ══════════════════════════════════════════
-// PAGARON
-// ══════════════════════════════════════════
-function buildPagaron(cartId,rows) {
-  if (!rows.length) return `<div class="empty">Ningún cliente ha pagado este mes todavía.</div>`;
-  const sorted=[...rows].sort((a,b)=>(b.saldo||0)-(a.saldo||0));
-  return `<div class="tbl-note">Clientes que abonaron este mes. Si el pago fue para cubrir el mes anterior, marcalos con "Era cuota anterior".</div>
-  <div class="tbl-wrap"><table>
-    <thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Último pago</th><th>Estado</th><th>Acción</th></tr></thead>
-    <tbody>
-      ${sorted.map((r,i)=>{
-        const p=PROMESAS[cartId+'::'+r.nombre];
-        const mora=p?.mora_pendiente;
-        return `<tr style="${mora?'background:rgba(184,68,0,0.04)':''}">
-          <td class="mono">${i+1}</td>
-          <td class="td-name" style="${mora?'':'text-decoration:line-through;color:var(--text3)'}">${r.nombre}</td>
-          <td class="mono" style="font-weight:600">L ${fmt(r.saldo||0)}</td>
-          <td class="mono">L ${fmt(r.cuota||0)}</td>
-          <td class="mono">${r.ultimo_pago||'—'}</td>
-          <td>${mora?'<span class="b b-orange">⚠️ Cuota anterior</span>':'<span class="b b-green">✅ Al día</span>'}</td>
-          <td>
-            ${mora
-              ? `<button class="btn btn-ghost btn-sm" onclick="quitarMora('${cartId}','${esc(r.nombre)}')">✓ Quitar mora</button>`
-              : `<button class="btn btn-amber btn-sm" onclick="marcarMora('${cartId}','${esc(r.nombre)}')">⚠️ Era cuota anterior</button>`
-            }
-          </td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table></div>`;
-}
-
-// ══════════════════════════════════════════
-// PROMESAS TAB
-// ══════════════════════════════════════════
-function buildPromeTab(cartId,cl) {
-  const conP=cl.filter(c=>PROMESAS[cartId+'::'+c.nombre]);
-  if (!conP.length) return `<div class="empty">No hay promesas registradas. Usa "+ agregar" en cualquier cliente.</div>`;
-  const estados={promesa:'📅 Prometió',pago:'✅ Pagó','no-contesta':'📵 No contesta','numero-mal':'❌ Núm. mal',negociacion:'🤝 Negociando',visita:'🚗 Visita'};
-  const sorted=[...conP].sort((a,b)=>{
-    const pa=PROMESAS[cartId+'::'+a.nombre],pb=PROMESAS[cartId+'::'+b.nombre];
-    return (pa.fecha||'').localeCompare(pb.fecha||'');
-  });
-  const adminBtns = USER?.rol==='admin' ? `
-    <div style="margin-bottom:10px">
-      <button class="btn btn-red btn-sm" onclick="borrarTodasPromesas('${cartId}')">🗑️ Borrar todas las promesas</button>
-    </div>` : '';
-  return adminBtns + `<div class="tbl-wrap"><table>
-    <thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Estado</th><th>Fecha</th><th>Monto</th><th>Nota</th><th></th></tr></thead>
-    <tbody>
-      ${sorted.map((r,i)=>{
-        const p=PROMESAS[cartId+'::'+r.nombre];
-        const delBtn = USER?.rol==='admin'
-          ? `<button class="btn btn-red btn-sm" style="font-size:10px;padding:2px 7px" onclick="borrarPromesa('${cartId}','${esc(r.nombre)}')">🗑</button>`
-          : '';
-        return `<tr>
-          <td class="mono">${i+1}</td>
-          <td class="td-name">${r.nombre}</td>
-          <td class="mono">L ${fmt(r.saldo||0)}</td>
-          <td class="mono">L ${fmt(r.cuota||0)}</td>
-          <td>${estados[p.estado]||p.estado}</td>
-          <td class="mono">${p.fecha||'—'}</td>
-          <td class="mono">${p.monto?'L '+fmt(p.monto):'—'}</td>
-          <td style="max-width:150px;white-space:normal;font-size:11px;color:var(--text2)">${p.nota||'—'}</td>
-          <td style="display:flex;gap:4px">
-            <span class="add-p" onclick="openModal('${cartId}','${esc(r.nombre)}',${r.cuota},${r.saldo})">✏️</span>
-            ${delBtn}
-          </td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table></div>`;
-}
-
-async function borrarPromesa(cartId, nombre) {
-  if (!confirm('¿Borrar la promesa de ' + nombre + '?')) return;
-  const key = cartId+'::'+nombre;
-  delete PROMESAS[key];
-  await dbSavePromesa(cartId, nombre);
-  if (CURRENT) renderDash(CURRENT);
-}
-
-async function borrarTodasPromesas(cartId) {
-  if (!confirm('¿Borrar TODAS las promesas de esta cartera?\nEsta acción no se puede deshacer.')) return;
-  const keys = Object.keys(PROMESAS).filter(k=>k.startsWith(cartId+'::'));
-  keys.forEach(k=>{ delete PROMESAS[k]; });
-  if (DB_OK) {
-    try {
-      await supa.from('promesas').delete().eq('cartera_id', cartId);
-      setConn(true,'Promesas borradas ✓');
-      setTimeout(()=>setConn(true,'Conectado'), 2000);
-    } catch(e) { console.error('Error borrando promesas:', e); }
-  }
-  if (CURRENT) renderDash(CURRENT);
-}
-
-
-// ══════════════════════════════════════════
-// CALENDAR
-// ══════════════════════════════════════════
-function buildCal(cartId,cl) {
-  const first=new Date(CAL_Y,CAL_M,1);
-  const last =new Date(CAL_Y,CAL_M+1,0);
-  const hoyD=HOY.getDate();
-  const isCurMes=CAL_M===HOY.getMonth()&&CAL_Y===HOY.getFullYear();
-  const monthName=first.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
-
-  // Build events map
-  const evts={};
-  const addE=(d,o)=>{ if(!evts[d])evts[d]=[]; evts[d].push(o); };
-  cl.forEach(c=>{
-    if (c.tramo==='INACTIVO') return;
-    const p=PROMESAS[cartId+'::'+c.nombre];
-    const pagado=pagoEsteMes(c.ultimo_pago)&&!p?.mora_pendiente;
-    const moraPend=pagoEsteMes(c.ultimo_pago)&&p?.mora_pendiente;
-    if (c.dia_pago>=1&&c.dia_pago<=last.getDate()) {
-      let tipo='pago';
-      if (pagado) tipo='pagado';
-      else if (moraPend) tipo='mora-p';
-      else if (isCurMes&&c.dia_pago<hoyD) tipo='mora';
-      addE(c.dia_pago,{nombre:c.nombre,tipo,cuota:c.cuota,saldo:c.saldo});
-    }
-    if (p?.fecha) {
-      const pd=new Date(p.fecha+'T12:00:00');
-      if (pd.getFullYear()===CAL_Y&&pd.getMonth()===CAL_M) {
-        addE(pd.getDate(),{nombre:c.nombre,tipo:'promesa',monto:p.monto,esP:true});
-      }
-    }
-  });
-
-  let html=`<div class="cal-nav">
-    <button class="btn btn-ghost btn-sm" onclick="calNav(-1,'${cartId}')">← Anterior</button>
-    <div class="cal-title-txt">${monthName}</div>
-    <button class="btn btn-ghost btn-sm" onclick="calNav(1,'${cartId}')">Siguiente →</button>
-  </div>
-  <div class="cal-grid">
-    ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
-
-  const startDow=first.getDay();
-  for (let i=0;i<startDow;i++) html+=`<div class="cal-day dim"></div>`;
-  for (let day=1;day<=last.getDate();day++) {
-    const isT=isCurMes&&day===hoyD;
-    const evs=evts[day]||[];
-    const show=evs.slice(0,3);
-    const more=evs.length-3;
-    html+=`<div class="cal-day${isT?' today':''}" onclick="calDayClick('${cartId}',${day},${CAL_M},${CAL_Y})">
-      <div class="cal-day-num">${day}</div>
-      ${show.map(e=>`<div class="cal-dot d-${e.tipo}" title="${e.nombre}">${e.tipo==='pagado'?'✓ ':e.tipo==='mora'?'⏰ ':e.tipo==='promesa'?'📅 ':e.tipo==='mora-p'?'⚠ ':''} ${e.nombre.split(' ')[0]}</div>`).join('')}
-      ${more>0?`<div class="cal-more">+${more} más</div>`:''}
-    </div>`;
-  }
-  html+=`</div>
-  <div class="cal-legend">
-    <span class="cal-leg-item"><span class="b b-green" style="font-size:9px;padding:1px 5px">✓ Pagó</span></span>
-    <span class="cal-leg-item"><span style="background:var(--orangebg);color:var(--orange);font-size:9px;padding:1px 5px;border-radius:3px">⚠ Cuota anterior</span></span>
-    <span class="cal-leg-item"><span class="b b-red" style="font-size:9px;padding:1px 5px">⏰ No pagó</span></span>
-    <span class="cal-leg-item"><span class="b b-purple" style="font-size:9px;padding:1px 5px">📅 Promesa</span></span>
-    <span class="cal-leg-item"><span class="b b-green" style="font-size:9px;padding:1px 5px">🕐 Pendiente</span></span>
-  </div>
-  <div id="day-detail"></div>`;
-  return html;
-}
-
-function calNav(dir,cartId){
-  CAL_M+=dir;
-  if(CAL_M>11){CAL_M=0;CAL_Y++;}
-  if(CAL_M<0){CAL_M=11;CAL_Y--;}
-  document.getElementById('tp-CAL').innerHTML=buildCal(cartId,CARTERAS[cartId].clientes);
-}
-
-function calDayClick(cartId,day,month,year){
-  const cl=CARTERAS[cartId].clientes;
-  const date=new Date(year,month,day);
-  const dateStr=date.toISOString().split('T')[0];
-  const label=date.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long'});
-  const hoyD=HOY.getDate();
-  const isCurMes=month===HOY.getMonth()&&year===HOY.getFullYear();
-
-  const paganEste=cl.filter(c=>c.dia_pago===day&&c.tramo!=='INACTIVO');
-  const promEste =cl.filter(c=>PROMESAS[cartId+'::'+c.nombre]?.fecha===dateStr);
-  const seen=new Set();
-  const all=[...paganEste,...promEste].filter(c=>{if(seen.has(c.nombre))return false;seen.add(c.nombre);return true;});
-
-  const pagaron =all.filter(c=>pagoEsteMes(c.ultimo_pago)&&!PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente);
-  const moraPend=all.filter(c=>pagoEsteMes(c.ultimo_pago)&&PROMESAS[cartId+'::'+c.nombre]?.mora_pendiente);
-  const vencidos=all.filter(c=>!pagoEsteMes(c.ultimo_pago)&&isCurMes&&day<hoyD);
-  const futuros =all.filter(c=>!pagoEsteMes(c.ultimo_pago)&&(!isCurMes||day>=hoyD));
-  const conP    =all.filter(c=>PROMESAS[cartId+'::'+c.nombre]?.fecha===dateStr);
-
-  let html=`<div class="section-card" style="margin-top:12px">
-    <div class="section-card-title">
-      <span>📅 ${label}</span>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('day-detail').innerHTML=''">✕</button>
-    </div>`;
-
-  if (!all.length) html+=`<div style="color:var(--text3);font-family:var(--mono);font-size:12px;padding:6px 0">Sin clientes programados.</div>`;
-
-  const mkSection=(title,color,items,fn)=>{
-    if(!items.length)return '';
-    return `<div style="margin-bottom:10px"><div style="font-family:var(--mono);font-size:9px;color:${color};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px">${title} (${items.length})</div>${items.map(fn).join('')}</div>`;
-  };
-
-  html+=mkSection('✅ Pagaron','var(--green)',pagaron,c=>`
-    <div class="client-row">
-      <div>
-        <div class="client-name" style="text-decoration:line-through;color:var(--text3)">${c.nombre}</div>
-        <div class="client-detail">Pago: ${c.ultimo_pago||'—'} · Saldo: L ${fmt(c.saldo)} · Cuota: L ${fmt(c.cuota)}</div>
-      </div>
-      <div class="client-right">
-        <span class="b b-green">✅ Pagó</span>
-        <button class="btn btn-amber btn-sm" style="font-size:10px" onclick="marcarMora('${cartId}','${esc(c.nombre)}')">⚠️ Era cuota anterior</button>
-      </div>
-    </div>`);
-
-  html+=mkSection('⚠️ Pagaron pero deben el mes anterior','var(--orange)',moraPend,c=>`
-    <div class="client-row">
-      <div>
-        <div class="client-name" style="color:var(--orange)">${c.nombre}</div>
-        <div class="client-detail">Pagó el ${c.ultimo_pago||'—'} — era cuota del mes anterior · Saldo: L ${fmt(c.saldo)}</div>
-      </div>
-      <div class="client-right">
-        <span class="b b-orange">⚠️ Mora</span>
-        <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="quitarMora('${cartId}','${esc(c.nombre)}')">✓ Quitar</button>
-      </div>
-    </div>`);
-
-  html+=mkSection('⏰ No pagaron','var(--red)',vencidos,c=>`
-    <div class="client-row">
-      <div>
-        <div class="client-name">${c.nombre}</div>
-        <div class="client-detail">Cuota: L ${fmt(c.cuota)} · Saldo: L ${fmt(c.saldo)}</div>
-      </div>
-      <div class="client-right">
-        <span class="b b-red">⏰ No pagó</span>
-        <span class="add-p" onclick="openModal('${cartId}','${esc(c.nombre)}',${c.cuota},${c.saldo})">+ promesa</span>
-      </div>
-    </div>`);
-
-  html+=mkSection('🕐 Pendientes','var(--text3)',futuros,c=>`
-    <div class="client-row">
-      <div>
-        <div class="client-name">${c.nombre}</div>
-        <div class="client-detail">Cuota: L ${fmt(c.cuota)} · Saldo: L ${fmt(c.saldo)}</div>
-      </div>
-      <div class="client-right">
-        ${PROMESAS[cartId+'::'+c.nombre]?promBadge(PROMESAS[cartId+'::'+c.nombre]):`<span class="add-p" onclick="openModal('${cartId}','${esc(c.nombre)}',${c.cuota},${c.saldo})">+ promesa</span>`}
-      </div>
-    </div>`);
-
-  html+=`</div>`;
-  document.getElementById('day-detail').innerHTML=html;
-}
-
-// ══════════════════════════════════════════
-// MESSAGES & ACTIONS
-// ══════════════════════════════════════════
-function buildMsg(cartId,G) {
-  const orden=['VENCIDO','MES','60','90','120','150'];
-  const cls={VENCIDO:'m-amber',MES:'m-blue','60':'m-amber','90':'m-amber','120':'m-red','150':'m-red'};
-  let html='<div class="msg-list">',count=0;
-  orden.forEach(gid=>{
-    (G[gid]||[]).filter(c=>c.mensaje_wa).forEach(c=>{
-      count++;
-      const mid='M'+Math.random().toString(36).slice(2);
-      const p=PROMESAS[cartId+'::'+c.nombre];
-      let msg=c.mensaje_wa;
-      if(p?.estado==='promesa'&&p.fecha) msg+=`\n\nSegún lo acordado, esperamos tu pago el ${p.fecha}.`;
-      html+=`<div class="msg-card ${cls[gid]||'m-blue'}">
-        <div class="msg-name">${c.nombre} ${p?promBadge(p):''}</div>
-        <div class="msg-meta">${gid==='MES'?'Recordatorio':gid==='VENCIDO'?'Vencido este mes':'Mora '+gid+'d'} · L ${fmt(c.cuota||0)}</div>
-        <div class="msg-body" id="${mid}">${esc(msg)}</div>
-        <button class="copy-btn" onclick="copyMsg('${mid}',this)">⧉ copiar</button>
-      </div>`;
-    });
-  });
-  if(!count) html+=`<div class="empty">No hay mensajes.</div>`;
-  return html+'</div>';
-}
-
-function buildAct(G) {
-  const top=(arr,n=8)=>[...arr].sort((a,b)=>a.dia_pago-b.dia_pago).slice(0,n);
-  const topS=(arr,n=6)=>[...arr].sort((a,b)=>(b.saldo||0)-(a.saldo||0)).slice(0,n);
-  const ac=(title,color,list,empty)=>`
-    <div class="act-card" style="border-left:3px solid ${color}">
-      <div class="act-title" style="color:${color}">${title}</div>
-      <ul class="act-list">
-        ${list.length?list.map(c=>`<li>${c.nombre} <span class="act-amt">· día ${c.dia_pago||'?'} · L ${fmt(c.saldo||0)}</span></li>`).join(''):`<li style="color:var(--text3)">${empty}</li>`}
-      </ul>
-    </div>`;
-  return `<div class="act-grid">
-    ${ac('📞 Llamar HOY — vencidos este mes','var(--orange)',top(G.VENCIDO),'Todos al día ✓')}
-    ${ac('🚨 Visitar / Negociar (120-150d)','var(--red)',topS([...G[150]||[],...G[120]||[]]),'Sin críticos ✓')}
-    ${ac('📞 Llamar esta semana (60-90d)','var(--amber)',topS([...G[90]||[],...G[60]||[]]),'Sin mora media ✓')}
-    ${ac('⚖️ Gestión especial (+180d)','var(--text3)',topS(G.INACTIVO||[]),'Sin inactivos ✓')}
-  </div>`;
-}
-
-// ══════════════════════════════════════════
-// PROMESAS — MODAL
-// ══════════════════════════════════════════
-function openModal(cartId,nombre,cuota,saldo) {
-  MODAL_KEY=cartId+'::'+nombre;
-  document.getElementById('modal-cliente').textContent=nombre;
-  document.getElementById('modal-info').textContent=`Cuota: L ${fmt(cuota)} · Saldo: L ${fmt(saldo)}`;
-  const ex=PROMESAS[MODAL_KEY]||{};
-  document.getElementById('p-estado').value=ex.estado||'promesa';
-  document.getElementById('p-fecha').value=ex.fecha||'';
-  document.getElementById('p-monto').value=ex.monto||cuota;
-  document.getElementById('p-nota').value=ex.nota||'';
-  togglePromesaFields();
-  document.getElementById('modal-overlay').classList.add('show');
-}
-function closeModal(){ document.getElementById('modal-overlay').classList.remove('show'); MODAL_KEY=null; }
-document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('modal-overlay'))closeModal(); });
-function togglePromesaFields(){
-  const e=document.getElementById('p-estado').value;
-  document.getElementById('row-fecha').style.display=['promesa','negociacion','visita'].includes(e)?'':'none';
-  document.getElementById('row-monto').style.display=e==='promesa'?'':'none';
-}
-
-async function savePromesa() {
-  if (!MODAL_KEY) return;
-  const estado=document.getElementById('p-estado').value;
-  const fecha =document.getElementById('p-fecha').value;
-  const monto =parseFloat(document.getElementById('p-monto').value)||0;
-  const nota  =document.getElementById('p-nota').value.trim();
-  const ex=PROMESAS[MODAL_KEY]||{};
-  PROMESAS[MODAL_KEY]={...ex,estado,fecha,monto,nota,ts:new Date().toISOString()};
-  const parts=MODAL_KEY.split('::');
-  await dbSavePromesa(parts[0],parts.slice(1).join('::'));
-  closeModal();
-  if(CURRENT) renderDash(CURRENT);
-}
-
-async function marcarMora(cartId,nombre){
-  const key=cartId+'::'+nombre;
-  if(!PROMESAS[key])PROMESAS[key]={};
-  PROMESAS[key].mora_pendiente=true;
-  PROMESAS[key].ts=new Date().toISOString();
-  await dbSavePromesa(cartId,nombre);
-  renderDash(cartId);
-  swTabByName('VENCIDO');
-}
-async function quitarMora(cartId,nombre){
-  const key=cartId+'::'+nombre;
-  if(PROMESAS[key]){delete PROMESAS[key].mora_pendiente;}
-  await dbSavePromesa(cartId,nombre);
-  renderDash(cartId);
-  swTabByName('PAGARON');
-}
-function swTabByName(id){
-  const btns=document.querySelectorAll('.tab-btn');
-  for(const btn of btns){
-    if(btn.getAttribute('onclick')?.includes("'"+id+"'")){
-      swTab(id,btn); return;
-    }
-  }
-}
-
-// ══════════════════════════════════════════
-// EXPORT CSV
-// ══════════════════════════════════════════
-function exportCSV(){
-  if(!CURRENT||!CARTERAS[CURRENT])return;
-  const cl=CARTERAS[CURRENT].clientes;
-  const rows=[['Nombre','Saldo','Cuota','Último Pago','Día Pago','Días Mora','Tramo','Estado Promesa','Fecha Promesa','Monto Prometido','Nota']];
-  cl.forEach(c=>{
-    const p=PROMESAS[CURRENT+'::'+c.nombre]||{};
-    rows.push([c.nombre,c.saldo,c.cuota,c.ultimo_pago||'',c.dia_pago||'',c.dias_mora||'',c.tramo,p.estado||'',p.fecha||'',p.monto||'',p.nota||'']);
-  });
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
-  a.download=`cartera_${CURRENT}_${HOY.toISOString().split('T')[0]}.csv`;
-  a.click();
-}
-
-// ══════════════════════════════════════════
-// ECG — PULSO DE CARTERA
-// ══════════════════════════════════════════
-const TRAMOS_ECG = [
-  { id:'VENCIDO', label:'Este mes', color:'#e87030' },
-  { id:'60',      label:'60 días',  color:'#e8a830' },
-  { id:'90',      label:'90 días',  color:'#e86030' },
-  { id:'120',     label:'120 días', color:'#e84040' },
-  { id:'150',     label:'150 días', color:'#b01020' },
-];
-
-var ECG_DATA = {}; // Global store for ECG point data
-
-async function buildECG(cartId, container) {
-  try {
-    const { data: snapsRaw, error } = await supa.from('snapshots')
-      .select('*')
-      .eq('cartera_id', cartId)
-      .limit(250);
-
-    // Sort by actual date (DD/MM/YYYY) chronologically
-    const snaps = (snapsRaw||[]).sort((a,b)=>{
-      const pa = (a.fecha||'').split('/');
-      const pb = (b.fecha||'').split('/');
-      const da = pa.length===3 ? new Date(+pa[2],+pa[1]-1,+pa[0]) : new Date(a.created_at);
-      const db = pb.length===3 ? new Date(+pb[2],+pb[1]-1,+pb[0]) : new Date(b.created_at);
-      return da - db;
-    });
-
-    // Remove duplicate dates - keep latest for same fecha
-    const seen = {};
-    const uniqueSnaps = [];
-    snaps.forEach(s => {
-      seen[s.fecha] = s; // last one wins
-    });
-    Object.values(seen).sort((a,b)=>{
-      const pa=(a.fecha||'').split('/'), pb=(b.fecha||'').split('/');
-      const da=pa.length===3?new Date(+pa[2],+pa[1]-1,+pa[0]):new Date(a.created_at);
-      const db=pb.length===3?new Date(+pb[2],+pb[1]-1,+pb[0]):new Date(b.created_at);
-      return da-db;
-    }).forEach(s=>uniqueSnaps.push(s));
-
-    // Use uniqueSnaps as the working set
-    if (error || uniqueSnaps.length < 2) {
-
-      container.innerHTML = `<div class="empty">
-        📊 Sube al menos 2 PDFs para ver el pulso de la cartera.<br>
-        <span style="font-size:11px;color:var(--text3)">Cada carga genera un punto en la gráfica.</span>
-      </div>`;
-      return;
-    }
-    // Use uniqueSnaps for all rendering
-    const finalSnaps = uniqueSnaps;
-
-    let html = '';
-
-    // Build one ECG per tramo
-    TRAMOS_ECG.forEach(tr => {
-      const vals = finalSnaps.map(s => ({ 
-        fecha: s.fecha, 
-        count: (s.tramos && s.tramos[tr.id]) || 0,
-        clientes: (s.clientes_por_tramo && s.clientes_por_tramo[tr.id]) || []
-      }));
-
-      const maxVal = Math.max(...vals.map(v => v.count), 1);
-      const minVal = 0;
-      const W = 600, H = 80, PAD = 30;
-      const stepX = vals.length > 1 ? (W - PAD*2) / (vals.length - 1) : W - PAD*2;
-
-      // Calculate trend
-      const first = vals[0].count;
-      const last  = vals[vals.length-1].count;
-      const trend = last > first ? 'up' : last < first ? 'down' : 'flat';
-      const trendLabel = trend==='up' ? `📈 +${last-first} clientes` : trend==='down' ? `📉 -${first-last} clientes` : '➡️ Sin cambio';
-      const trendClass = trend;
-
-      // Build SVG path
-      const points = vals.map((v, i) => {
-        const x = PAD + i * stepX;
-        const y = H - PAD - ((v.count - minVal) / (maxVal - minVal || 1)) * (H - PAD*2);
-        return { x, y, ...v };
-      });
-
-      // Gradient fill
-      const pathD = points.map((p,i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-      const fillD = pathD + ` L${points[points.length-1].x.toFixed(1)},${H} L${PAD},${H} Z`;
-
-      // Color based on trend and value
-      const lineColor = trend==='up' ? '#e84040' : trend==='down' ? '#22a050' : '#e8a830';
-      const fillColor = trend==='up' ? 'rgba(232,64,64,0.08)' : trend==='down' ? 'rgba(34,160,80,0.08)' : 'rgba(232,168,48,0.08)';
-
-      html += `<div class="ecg-wrap">
-        <div class="ecg-title">
-          <span style="display:flex;align-items:center;gap:6px">
-            <span style="width:12px;height:12px;border-radius:50%;background:${tr.color};display:inline-block"></span>
-            Mora <strong>${tr.label}</strong>
-          </span>
-          <span class="ecg-status ${trendClass}">${trendLabel}</span>
-        </div>
-        <svg class="ecg-svg" viewBox="0 0 ${W} ${H}" style="height:${H}px">
-          <defs>
-            <linearGradient id="g${tr.id}" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.3"/>
-              <stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <!-- Fill area -->
-          <path d="${fillD}" fill="url(#g${tr.id})"/>
-          <!-- Line -->
-          <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-          <!-- Grid lines -->
-          ${[0,1,2].map(i=>{
-            const y = H - PAD - (i/2)*(H-PAD*2);
-            const val = Math.round(minVal + (i/2)*(maxVal-minVal));
-            return `<line x1="${PAD}" y1="${y.toFixed(1)}" x2="${W-PAD}" y2="${y.toFixed(1)}" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
-                    <text x="${PAD-4}" y="${(y+4).toFixed(1)}" font-size="9" fill="rgba(0,0,0,0.3)" text-anchor="end" font-family="monospace">${val}</text>`;
-          }).join('')}
-          <!-- Points and labels -->
-          ${points.map((p, i) => {
-            const prev = i > 0 ? points[i-1].count : p.count;
-            const diff = p.count - prev;
-            const dotColor = i===0 ? lineColor : diff>0 ? '#e84040' : diff<0 ? '#22a050' : '#e8a830';
-            const uid = `ecg_${tr.id}_${i}`;
-            // Store data in global for safe onclick reference
-            const ecgKey = cartId+'_'+tr.id+'_'+i;
-            ECG_DATA[ecgKey] = { fecha: p.fecha, count: p.count, clientes: p.clientes };
-            return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" 
-              fill="${dotColor}" stroke="white" stroke-width="2"
-              style="cursor:pointer"
-              onclick="showSnapDetail('${ecgKey}','${tr.id}')"/>
-            <text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" font-size="9" fill="${dotColor}" text-anchor="middle" font-family="monospace" font-weight="bold">${p.count}</text>
-            <text x="${p.x.toFixed(1)}" y="${(H-8).toFixed(1)}" font-size="8" fill="rgba(0,0,0,0.4)" text-anchor="middle" font-family="monospace">${p.fecha.substring(0,5)}</text>`;
-          }).join('')}
-        </svg>
-        <div id="snap_${tr.id}" class="snap-detail" style="display:none"></div>
-      </div>`;
-    });
-
-    container.innerHTML = html;
-  } catch(e) {
-    container.innerHTML = `<div class="empty">Error cargando datos: ${e.message}</div>`;
-    console.error('buildECG error:', e);
-  }
-}
-
-function showSnapDetail(ecgKey, tramoId) {
-  const data = ECG_DATA[ecgKey];
-  if (!data) return;
-  const detailEl = document.getElementById('snap_' + tramoId);
-  if (!detailEl) return;
-
-  if (detailEl.style.display !== 'none' && detailEl.dataset.key === ecgKey) {
-    detailEl.style.display = 'none';
-    return;
-  }
-  detailEl.dataset.key = ecgKey;
-  detailEl.style.display = 'block';
-
-  const clientes = data.clientes || [];
-  const clientesList = clientes.length > 0
-    ? clientes.map(c => `<span class="snap-client entro">${c.nombre} — L ${fmt(c.saldo||0)}</span>`).join('')
-    : '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">Sin clientes en este tramo</span>';
-
-  detailEl.innerHTML = `
-    <div class="snap-detail-title">📅 ${data.fecha} — ${data.count} cliente${data.count!==1?'s':''} en este tramo</div>
-    <div class="snap-client-list">${clientesList}</div>
-  `;
-}
-
-// ══════════════════════════════════════════
-// ALERTAS
-// ══════════════════════════════════════════
-var lastAlertCheck = new Date().toISOString();
-var shownAlerts    = {};
-
-async function checkAlertas() {
-  if (!USER || !DB_OK) return;
-  try {
-    // Get ALL alerts from last 24 hours
-    var since = new Date(Date.now() - 24*60*60*1000).toISOString();
-    var result = await supa.from('alertas')
-      .select('*')
-      .gt('created_at', since)
-      .order('created_at', {ascending:true});
-    if (result.error || !result.data || !result.data.length) return;
-
-    // Get which ones this user already confirmed
-    var lResult = await supa.from('alertas_lecturas')
-      .select('alerta_id')
-      .eq('usuario', USER.nombre);
-    var leidas = new Set((lResult.data||[]).map(function(l){ return l.alerta_id; }));
-
-    result.data.forEach(function(a) {
-      // Show if not yet confirmed by this user AND not already shown in this session
-      if (!leidas.has(a.id) && !shownAlerts[a.id]) {
-        shownAlerts[a.id] = true;
-        showAlertBanner(a);
-      }
-    });
-  } catch(e) {}
-}
-
-function showAlertBanner(alerta) {
-  var container = document.getElementById('alert-container');
-  var div = document.createElement('div');
-  div.className = 'alert-banner tipo-' + (alerta.tipo||'info');
-  div.id = 'alert-' + alerta.id;
-  div.innerHTML = `
-    <div class="alert-title">${alerta.tipo==='animo'?'💪':alerta.tipo==='urgente'?'🚨':'📋'} ${esc2(alerta.titulo||'')}</div>
-    <div class="alert-msg">${esc2(alerta.mensaje||'')}</div>
-    ${alerta.cliente?`<div class="alert-meta">👤 Cliente: ${esc2(alerta.cliente)}</div>`:''}
-    <div class="alert-meta">De: ${esc2(alerta.autor||'Admin')} · ${new Date(alerta.created_at).toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'})}</div>
-    <button class="alert-confirm" onclick="confirmarAlerta('${alerta.id}',this.parentNode)">✓ Visto</button>
-  `;
-  container.appendChild(div);
-  // Auto-remove after 30 seconds if not confirmed
-  setTimeout(function() { if(div.parentNode) div.parentNode.removeChild(div); }, 30000);
-}
-
-async function confirmarAlerta(alertaId, el) {
-  try {
-    await supa.from('alertas_lecturas').insert({
-      alerta_id: alertaId,
-      usuario: USER?.nombre||'—',
-      leido_at: new Date().toISOString()
-    });
-  } catch(e) {}
-  if (el && el.parentNode) el.parentNode.removeChild(el);
-}
-
-async function enviarAlerta() {
-  var tipo    = document.getElementById('a-tipo').value;
-  var titulo  = document.getElementById('a-titulo').value.trim();
-  var mensaje = document.getElementById('a-mensaje').value.trim();
-  var cliente = document.getElementById('a-cliente').value.trim();
-  if (!titulo || !mensaje) { alert('Completa el título y mensaje'); return; }
-  try {
-    await supa.from('alertas').insert({
-      tipo, titulo, mensaje, cliente: cliente||null,
-      autor: USER?.nombre||'Admin',
-      created_at: new Date().toISOString()
-    });
-    document.getElementById('modal-alerta').classList.remove('show');
-    document.getElementById('a-titulo').value='';
-    document.getElementById('a-mensaje').value='';
-    document.getElementById('a-cliente').value='';
-    alert('✅ Alerta enviada a todos los usuarios activos');
-  } catch(e) { alert('Error al enviar: ' + e.message); }
-}
-
-function esc2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// Add alert button to home for admins
-function addAlertButton() {
-  // Remove existing button first
-  var existing = document.getElementById('alert-admin-btn');
-  if (existing) existing.parentNode.removeChild(existing);
-  // Only admin can send alerts
-  if (!USER || USER.rol !== 'admin') return;
-  var btn = document.createElement('button');
-  btn.id = 'alert-admin-btn';
-  btn.className = 'btn btn-primary btn-sm';
-  btn.textContent = '📣 Enviar alerta';
-  btn.onclick = function() { document.getElementById('modal-alerta').classList.add('show'); };
-  btn.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:500;box-shadow:var(--shadow2);font-size:12px';
-  document.body.appendChild(btn);
-}
-
-// ══════════════════════════════════════════
-// UTILS
-// ══════════════════════════════════════════
-function fmt(n){ return Number(n).toLocaleString('es-HN'); }
-function esc(s){ return String(s).replace(/'/g,"\\'"); }
-function copyMsg(id,btn){
-  navigator.clipboard.writeText(document.getElementById(id).textContent)
-    .then(()=>{ btn.textContent='✓ copiado'; setTimeout(()=>btn.textContent='⧉ copiar',2000); });
-}
-function showErr(msg){
-  const b=document.getElementById('err-box');
-  b.style.display='block';b.textContent='⚠ '+msg;
-  setTimeout(()=>b.style.display='none',5000);
-}
-function setProgress(pct,lbl){
-  document.getElementById('prog-wrap').style.display='block';
-  document.getElementById('prog-fill').style.width=pct+'%';
-  document.getElementById('prog-lbl').textContent=lbl;
-}
-function promBadge(p){
-  const m={
-    promesa:`<span class="b b-purple">📅 ${p.fecha||'—'}</span>`,
-    pago:`<span class="b b-green">✅ Pagó</span>`,
-    'no-contesta':`<span class="b b-gray">📵 No contesta</span>`,
-    'numero-mal':`<span class="b b-gray">❌ Núm. mal</span>`,
-    negociacion:`<span class="b b-amber">🤝 Negociando</span>`,
-    visita:`<span class="b b-blue">🚗 Visita</span>`,
-  };
-  return m[p.estado]||'';
-}
-// SD declared above
-function srt(tid,col){
-  const tb=document.getElementById(tid)?.querySelector('tbody'); if(!tb)return;
-  const rows=Array.from(tb.querySelectorAll('tr:not(.total-row)'));
-  const dir=(SD[tid+col]||1)*-1; SD[tid+col]=dir;
-  rows.sort((a,b)=>{
-    const av=(a.cells[col]?.textContent||'').replace(/[L,\s]/g,'');
-    const bv=(b.cells[col]?.textContent||'').replace(/[L,\s]/g,'');
-    const an=parseFloat(av),bn=parseFloat(bv);
-    if(!isNaN(an)&&!isNaN(bn))return(an-bn)*dir;
-    return av.localeCompare(bv,'es')*dir;
-  });
-  const tr=tb.querySelector('.total-row');
-  rows.forEach(r=>tb.insertBefore(r,tr));
-}
-function flt(tid,sid){
-  const q=document.getElementById(sid).value.toLowerCase();
-  document.querySelectorAll('#'+tid+' tbody tr:not(.total-row)').forEach(r=>{
-    r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
-  });
-}
-</script>
-</body>
-</html>
