@@ -634,15 +634,38 @@ async function processPDF(file){
     var ab=await file.arrayBuffer();var lines=await extractText(ab);var data=parseCartera(lines);
     if(!data.clientes.length){showErr('Sin clientes en: '+file.name);return;}
     var id=getCanonicalId(data.empresa);
-    // Detect payments
+    // Detect payments and cancellations
     var existing=CARTERAS[id];
     if(existing&&existing.clientes){
-      var prev={};existing.clientes.forEach(function(c){prev[c.nombre]=c.saldo;});
+      var prev={};
+      existing.clientes.forEach(function(c){prev[c.nombre]={saldo:c.saldo,cuota:c.cuota};});
+      var newNames=new Set(data.clientes.map(function(c){return c.nombre;}));
+
+      // Clients in prev but NOT in new PDF = cancelled / paid off completely
+      existing.clientes.forEach(function(c){
+        if(!newNames.has(c.nombre)){
+          // Client disappeared from cartera = cancelled
+          dbSaveHist({
+            cartera_id:id, cliente_nombre:c.nombre, tipo:'pago',
+            monto:c.saldo, nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',
+            fecha_accion:HOY.toISOString().split('T')[0], gestor:'Sistema',
+            created_at:new Date().toISOString()
+          });
+          // Clear any active promesa
+          var key=id+'::'+c.nombre;
+          if(PROMESAS[key]){delete PROMESAS[key];dbSaveProm(id,c.nombre);}
+        }
+      });
+
+      // Clients still in cartera - check for payments
       data.clientes.forEach(function(c){
         var ps=prev[c.nombre];
-        if(ps!==undefined&&c.saldo<ps){
-          var abonado=ps-c.saldo;var tipo=(c.saldo===0||abonado>=c.cuota*0.9)?'pago':'abono';
-          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,nota:tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado),fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
+        if(ps!==undefined&&c.saldo<ps.saldo){
+          var abonado=ps.saldo-c.saldo;
+          var tipo=(c.saldo===0||abonado>=ps.cuota*0.9)?'pago':'abono';
+          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,
+            nota:tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado),
+            fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
           var key=id+'::'+c.nombre;var prom=PROMESAS[key];
           if(prom){PROMESAS[key]=Object.assign({},prom,{estado:tipo,ts:new Date().toISOString()});dbSaveProm(id,c.nombre);}
         }
@@ -1355,30 +1378,66 @@ function showEcgDetail(key){
   var el=document.getElementById('snap-'+data.cartId+'-'+data.tramoId);if(!el)return;
   if(el.style.display!=='none'&&el.dataset.key===key){el.style.display='none';return;}
   el.dataset.key=key;el.style.display='block';
-  // Get prev point for comparison
-  var prevKey=data.cartId+'_'+data.tramoId+'_'+(data.idx-1);
+
+  var cartId=data.cartId;
+  var prevKey=cartId+'_'+data.tramoId+'_'+(data.idx-1);
   var prevData=data.idx>0?ECG_DATA[prevKey]:null;
   var currNames=new Set((data.clientes||[]).map(function(c){return c.nombre;}));
   var prevNames=prevData?new Set((prevData.clientes||[]).map(function(c){return c.nombre;})):new Set();
   var salieron=prevData?(prevData.clientes||[]).filter(function(c){return !currNames.has(c.nombre);}):[];
   var entraron=prevData?(data.clientes||[]).filter(function(c){return !prevNames.has(c.nombre);}):[];
-  var siguen=(data.clientes||[]);
+  var siguen=data.clientes||[];
   var dateLabel=data.created_at?new Date(data.created_at).toLocaleDateString('es-HN'):data.fecha;
+
+  // Helper: get gestión badge for a client name using current PROMESAS
+  function gestBadge(nombre){
+    var p=PROMESAS[cartId+'::'+nombre];
+    if(!p||!p.estado) return ''; // no action
+    if(p.estado==='promesa') return ' <span style="font-size:10px">📅</span>';
+    if(p.estado==='visita'||p.estado==='visita_agenda'||p.estado==='visita_realizada') return ' <span style="font-size:10px">🚗</span>';
+    if(p.estado==='pago') return ' <span style="font-size:10px">✅</span>';
+    if(p.estado==='no-contesta'||p.estado==='no_contesta') return ' <span style="font-size:10px">📵</span>';
+    return '';
+  }
+  function hasGestion(nombre){
+    var p=PROMESAS[cartId+'::'+nombre];
+    return p&&p.estado&&p.estado!=='';
+  }
+
+  // Chip builder: red if no gestión, colored badge if has gestión
+  function chip(c,baseClass){
+    var badge=gestBadge(c.nombre);
+    var noAct=!hasGestion(c.nombre);
+    // For "siguen" chips: red background if no action, gray if has action
+    var chipClass=baseClass;
+    if(baseClass==='chip-gray'&&noAct) chipClass='chip-red'; // highlight no-action clients
+    return '<span class="'+chipClass+'" style="'+(noAct&&baseClass==='chip-gray'?'border:1.5px solid rgba(176,16,32,.4);font-weight:600':'')+'">'+c.nombre+badge+' — L '+fmt(c.saldo||0)+'</span>';
+  }
+
   var html='<div class="snap-title">📅 '+dateLabel+' — '+data.count+' cliente(s) en mora</div>';
+  html+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:6px">📅=promesa &nbsp; 🚗=visita &nbsp; sin ícono = sin gestión</div>';
+
   if(salieron.length){
     html+='<div class="snap-section" style="color:var(--green)">✅ Salieron de mora ('+salieron.length+')</div>';
-    html+='<div class="snap-chips">'+salieron.map(function(c){return '<span class="chip-green">'+c.nombre+' — L '+fmt(c.saldo||0)+'</span>';}).join('')+'</div>';
+    html+='<div class="snap-chips">'+salieron.map(function(c){return chip(c,'chip-green');}).join('')+'</div>';
   }
   if(entraron.length){
     html+='<div class="snap-section" style="color:var(--red)">⚠️ Entraron a mora ('+entraron.length+')</div>';
-    html+='<div class="snap-chips">'+entraron.map(function(c){return '<span class="chip-red">'+c.nombre+' — L '+fmt(c.saldo||0)+'</span>';}).join('')+'</div>';
+    html+='<div class="snap-chips">'+entraron.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';
   }
   if(siguen.length){
-    var lbl=prevData?'Siguen en mora ('+siguen.length+')':'En mora ('+siguen.length+')';
+    var sinAct=siguen.filter(function(c){return !hasGestion(c.nombre);}).length;
+    var lbl=(prevData?'Siguen en mora':'En mora')+' ('+siguen.length+')'+(sinAct?' — <span style="color:var(--red)">'+sinAct+' sin gestión</span>':'');
     html+='<div class="snap-section" style="color:var(--text3)">🔴 '+lbl+'</div>';
-    html+='<div class="snap-chips">'+siguen.map(function(c){return '<span class="chip-gray">'+c.nombre+' — L '+fmt(c.saldo||0)+'</span>';}).join('')+'</div>';
+    // Sort: no-action first (red), then with action
+    var sorted=[...siguen].sort(function(a,b){
+      var ha=hasGestion(a.nombre)?1:0, hb=hasGestion(b.nombre)?1:0;
+      return ha-hb; // no-action first
+    });
+    html+='<div class="snap-chips">'+sorted.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';
   }
-  if(!salieron.length&&!entraron.length&&!siguen.length)html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
+  if(!salieron.length&&!entraron.length&&!siguen.length)
+    html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
   el.innerHTML=html;
 }
 
