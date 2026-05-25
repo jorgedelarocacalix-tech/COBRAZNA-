@@ -183,6 +183,42 @@ tr:hover td{background:#f5f8ff}
 .form-inp:focus{border-color:#22a050;background:var(--bg2)}
 .form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 .empty{padding:28px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--text3)}
+
+/* ══ REPORTE STYLES ══ */
+.rep-header{background:linear-gradient(135deg,#1a7a3c,#22a050);color:#fff;border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:var(--shadow2)}
+.rep-title{font-size:20px;font-weight:700;font-family:var(--mono);margin-bottom:4px}
+.rep-sub{font-size:11px;opacity:.8;font-family:var(--mono)}
+.rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px}
+.rep-kpi{background:rgba(255,255,255,.15);border-radius:6px;padding:10px;text-align:center}
+.rep-kpi-v{font-family:var(--mono);font-size:20px;font-weight:700}
+.rep-kpi-l{font-size:10px;opacity:.85;margin-top:2px}
+.rep-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.rep-filter-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .15s;color:var(--text2)}
+.rep-filter-btn.on{border-color:#22a050;background:var(--greenbg);color:var(--green);font-weight:600}
+.rep-filter-btn:hover:not(.on){background:var(--bg3)}
+.rep-tbl-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow)}
+.rep-tbl{width:100%;border-collapse:collapse;font-size:12px;background:var(--bg2)}
+.rep-tbl th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);padding:9px 10px;border-bottom:2px solid var(--border2);background:#f0f2f5;white-space:nowrap;position:sticky;top:0;z-index:10}
+.rep-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rep-tbl tr:last-child td{border-bottom:none}
+.rep-tbl tr:hover td{background:#f5f8ff}
+.rep-tbl tr.rep-total td{background:var(--bg3);font-family:var(--mono);font-weight:700;border-top:2px solid var(--border2)}
+.rep-tbl tr.rep-subtotal td{background:#fafbfc;font-family:var(--mono);font-weight:600;font-size:11px;color:var(--text2);border-top:1px solid var(--border2)}
+.tramo-badge{display:inline-block;padding:2px 7px;border-radius:20px;font-family:var(--mono);font-size:10px;font-weight:600;white-space:nowrap}
+.tramo-MES{background:var(--greenbg);color:var(--green)}
+.tramo-VENCIDO{background:var(--orangebg);color:var(--orange)}
+.tramo-60{background:var(--amberbg);color:var(--amber)}
+.tramo-90{background:var(--orangebg);color:var(--orange)}
+.tramo-120{background:var(--redbg);color:var(--red)}
+.tramo-150{background:#fcc;color:#800010}
+.tramo-INACTIVO{background:var(--bg4);color:var(--text2)}
+.rep-sort-btn{background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text3);padding:0;margin-left:4px}
+.rep-sort-btn:hover{color:var(--green)}
+.rep-row-prioridad-1 td:first-child{border-left:3px solid var(--red)}
+.rep-row-prioridad-2 td:first-child{border-left:3px solid var(--orange)}
+.rep-row-prioridad-3 td:first-child{border-left:3px solid var(--amber)}
+.rep-row-prioridad-4 td:first-child{border-left:3px solid var(--green)}
+.rep-export-row{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -321,6 +357,7 @@ var supa=null, DB_OK=false, PDFJS_OK=false;
 var PIN_VAL='', CAL_Y=HOY.getFullYear(), CAL_M=HOY.getMonth();
 var MODAL_AC=null, ECG_DATA={}, SHOWN_ALERTS={}, SYNC_T=null;
 var LAST_ALERT_CHECK=new Date(Date.now()-24*60*60*1000).toISOString();
+var REP_SORT={col:'dia_pago',dir:1};
 
 document.getElementById('hdate').textContent=HOY.toLocaleDateString('es-HN',{weekday:'short',year:'numeric',month:'short',day:'numeric'}).toUpperCase();
 
@@ -336,14 +373,14 @@ async function loadLibs(){
   var pdfCDNs=['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js'];
   for(var i=0;i<pdfCDNs.length;i++){
     await loadScript(pdfCDNs[i]);
-    if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc=pdfCDNs[i].replace('pdf.min.js','pdf.worker.min.js');PDFJS_OK=true;console.log('PDF.js OK');break;}
+    if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc=pdfCDNs[i].replace('pdf.min.js','pdf.worker.min.js');PDFJS_OK=true;break;}
   }
   var supaCDNs=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js','https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'];
   for(var j=0;j<supaCDNs.length;j++){
     if(typeof supabase!=='undefined')break;
     await loadScript(supaCDNs[j]);
   }
-  if(typeof supabase!=='undefined'){supa=supabase.createClient(SUPA_URL,SUPA_KEY);console.log('Supabase OK');}
+  if(typeof supabase!=='undefined'){supa=supabase.createClient(SUPA_URL,SUPA_KEY);}
   else console.error('Supabase failed');
 }
 
@@ -418,7 +455,6 @@ async function loadData(){
     PROMESAS={};
     (r2.data||[]).forEach(function(p){PROMESAS[p.cartera_id+'::'+p.cliente_nombre]={estado:p.estado,fecha:p.fecha,monto:p.monto,nota:p.nota,mora_pendiente:p.mora_pendiente||false,ts:p.updated_at};});
     DB_OK=true;setConn(true,'Conectado');
-    console.log('Loaded',Object.keys(CARTERAS).length,'carteras,',Object.keys(PROMESAS).length,'promesas');
   }catch(e){DB_OK=false;setConn(false,'Sin conexión');console.error('loadData:',e);}
 }
 async function syncNow(){setConn(null,'Sincronizando...');await loadData();if(CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);else renderHome();}
@@ -457,17 +493,22 @@ async function dbSaveProm(cartId,nombre){
   }catch(e){console.error('saveProm:',e);}
 }
 async function dbSaveHist(entry){if(!supa)return;try{await supa.from('historial_clientes').insert(entry);}catch(e){console.error('saveHist:',e);}}
+
+// ══ FIX #1: dbSaveSnap excluye clientes que ya pagaron este mes ══
 async function dbSaveSnap(cartId){
   if(!supa)return;var c=CARTERAS[cartId];if(!c||!c.clientes)return;
   try{
     var tr={MES:0,VENCIDO:0,'60':0,'90':0,'120':0,'150':0,INACTIVO:0};
     var byT={MES:[],VENCIDO:[],'60':[],'90':[],'120':[],'150':[],INACTIVO:[]};
-    // Track gestión: promesas y visitas
     var conPromesa=[],conVisita=[],sinGestion=[];
     c.clientes.forEach(function(cl){
+      // FIX: excluir clientes que ya pagaron este mes (igual que renderDash)
+      var p=PROMESAS[cartId+'::'+cl.nombre];
+      var pagado=pagoEsteMes(cl.ultimo_pago)&&!(p&&p.mora_pendiente);
+      if(pagado) return; // ← FIX: no contarlos en el snapshot
+
       var t=cl.tramo||'MES';
       if(tr[t]!==undefined){tr[t]++;byT[t].push({nombre:cl.nombre,saldo:cl.saldo,cuota:cl.cuota});}
-      var p=PROMESAS[cartId+'::'+cl.nombre];
       if(p&&p.estado==='promesa') conPromesa.push({nombre:cl.nombre,saldo:cl.saldo,tramo:t,fecha:p.fecha||''});
       else if(p&&(p.estado==='visita'||p.estado==='visita_agenda')) conVisita.push({nombre:cl.nombre,saldo:cl.saldo,tramo:t});
       else if(t!=='MES'&&t!=='INACTIVO'&&t!=='PAGARON') sinGestion.push({nombre:cl.nombre,saldo:cl.saldo,tramo:t});
@@ -548,44 +589,26 @@ function parseCartera(lines){
 }
 function calcMora(up,dp,sinP,fFact){
   var hD=HOY.getDate();
-
-  // sinPago = fecha_factura === ultimo_pago (el sistema pone la misma fecha)
-  // Esto puede significar dos cosas:
-  // A) Nunca ha pagado (fecha factura vieja = mora real)
-  // B) Pagó exactamente el dia de factura (cliente nuevo, al dia)
-  //
-  // Regla: si la fecha factura tiene mas de 45 dias = lleva tiempo sin pagar = mora real
-  //        si la fecha factura tiene menos de 45 dias = cliente nuevo = puede estar al dia
-
   if(sinP){
-    var diasDesdeFactura = daysSince(fFact);
-
-    // Cliente nuevo (menos de 45 dias desde factura) - verificar por dia de pago
-    if(diasDesdeFactura !== null && diasDesdeFactura <= 45){
-      // Su primer pago aun no vence o acaba de vencer
-      if(dp>0 && dp<hD){
+    var diasDesdeFactura=daysSince(fFact);
+    if(diasDesdeFactura!==null&&diasDesdeFactura<=45){
+      if(dp>0&&dp<hD){
         var fp=new Date(HOY.getFullYear(),HOY.getMonth(),dp);fp.setHours(0,0,0,0);
         var fd=parseHNDate(fFact);
-        if(fd&&HOY>fp&&fd<fp) return{dias:Math.floor((HOY-fp)/86400000),tramo:'VENCIDO'};
+        if(fd&&HOY>fp&&fd<fp)return{dias:Math.floor((HOY-fp)/86400000),tramo:'VENCIDO'};
       }
       return{dias:null,tramo:'MES'};
     }
-
-    // Cliente con fecha factura antigua (mas de 45 dias) sin pago = mora real
-    // Calcular mora desde cuando debia haber pagado por primera vez
-    if(diasDesdeFactura !== null && diasDesdeFactura > 45){
-      if(diasDesdeFactura > 180) return{dias:diasDesdeFactura,tramo:'INACTIVO'};
-      // Buscar el ultimo dia de pago que paso
+    if(diasDesdeFactura!==null&&diasDesdeFactura>45){
+      if(diasDesdeFactura>180)return{dias:diasDesdeFactura,tramo:'INACTIVO'};
       if(dp>0){
         var fpM=new Date(HOY.getFullYear(),HOY.getMonth(),dp);fpM.setHours(0,0,0,0);
-        if(HOY>fpM) return{dias:Math.floor((HOY-fpM)/86400000),tramo:getTramo(Math.floor((HOY-fpM)/86400000))};
+        if(HOY>fpM)return{dias:Math.floor((HOY-fpM)/86400000),tramo:getTramo(Math.floor((HOY-fpM)/86400000))};
       }
       return{dias:diasDesdeFactura,tramo:getTramo(diasDesdeFactura)};
     }
-
     return{dias:null,tramo:'MES'};
   }
-
   if(!up)return{dias:null,tramo:'MES'};
   var ds=daysSince(up);if(ds===null)return{dias:null,tramo:'MES'};
   if(ds>180)return{dias:ds,tramo:'INACTIVO'};
@@ -634,38 +657,24 @@ async function processPDF(file){
     var ab=await file.arrayBuffer();var lines=await extractText(ab);var data=parseCartera(lines);
     if(!data.clientes.length){showErr('Sin clientes en: '+file.name);return;}
     var id=getCanonicalId(data.empresa);
-    // Detect payments and cancellations
     var existing=CARTERAS[id];
     if(existing&&existing.clientes){
       var prev={};
       existing.clientes.forEach(function(c){prev[c.nombre]={saldo:c.saldo,cuota:c.cuota};});
       var newNames=new Set(data.clientes.map(function(c){return c.nombre;}));
-
-      // Clients in prev but NOT in new PDF = cancelled / paid off completely
       existing.clientes.forEach(function(c){
         if(!newNames.has(c.nombre)){
-          // Client disappeared from cartera = cancelled
-          dbSaveHist({
-            cartera_id:id, cliente_nombre:c.nombre, tipo:'pago',
-            monto:c.saldo, nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',
-            fecha_accion:HOY.toISOString().split('T')[0], gestor:'Sistema',
-            created_at:new Date().toISOString()
-          });
-          // Clear any active promesa
+          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'pago',monto:c.saldo,nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
           var key=id+'::'+c.nombre;
           if(PROMESAS[key]){delete PROMESAS[key];dbSaveProm(id,c.nombre);}
         }
       });
-
-      // Clients still in cartera - check for payments
       data.clientes.forEach(function(c){
         var ps=prev[c.nombre];
         if(ps!==undefined&&c.saldo<ps.saldo){
           var abonado=ps.saldo-c.saldo;
           var tipo=(c.saldo===0||abonado>=ps.cuota*0.9)?'pago':'abono';
-          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,
-            nota:tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado),
-            fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
+          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,nota:tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado),fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
           var key=id+'::'+c.nombre;var prom=PROMESAS[key];
           if(prom){PROMESAS[key]=Object.assign({},prom,{estado:tipo,ts:new Date().toISOString()});dbSaveProm(id,c.nombre);}
         }
@@ -732,7 +741,9 @@ function renderDash(id){
   document.getElementById('dash-meta').textContent='Emision: '+data.fecha_emision+' · Hoy: '+HOY.toLocaleDateString('es-HN')+' · '+cl.length+' clientes';
   var G={MES:[],VENCIDO:[],'60':[],'90':[],'120':[],'150':[],INACTIVO:[],PAGARON:[]};
   cl.forEach(function(c){
-    var p=PROMESAS[id+'::'+c.nombre];var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    var p=PROMESAS[id+'::'+c.nombre];
+    // FIX: La logica de "pagado" es consistente en todas las vistas
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
     if(pagado){G.PAGARON.push(c);return;}
     var t=c.tramo||'MES';if(G[t])G[t].push(c);else G.MES.push(c);
   });
@@ -751,6 +762,7 @@ function renderDash(id){
   ].map(function(k){return '<div class="kpi-card"><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
   var TABS=[
     {id:'HOY',lbl:'📅 Hoy ('+G.VENCIDO.length+')'},
+    {id:'REPORTE',lbl:'📊 Reporte Cobro'},
     {id:'VENCIDO',lbl:'🟠 Este mes ('+G.VENCIDO.length+')',cls:'bo'},
     {id:'MES',lbl:'🟢 Al dia ('+G.MES.length+')',cls:'bg'},
     {id:'60',lbl:'🟡 60d ('+G['60'].length+')',cls:'ba'},
@@ -780,6 +792,7 @@ function renderDash(id){
     d.className='tab-pane'+(i===activeTabIdx?' on':'');
     d.id='tp-'+t.id;
     if(t.id==='HOY')d.innerHTML=buildHoy(id,cl,G);
+    else if(t.id==='REPORTE')d.innerHTML=buildReporte(id,cl,G);
     else if(t.id==='CAL')d.innerHTML=buildCal(id,cl);
     else if(t.id==='PROMESAS')d.innerHTML=buildPromeTab(id,cl);
     else if(t.id==='PAGARON')d.innerHTML=buildPagaron(id,G.PAGARON);
@@ -835,6 +848,580 @@ function cliRow(cartId,c,diasLbl){
     +'<div class="cli-right">'+pBadge+vBtn+'<span class="add-p" onclick="openAccion('+qc+')">📋</span></div></div>';
 }
 
+// ══════════════════════════════════════════════════════════
+// ══ REPORTE DE COBRO (NUEVO) ══
+// ══════════════════════════════════════════════════════════
+var REP_FILTER='TODOS'; // TODOS | PENDIENTES | ESTA_SEMANA | CON_PROMESA | SIN_GESTION
+
+function buildReporte(cartId, cl, G){
+  var hoy=HOY.getDate();
+  var finMes=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
+
+  // Construir lista completa excluyendo INACTIVOS y los que ya PAGARON este mes
+  var pendientes=cl.filter(function(c){
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    return !pagado && c.tramo!=='INACTIVO';
+  });
+
+  // Totales para el header
+  var totalSaldo=pendientes.reduce(function(s,c){return s+(c.saldo||0);},0);
+  var totalCuotas=pendientes.reduce(function(s,c){return s+(c.cuota||0);},0);
+  var conPromesa=pendientes.filter(function(c){var p=PROMESAS[cartId+'::'+c.nombre];return p&&p.estado==='promesa';}).length;
+  var enMora=pendientes.filter(function(c){return c.tramo!=='MES';}).length;
+
+  // Rango: hoy a fin de mes
+  var porCobrarMes=pendientes.filter(function(c){return c.dia_pago>=hoy&&c.dia_pago<=finMes;});
+  var totalPorCobrar=porCobrarMes.reduce(function(s,c){return s+(c.cuota||0);},0);
+  var proximos7=pendientes.filter(function(c){return c.dia_pago>=hoy&&c.dia_pago<=(hoy+7);});
+  var totalProx7=proximos7.reduce(function(s,c){return s+(c.cuota||0);},0);
+
+  var html='';
+
+  // Header del reporte
+  html+='<div class="rep-header">';
+  html+='<div class="rep-title">📊 Reporte de Cobro</div>';
+  html+='<div class="rep-sub">'+HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · Dia '+hoy+' de '+finMes+'</div>';
+  html+='<div class="rep-kpis" style="margin-top:14px">';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">'+pendientes.length+'</div><div class="rep-kpi-l">Pendientes</div></div>';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">L '+fmtK(totalSaldo)+'</div><div class="rep-kpi-l">Saldo total</div></div>';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">L '+fmtK(totalPorCobrar)+'</div><div class="rep-kpi-l">Cuotas hoy→fin mes</div></div>';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">L '+fmtK(totalProx7)+'</div><div class="rep-kpi-l">Proximos 7 dias</div></div>';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">'+enMora+'</div><div class="rep-kpi-l">En mora</div></div>';
+  html+='<div class="rep-kpi"><div class="rep-kpi-v">'+conPromesa+'</div><div class="rep-kpi-l">Con promesa</div></div>';
+  html+='</div></div>';
+
+  // Controles
+  html+='<div class="rep-filters" style="margin-top:12px">';
+  var filtros=[
+    {id:'TODOS',lbl:'📋 Todos ('+pendientes.length+')'},
+    {id:'ESTA_SEMANA',lbl:'📅 Proximos 7d ('+proximos7.length+')'},
+    {id:'MORA_ALTA',lbl:'🔴 Mora alta ('+( (G['120']||[]).length+(G['150']||[]).length )+')'},
+    {id:'CON_PROMESA',lbl:'🟣 Con promesa ('+conPromesa+')'},
+    {id:'SIN_GESTION',lbl:'⚪ Sin gestión'},
+  ];
+  filtros.forEach(function(f){
+    html+='<button class="rep-filter-btn'+(REP_FILTER===f.id?' on':'')+'" onclick="setRepFilter(\''+cartId+'\',\''+f.id+'\')">'+f.lbl+'</button>';
+  });
+  html+='</div>';
+
+  // Búsqueda y exportar
+  html+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">';
+  html+='<input class="tbl-search" id="rep-search" style="margin:0;flex:1;min-width:180px" placeholder="Buscar cliente..." onkeyup="repFiltrar()">';
+  html+='<button class="btn btn-ghost btn-sm" onclick="exportReporteCSV(\''+cartId+'\')" style="color:var(--green);border-color:rgba(26,122,60,.3)">📗 Excel</button>';
+  html+='<button class="btn btn-ghost btn-sm" onclick="printReporte()">🖨 Imprimir</button>';
+  html+='</div>';
+
+  // Tabla
+  html+=buildRepTabla(cartId, pendientes, G);
+  return html;
+}
+
+function buildRepTabla(cartId, pendientes, G){
+  // Aplicar filtro activo
+  var rows=pendientes.filter(function(c){
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    if(REP_FILTER==='ESTA_SEMANA'){var d=c.dia_pago;var h=HOY.getDate();return d>=h&&d<=(h+7);}
+    if(REP_FILTER==='MORA_ALTA'){return c.tramo==='120'||c.tramo==='150';}
+    if(REP_FILTER==='CON_PROMESA'){return p&&p.estado==='promesa';}
+    if(REP_FILTER==='SIN_GESTION'){return !p||!p.estado;}
+    return true; // TODOS
+  });
+
+  if(!rows.length)return '<div class="empty">Sin clientes para este filtro.</div>';
+
+  // Orden: dia_pago asc por default, luego tramo
+  rows.sort(function(a,b){
+    if(REP_SORT.col==='saldo') return (b.saldo-a.saldo)*REP_SORT.dir;
+    if(REP_SORT.col==='cuota') return (b.cuota-a.cuota)*REP_SORT.dir;
+    if(REP_SORT.col==='nombre') return a.nombre.localeCompare(b.nombre)*REP_SORT.dir;
+    if(REP_SORT.col==='tramo'){
+      var ord={MES:1,VENCIDO:2,'60':3,'90':4,'120':5,'150':6};
+      return ((ord[a.tramo]||9)-(ord[b.tramo]||9))*REP_SORT.dir;
+    }
+    // dia_pago: pendientes primero (>=hoy), luego el resto
+    var h=HOY.getDate();
+    var aP=a.dia_pago>=h?a.dia_pago:a.dia_pago+100;
+    var bP=b.dia_pago>=h?b.dia_pago:b.dia_pago+100;
+    return (aP-bP)*REP_SORT.dir;
+  });
+
+  var totalSaldo=rows.reduce(function(s,c){return s+(c.saldo||0);},0);
+  var totalCuota=rows.reduce(function(s,c){return s+(c.cuota||0);},0);
+  var hoy=HOY.getDate();
+
+  function thSort(col,label){
+    var arrow=REP_SORT.col===col?(REP_SORT.dir===1?'↑':'↓'):'↕';
+    return '<th style="cursor:pointer" onclick="repSort(\''+col+'\')">'+label+' <span style="opacity:.5">'+arrow+'</span></th>';
+  }
+
+  var html='<div class="rep-tbl-wrap" id="rep-tbl-container"><table class="rep-tbl" id="rep-tabla">';
+  html+='<thead><tr>';
+  html+='<th>#</th>';
+  html+=thSort('nombre','Cliente');
+  html+=thSort('saldo','Saldo');
+  html+=thSort('cuota','Cuota');
+  html+=thSort('dia_pago','Dia Pago');
+  html+='<th>Ult. Pago</th>';
+  html+=thSort('tramo','Mora');
+  html+='<th>Promesa / Accion</th>';
+  html+='<th>Visita</th>';
+  html+='<th>Nota</th>';
+  html+='<th></th>';
+  html+='</tr></thead><tbody>';
+
+  // Agrupar por "esta semana" vs "resto del mes" vs "mora"
+  var grupos={esta_semana:[],resto_mes:[],mora:[],vencido:[]};
+  rows.forEach(function(c){
+    if(c.tramo==='VENCIDO') grupos.vencido.push(c);
+    else if(['60','90','120','150'].includes(c.tramo)) grupos.mora.push(c);
+    else if(c.dia_pago>=hoy&&c.dia_pago<=(hoy+7)) grupos.esta_semana.push(c);
+    else grupos.resto_mes.push(c);
+  });
+
+  var rendered=0;
+  function renderGrupo(lista, label, color){
+    if(!lista.length)return '';
+    var sub=lista.reduce(function(s,c){return s+(c.cuota||0);},0);
+    var r='<tr class="rep-subtotal"><td colspan="11" style="color:'+color+';border-left:3px solid '+color+'">'+label+' <span style="font-weight:400;color:var(--text3)">· '+lista.length+' clientes · L '+fmt(sub)+' en cuotas</span></td></tr>';
+    lista.forEach(function(c){
+      rendered++;
+      var p=PROMESAS[cartId+'::'+c.nombre];
+      var diasResta=c.dia_pago>=hoy?c.dia_pago-hoy:null;
+      var urgente=diasResta!==null&&diasResta<=3;
+      var prioridad=c.tramo==='120'||c.tramo==='150'?1:c.tramo==='90'||c.tramo==='VENCIDO'?2:c.tramo==='60'?3:4;
+      var fechaVisita='—';
+      // Buscar visita en promesa
+      if(p&&p.estado==='visita'&&p.fecha) fechaVisita='<span class="b bb">🚗 '+p.fecha+'</span>';
+      else if(p&&p.estado==='visita_agenda'&&p.fecha) fechaVisita='<span class="b bb">🗓 '+p.fecha+'</span>';
+
+      var promBadgeStr='<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">+ accion</span>';
+      if(p&&p.estado==='promesa') promBadgeStr='<span class="b bp" title="'+(p.nota||'')+'">📅 '+(p.fecha||'—')+'</span>';
+      else if(p&&p.estado==='pago') promBadgeStr='<span class="b bg">✅ Pago</span>';
+      else if(p&&p.estado==='no-contesta') promBadgeStr='<span class="b bx">📵 N/C</span>';
+      else if(p&&p.estado==='no_contesta') promBadgeStr='<span class="b bx">📵 N/C</span>';
+      else if(p&&p.estado==='visita') promBadgeStr='<span class="b bb">🚗 Visita</span>';
+
+      var tramoCls='tramo-'+c.tramo;
+      var tramoLabel=c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'—')+'d';
+
+      var rowStyle=urgente?'background:rgba(184,68,0,.04)':'';
+      r+='<tr style="'+rowStyle+'" class="rep-row-prioridad-'+prioridad+'" data-search="'+c.nombre.toLowerCase()+' '+c.tramo.toLowerCase()+'">';
+      r+='<td class="mono" style="color:var(--text3);font-size:10px">'+rendered+'</td>';
+      r+='<td class="td-name" style="max-width:160px">'+c.nombre+(urgente&&diasResta===0?'<span style="font-family:var(--mono);font-size:9px;color:var(--red);display:block">HOY</span>':urgente?'<span style="font-family:var(--mono);font-size:9px;color:var(--orange);display:block">en '+diasResta+'d</span>':'')+'</td>';
+      r+='<td class="mono" style="font-weight:700;color:var(--blue)">L '+fmt(c.saldo)+'</td>';
+      r+='<td class="mono">L '+fmt(c.cuota)+'</td>';
+      r+='<td class="mono" style="text-align:center;'+(urgente?'color:var(--orange);font-weight:700':'')+'">'+
+          (c.dia_pago?c.dia_pago+(diasResta!==null?' <span style="font-size:9px;opacity:.6">(+'+diasResta+')</span>':''):'—')+'</td>';
+      r+='<td class="mono" style="font-size:11px">'+(c.ultimo_pago||'—')+'</td>';
+      r+='<td><span class="tramo-badge '+tramoCls+'">'+tramoLabel+'</span></td>';
+      r+='<td>'+promBadgeStr+'</td>';
+      r+='<td>'+fechaVisita+'</td>';
+      r+='<td style="font-size:11px;color:var(--text2);max-width:120px;white-space:normal">'+(p&&p.nota?p.nota:'')+'</td>';
+      r+='<td><span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">📋</span></td>';
+      r+='</tr>';
+    });
+    return r;
+  }
+
+  if(grupos.vencido.length)  html+=renderGrupo(grupos.vencido,'🟠 Vencidos este mes — cobrar HOY','var(--orange)');
+  if(grupos.mora.length)     html+=renderGrupo(grupos.mora,'🔴 En mora — gestión urgente','var(--red)');
+  if(grupos.esta_semana.length) html+=renderGrupo(grupos.esta_semana,'📅 Proximos 7 dias','var(--blue)');
+  if(grupos.resto_mes.length)html+=renderGrupo(grupos.resto_mes,'📋 Resto del mes','var(--text3)');
+
+  // Fila total
+  html+='<tr class="rep-total">';
+  html+='<td colspan="2">TOTAL · '+rows.length+' clientes</td>';
+  html+='<td class="mono">L '+fmt(totalSaldo)+'</td>';
+  html+='<td class="mono">L '+fmt(totalCuota)+' <span style="font-size:9px;font-weight:400;color:var(--text3)">/mes</span></td>';
+  html+='<td colspan="7"></td>';
+  html+='</tr>';
+  html+='</tbody></table></div>';
+  return html;
+}
+
+function setRepFilter(cartId,filtro){
+  REP_FILTER=filtro;
+  // Re-renderizar solo la tabla
+  var data=CARTERAS[cartId];if(!data)return;
+  var cl=data.clientes;
+  var G={MES:[],VENCIDO:[],'60':[],'90':[],'120':[],'150':[],INACTIVO:[],PAGARON:[]};
+  cl.forEach(function(c){
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    if(pagado){G.PAGARON.push(c);return;}
+    var t=c.tramo||'MES';if(G[t])G[t].push(c);else G.MES.push(c);
+  });
+  document.getElementById('tp-REPORTE').innerHTML=buildReporte(cartId,cl,G);
+}
+
+function repSort(col){
+  if(REP_SORT.col===col) REP_SORT.dir*=-1;
+  else{REP_SORT.col=col;REP_SORT.dir=1;}
+  if(!CURRENT)return;
+  setRepFilter(CURRENT,REP_FILTER);
+}
+
+function repFiltrar(){
+  var q=(document.getElementById('rep-search')||{}).value.toLowerCase()||'';
+  document.querySelectorAll('#rep-tabla tbody tr[data-search]').forEach(function(r){
+    r.style.display=r.dataset.search.includes(q)?'':'none';
+  });
+}
+
+function exportReporteCSV(cartId){
+  // Cargar SheetJS si no esta disponible
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){_doExportXLSX(cartId);};
+    s.onerror=function(){_fallbackCSV(cartId);};
+    document.head.appendChild(s);
+  } else {
+    _doExportXLSX(cartId);
+  }
+}
+
+function _getReporteData(cartId){
+  var data=CARTERAS[cartId];if(!data)return[];
+  var cl=data.clientes;
+  var hoy=HOY.getDate();
+  var pendientes=cl.filter(function(c){
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    return !pagado && c.tramo!=='INACTIVO';
+  });
+  pendientes.sort(function(a,b){
+    var ord={VENCIDO:1,'150':2,'120':3,'90':4,'60':5,MES:6};
+    var oa=ord[a.tramo]||7, ob=ord[b.tramo]||7;
+    if(oa!==ob) return oa-ob;
+    var aP=a.dia_pago>=hoy?a.dia_pago:a.dia_pago+100;
+    var bP=b.dia_pago>=hoy?b.dia_pago:b.dia_pago+100;
+    return aP-bP;
+  });
+  return pendientes;
+}
+
+function _doExportXLSX(cartId){
+  var data=CARTERAS[cartId];if(!data)return;
+  var pendientes=_getReporteData(cartId);
+  var hoy=HOY.getDate();
+  var empresa=data.empresa||cartId;
+  var fechaHoy=HOY.toLocaleDateString('es-HN');
+
+  // ── Construir array de filas ──
+  var wsData=[];
+
+  // Fila titulo
+  wsData.push([empresa+' — Reporte de Cobro','','','','','','','','','','']);
+  wsData.push(['Generado: '+fechaHoy+' · Dia '+hoy+' de '+new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate(),'','','','','','','','','','']);
+  wsData.push([]); // espacio
+
+  // KPIs en una fila
+  var totalSaldo=pendientes.reduce(function(s,c){return s+(c.saldo||0);},0);
+  var totalCuota=pendientes.reduce(function(s,c){return s+(c.cuota||0);},0);
+  var enMora=pendientes.filter(function(c){return c.tramo!=='MES';}).length;
+  var conProm=pendientes.filter(function(c){var p=PROMESAS[cartId+'::'+c.nombre];return p&&p.estado==='promesa';}).length;
+  var proximos7=pendientes.filter(function(c){return c.dia_pago>=hoy&&c.dia_pago<=(hoy+7);});
+  var total7=proximos7.reduce(function(s,c){return s+(c.cuota||0);},0);
+  wsData.push(['Pendientes','Saldo Total','Cuota/Mes','Proximos 7d','En Mora','Con Promesa']);
+  wsData.push([pendientes.length, totalSaldo, totalCuota, total7, enMora, conProm]);
+  wsData.push([]); // espacio
+
+  // Encabezados de tabla
+  var headers=['#','Cliente','Saldo (L)','Cuota (L)','Dia Pago','Dias para pago','Ultimo Pago','Mora','Estado','Fecha Promesa','Fecha Visita','Nota'];
+  wsData.push(headers);
+
+  var headerRow=wsData.length; // fila 1-indexed de los headers
+
+  // Filas de datos
+  pendientes.forEach(function(c,i){
+    var p=PROMESAS[cartId+'::'+c.nombre]||{};
+    var diasPara=c.dia_pago>=hoy?(c.dia_pago-hoy):(c.dia_pago>0?(c.dia_pago+new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate()-hoy):0);
+    var fechaPromesa=p.estado==='promesa'?p.fecha||'':'';
+    var fechaVisita=(p.estado==='visita'||p.estado==='visita_agenda')?p.fecha||'':'';
+    var tramoLabel=c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'')+'d';
+    var estadoLabel={promesa:'Prometio pagar',pago:'Pago confirmado','no-contesta':'No contesta','no_contesta':'No contesta',visita:'Visita agendada',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',nota:'Nota'}[p.estado]||p.estado||'Sin gestion';
+    wsData.push([
+      i+1,
+      c.nombre,
+      c.saldo||0,
+      c.cuota||0,
+      c.dia_pago||'',
+      diasPara,
+      c.ultimo_pago||'',
+      tramoLabel,
+      estadoLabel,
+      fechaPromesa,
+      fechaVisita,
+      p.nota||''
+    ]);
+  });
+
+  // Fila totales
+  var dataStart=headerRow+1;
+  var dataEnd=headerRow+pendientes.length;
+  wsData.push([
+    'TOTAL',
+    pendientes.length+' clientes',
+    {f:'SUM(C'+dataStart+':C'+dataEnd+')'},
+    {f:'SUM(D'+dataStart+':D'+dataEnd+')'},
+    '','','','','','','',''
+  ]);
+
+  // ── Crear worksheet ──
+  var ws=XLSX.utils.aoa_to_sheet(wsData);
+
+  // ── Anchos de columna ──
+  ws['!cols']=[
+    {wch:5},   // #
+    {wch:32},  // Cliente
+    {wch:14},  // Saldo
+    {wch:12},  // Cuota
+    {wch:10},  // Dia Pago
+    {wch:13},  // Dias para pago
+    {wch:13},  // Ultimo Pago
+    {wch:10},  // Mora
+    {wch:18},  // Estado
+    {wch:14},  // Fecha Promesa
+    {wch:14},  // Fecha Visita
+    {wch:28},  // Nota
+  ];
+
+  // ── Fusionar celdas del titulo ──
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:11}},
+    {s:{r:1,c:0},e:{r:1,c:11}},
+  ];
+
+  // ── Aplicar estilos celda por celda ──
+  var tramColores={
+    'Vencido': {fg:{rgb:'B84400'},bg:{rgb:'FDEEE5'}},
+    '60d':     {fg:{rgb:'8A5F00'},bg:{rgb:'FDF3DC'}},
+    '90d':     {fg:{rgb:'B84400'},bg:{rgb:'FDEEE5'}},
+    '120d':    {fg:{rgb:'B01020'},bg:{rgb:'FDE8EB'}},
+    '150d':    {fg:{rgb:'800010'},bg:{rgb:'FFCCCC'}},
+    'Al dia':  {fg:{rgb:'1A7A3C'},bg:{rgb:'E6F4EC'}},
+  };
+
+  var estadoColores={
+    'Prometio pagar': {fg:{rgb:'6030B0'},bg:{rgb:'F0EAFB'}},
+    'Pago confirmado':{fg:{rgb:'1A7A3C'},bg:{rgb:'E6F4EC'}},
+    'No contesta':    {fg:{rgb:'4A5568'},bg:{rgb:'E4E7EC'}},
+    'Visita agendada':{fg:{rgb:'1A55A0'},bg:{rgb:'E8F0FB'}},
+    'Sin gestion':    {fg:{rgb:'8896A8'},bg:{rgb:'F4F5F7'}},
+  };
+
+  function styleCell(addr, style){
+    if(!ws[addr]) ws[addr]={t:'z',v:''};
+    ws[addr].s=style;
+  }
+
+  // Titulo
+  var titleAddr=XLSX.utils.encode_cell({r:0,c:0});
+  styleCell(titleAddr,{font:{bold:true,sz:14,color:{rgb:'1A7A3C'}},fill:{fgColor:{rgb:'E6F4EC'}},alignment:{horizontal:'left',vertical:'center'}});
+
+  // Sub titulo
+  var subAddr=XLSX.utils.encode_cell({r:1,c:0});
+  styleCell(subAddr,{font:{sz:10,color:{rgb:'8896A8'}},fill:{fgColor:{rgb:'F4F5F7'}},alignment:{horizontal:'left'}});
+
+  // KPI headers (fila 4, index 3)
+  ['A4','B4','C4','D4','E4','F4'].forEach(function(addr){
+    if(ws[addr]) ws[addr].s={font:{bold:true,sz:9,color:{rgb:'4A5568'}},fill:{fgColor:{rgb:'EEF0F3'}},alignment:{horizontal:'center',vertical:'center'},border:{bottom:{style:'thin',color:{rgb:'CCCCCC'}}}};
+  });
+  // KPI values (fila 5, index 4)
+  ['A5','B5','C5','D5','E5','F5'].forEach(function(addr,i){
+    var colors=['1A7A3C','1A55A0','6030B0','22A050','B01020','6030B0'];
+    if(ws[addr]) ws[addr].s={font:{bold:true,sz:16,color:{rgb:colors[i]}},alignment:{horizontal:'center',vertical:'center'}};
+    // Formato numero para saldo/cuota/etc
+    if(i>=1&&i<=3&&ws[addr]&&typeof ws[addr].v==='number'){
+      ws[addr].z='"L "#,##0';
+    }
+  });
+
+  // Headers de tabla
+  var headerRowIdx=headerRow-1;
+  for(var col=0;col<12;col++){
+    var hAddr=XLSX.utils.encode_cell({r:headerRowIdx,c:col});
+    if(ws[hAddr]) ws[hAddr].s={
+      font:{bold:true,sz:9,color:{rgb:'FFFFFF'}},
+      fill:{fgColor:{rgb:'18202C'}},
+      alignment:{horizontal:'center',vertical:'center',wrapText:true},
+      border:{bottom:{style:'medium',color:{rgb:'000000'}}}
+    };
+  }
+
+  // Filas de datos — colorear Mora y Estado, formato numeros
+  for(var i=0;i<pendientes.length;i++){
+    var rowIdx=headerRow+i; // 0-indexed
+    var c=pendientes[i];
+    var p=PROMESAS[cartId+'::'+c.nombre]||{};
+    var tramoLabel=c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'')+'d';
+    var estadoLabel={promesa:'Prometio pagar',pago:'Pago confirmado','no-contesta':'No contesta','no_contesta':'No contesta',visita:'Visita agendada',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',nota:'Nota'}[p.estado]||p.estado||'Sin gestion';
+
+    // Fila alternada ligera
+    var rowBg=i%2===0?'FFFFFF':'FAFBFC';
+
+    for(var col2=0;col2<12;col2++){
+      var cAddr=XLSX.utils.encode_cell({r:rowIdx,c:col2});
+      if(!ws[cAddr]) continue;
+      ws[cAddr].s={
+        font:{sz:10},
+        fill:{fgColor:{rgb:rowBg}},
+        alignment:{vertical:'center',wrapText:col2===1||col2===11},
+        border:{bottom:{style:'hair',color:{rgb:'E4E7EC'}}}
+      };
+    }
+
+    // Columna Saldo (C) — formato moneda y bold
+    var saldoAddr=XLSX.utils.encode_cell({r:rowIdx,c:2});
+    if(ws[saldoAddr]){ws[saldoAddr].z='"L "#,##0';ws[saldoAddr].s=Object.assign({},ws[saldoAddr].s,{font:{sz:10,bold:true,color:{rgb:'1A55A0'}},alignment:{horizontal:'right',vertical:'center'}});}
+
+    // Columna Cuota (D) — formato moneda
+    var cuotaAddr=XLSX.utils.encode_cell({r:rowIdx,c:3});
+    if(ws[cuotaAddr]){ws[cuotaAddr].z='"L "#,##0';ws[cuotaAddr].s=Object.assign({},ws[cuotaAddr].s,{alignment:{horizontal:'right',vertical:'center'}});}
+
+    // Columna Mora (H=7) — color por tramo
+    var moraAddr=XLSX.utils.encode_cell({r:rowIdx,c:7});
+    var tc=tramColores[tramoLabel];
+    if(ws[moraAddr]&&tc){ws[moraAddr].s=Object.assign({},ws[moraAddr].s,{font:{sz:10,bold:true,color:{rgb:tc.fg.rgb}},fill:{fgColor:{rgb:tc.bg.rgb}},alignment:{horizontal:'center',vertical:'center'}});}
+
+    // Columna Estado (I=8) — color por estado
+    var estAddr=XLSX.utils.encode_cell({r:rowIdx,c:8});
+    var ec=estadoColores[estadoLabel];
+    if(ws[estAddr]&&ec){ws[estAddr].s=Object.assign({},ws[estAddr].s,{font:{sz:10,color:{rgb:ec.fg.rgb}},fill:{fgColor:{rgb:ec.bg.rgb}},alignment:{horizontal:'center',vertical:'center'}});}
+
+    // Dias para pago (F=5) — naranja si urgente
+    var diasAddr=XLSX.utils.encode_cell({r:rowIdx,c:5});
+    if(ws[diasAddr]&&typeof ws[diasAddr].v==='number'&&ws[diasAddr].v<=3){
+      ws[diasAddr].s=Object.assign({},ws[diasAddr].s,{font:{sz:10,bold:true,color:{rgb:'B84400'}},alignment:{horizontal:'center',vertical:'center'}});
+    }
+
+    // Nombre (B=1) — bold si mora alta
+    var nomAddr=XLSX.utils.encode_cell({r:rowIdx,c:1});
+    if(ws[nomAddr]&&(c.tramo==='120'||c.tramo==='150')){
+      ws[nomAddr].s=Object.assign({},ws[nomAddr].s,{font:{sz:10,bold:true}});
+    }
+  }
+
+  // Fila TOTAL — al final
+  var totalRowIdx=headerRow+pendientes.length;
+  for(var tc2=0;tc2<12;tc2++){
+    var tAddr=XLSX.utils.encode_cell({r:totalRowIdx,c:tc2});
+    if(!ws[tAddr]) ws[tAddr]={t:'z',v:''};
+    ws[tAddr].s={font:{bold:true,sz:10,color:{rgb:'18202C'}},fill:{fgColor:{rgb:'EEF0F3'}},border:{top:{style:'medium',color:{rgb:'18202C'}}}};
+  }
+  // Saldo total formato moneda
+  var stAddr=XLSX.utils.encode_cell({r:totalRowIdx,c:2});
+  if(ws[stAddr]){ws[stAddr].z='"L "#,##0';ws[stAddr].s=Object.assign({},ws[stAddr].s,{font:{bold:true,sz:10,color:{rgb:'1A55A0'}},alignment:{horizontal:'right'}});}
+  var ctAddr=XLSX.utils.encode_cell({r:totalRowIdx,c:3});
+  if(ws[ctAddr]){ws[ctAddr].z='"L "#,##0';ws[ctAddr].s=Object.assign({},ws[ctAddr].s,{alignment:{horizontal:'right'}});}
+
+  // Altura de filas
+  ws['!rows']=[];
+  ws['!rows'][0]={hpt:22};
+  ws['!rows'][1]={hpt:16};
+  ws['!rows'][3]={hpt:18};
+  ws['!rows'][4]={hpt:28};
+  ws['!rows'][headerRow-1]={hpt:20};
+  for(var ri=0;ri<pendientes.length;ri++){
+    ws['!rows'][headerRow+ri]={hpt:18};
+  }
+
+  // ── Crear workbook ──
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Reporte de Cobro');
+
+  // Hoja 2: datos limpios para análisis
+  var ws2Data=[['#','Cliente','Saldo','Cuota','Dia Pago','Ultimo Pago','Tramo','Estado','Fecha Promesa','Fecha Visita','Nota']];
+  pendientes.forEach(function(c,i){
+    var p2=PROMESAS[cartId+'::'+c.nombre]||{};
+    var diasPara2=c.dia_pago>=hoy?(c.dia_pago-hoy):0;
+    ws2Data.push([
+      i+1,c.nombre,c.saldo||0,c.cuota||0,c.dia_pago||'',c.ultimo_pago||'',
+      c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'')+'d',
+      p2.estado||'',p2.estado==='promesa'?p2.fecha||'':'',
+      (p2.estado==='visita'||p2.estado==='visita_agenda')?p2.fecha||'':'',
+      p2.nota||''
+    ]);
+  });
+  var ws2=XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols']=[{wch:5},{wch:32},{wch:12},{wch:12},{wch:10},{wch:13},{wch:10},{wch:18},{wch:14},{wch:14},{wch:28}];
+  // Tabla de Excel nativa en hoja 2
+  if(pendientes.length>0){
+    ws2['!autofilter']={ref:'A1:K'+(ws2Data.length)};
+  }
+  XLSX.utils.book_append_sheet(wb,ws2,'Datos');
+
+  // ── Descargar ──
+  var filename='Reporte_Cobro_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx';
+  XLSX.writeFile(wb,filename,{cellStyles:true,bookSST:false,type:'binary'});
+}
+
+function _fallbackCSV(cartId){
+  // Fallback si SheetJS no carga
+  var pendientes=_getReporteData(cartId);
+  var hoy=HOY.getDate();
+  var rows=[['#','Cliente','Saldo','Cuota','Dia Pago','Ultimo Pago','Mora','Estado','Fecha Promesa','Fecha Visita','Nota']];
+  pendientes.forEach(function(c,i){
+    var p=PROMESAS[cartId+'::'+c.nombre]||{};
+    rows.push([i+1,c.nombre,c.saldo,c.cuota,c.dia_pago||'',c.ultimo_pago||'',
+      c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'')+'d',
+      p.estado||'',p.estado==='promesa'?p.fecha||'':'',
+      (p.estado==='visita'||p.estado==='visita_agenda')?p.fecha||'':'',p.nota||'']);
+  });
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='reporte_'+cartId+'_'+HOY.toISOString().split('T')[0]+'.csv';
+  a.click();
+}
+
+function printReporte(){
+  var tbl=document.getElementById('rep-tabla');
+  if(!tbl){alert('Abre el reporte primero.');return;}
+  var data=CARTERAS[CURRENT]||{};
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reporte Cobro — '+data.empresa+'</title>');
+  w.document.write('<style>');
+  w.document.write('body{font-family:Arial,sans-serif;font-size:11px;color:#18202c;padding:16px}');
+  w.document.write('h2{font-size:16px;margin-bottom:4px}');
+  w.document.write('p{font-size:10px;color:#666;margin-bottom:12px}');
+  w.document.write('table{width:100%;border-collapse:collapse;font-size:10px}');
+  w.document.write('th{background:#f0f2f5;padding:6px 8px;text-align:left;border-bottom:2px solid #ccc;font-size:9px;text-transform:uppercase}');
+  w.document.write('td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:middle}');
+  w.document.write('tr:hover td{background:#f5f8ff}');
+  w.document.write('.sub{background:#fafbfc;font-weight:600;color:#4a5568;font-size:9px}');
+  w.document.write('.tot{background:#eef0f3;font-weight:700;border-top:2px solid #ccc}');
+  w.document.write('@media print{button{display:none}}');
+  w.document.write('</style></head><body>');
+  w.document.write('<h2>📊 Reporte de Cobro — '+data.empresa+'</h2>');
+  w.document.write('<p>Generado: '+HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</p>');
+  // Clonar tabla limpia (solo texto, sin botones)
+  var clone=tbl.cloneNode(true);
+  // Remover botones de accion en la copia
+  clone.querySelectorAll('button,span.add-p,[onclick]').forEach(function(el){
+    if(el.tagName==='TD'||el.tagName==='TH')return;
+    el.outerHTML=el.textContent;
+  });
+  // Ultima columna (botón accion) — vaciar
+  clone.querySelectorAll('tr').forEach(function(r){
+    var last=r.lastElementChild;
+    if(last&&(last.tagName==='TD'||last.tagName==='TH'))last.innerHTML='';
+  });
+  w.document.write(clone.outerHTML);
+  w.document.write('<br><p style="font-size:9px;color:#aaa">La Roca Cobranza · '+new Date().toLocaleString('es-HN')+'</p>');
+  w.document.write('</body></html>');
+  w.document.close();
+  setTimeout(function(){w.print();},400);
+}
+
+function fmtK(n){
+  if(n>=1000000)return (n/1000000).toFixed(1)+'M';
+  if(n>=1000)return (n/1000).toFixed(1)+'k';
+  return fmt(n);
+}
+
 // ══ TABLE ══
 function buildTbl(cartId,rows,cls,note){
   if(!rows.length)return '<div class="empty">Sin clientes en este tramo.</div>';
@@ -881,7 +1468,6 @@ function buildPromeTab(cartId,cl){
 }
 
 // ══ VISITAS ══
-// Quick visit button — opens action modal pre-set to visita_realizada
 function quickVisita(cartId,nombre){
   var cl=(CARTERAS[cartId]||{}).clientes||[];
   var c=cl.find(function(x){return x.nombre===nombre;})||{cuota:0,saldo:0};
@@ -896,8 +1482,6 @@ function quickVisita(cartId,nombre){
   document.getElementById('modal-accion').classList.add('show');
 }
 
-
-// ── BORRAR VISITA ──
 async function borrarVisita(el){
   var id=el.getAttribute('data-id');
   var cartId=el.getAttribute('data-cart');
@@ -905,22 +1489,15 @@ async function borrarVisita(el){
   if(!confirm('¿Borrar esta visita del historial?'))return;
   try{
     await supa.from('historial_clientes').delete().eq('id',id);
-    // Refresh visitas tab
     var pane=document.getElementById('tp-VISITAS');
-    if(pane&&pane.classList.contains('on')){
-      pane.innerHTML='<div class="empty">Cargando...</div>';
-      buildVisitas(cartId,pane);
-    }
-    // Also refresh visit-day-detail if open
-    var dd=document.getElementById('visit-day-detail');
-    if(dd)dd.innerHTML='';
+    if(pane&&pane.classList.contains('on')){pane.innerHTML='<div class="empty">Cargando...</div>';buildVisitas(cartId,pane);}
+    var dd=document.getElementById('visit-day-detail');if(dd)dd.innerHTML='';
   }catch(e){alert('Error: '+e.message);}
 }
 
-// ── VISIT CALENDAR ──
 function buildVisitCal(byDate,cartId){
-  var now=new Date(); var yr=now.getFullYear(); var mo=now.getMonth();
-  var first=new Date(yr,mo,1); var last=new Date(yr,mo+1,0);
+  var now=new Date();var yr=now.getFullYear();var mo=now.getMonth();
+  var first=new Date(yr,mo,1);var last=new Date(yr,mo+1,0);
   var mN=first.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
   var hD=now.getDate();
   var html='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)">';
@@ -932,12 +1509,9 @@ function buildVisitCal(byDate,cartId){
     var dateStr=yr+'-'+(mo+1<10?'0':'')+(mo+1)+'-'+(day<10?'0':'')+day;
     var visits=byDate[dateStr]||[];
     var isT=day===hD;
-    var daytitle=visits.length?visits.length+' visita(s)':'';
-    html+='<div class="cal-day'+(isT?' today':'')+'" data-vdate="'+dateStr+'" style="cursor:'+(visits.length?'pointer':'default')+'"'+(visits.length?' onclick="showVisitDay(this)"':'')+' title="'+daytitle+'">';
+    html+='<div class="cal-day'+(isT?' today':'')+'" data-vdate="'+dateStr+'" style="cursor:'+(visits.length?'pointer':'default')+'"'+(visits.length?' onclick="showVisitDay(this)"':'')+' title="'+(visits.length?visits.length+' visita(s)':'')+'">';
     html+='<div class="cal-day-num">'+day+'</div>';
-    if(visits.length){
-      html+='<div style="background:var(--bluebg);color:var(--blue);border-radius:3px;padding:1px 4px;font-size:9px;font-family:var(--mono);font-weight:600">&#x1F697; '+visits.length+'</div>';
-    }
+    if(visits.length)html+='<div style="background:var(--bluebg);color:var(--blue);border-radius:3px;padding:1px 4px;font-size:9px;font-family:var(--mono);font-weight:600">&#x1F697; '+visits.length+'</div>';
     html+='</div>';
   }
   html+='</div><div id="visit-day-detail" style="margin-top:8px"></div></div>';
@@ -949,8 +1523,6 @@ function showVisitDay(dayEl){
   var el=document.getElementById('visit-day-detail');if(!el)return;
   var date=new Date(dateStr+'T12:00:00');
   var label=date.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long'});
-  // Get visits from ECG_DATA? No - re-query from last loaded byDate is not available
-  // So we query Supabase directly
   if(!supa){el.innerHTML='<div class="empty">Sin conexion.</div>';return;}
   el.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text3);padding:6px">Cargando...</div>';
   supa.from('historial_clientes').select('*').eq('cartera_id',CURRENT).eq('tipo','visita_realizada').gte('fecha_visita',dateStr).lte('fecha_visita',dateStr).then(function(r2){
@@ -960,11 +1532,8 @@ function showVisitDay(dayEl){
       var cl2=((CARTERAS[CURRENT]||{}).clientes||[]).find(function(c){return c.nombre===v.cliente_nombre;})||{};
       html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">';
       html+='<div><div style="font-size:12px;font-weight:500">'+v.cliente_nombre+'</div><div style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+(cl2.tramo||'')+(v.nota?' · '+v.nota:'')+'</div></div>';
-      html+='<div style="display:flex;gap:4px">';
-      html+='<span class="add-p" data-cart="'+CURRENT+'" data-nom="'+esc(v.cliente_nombre)+'" onclick="reagendarVisita(this.dataset.cart,this.dataset.nom)" style="background:var(--bluebg);color:var(--blue)">&#x1F504; Reagendar</span>';
-      html+='<span class="add-p" data-id="'+v.id+'" data-cart="'+CURRENT+'" onclick="borrarVisita(this)" style="background:var(--redbg);color:var(--red);border-color:rgba(176,16,32,.2)">&#x1F5D1; Borrar</span>';
-      html+='</div>';
-      html+='</div>';
+      html+='<div style="display:flex;gap:4px"><span class="add-p" data-cart="'+CURRENT+'" data-nom="'+esc(v.cliente_nombre)+'" onclick="reagendarVisita(this.dataset.cart,this.dataset.nom)" style="background:var(--bluebg);color:var(--blue)">&#x1F504; Reagendar</span>';
+      html+='<span class="add-p" data-id="'+v.id+'" data-cart="'+CURRENT+'" onclick="borrarVisita(this)" style="background:var(--redbg);color:var(--red);border-color:rgba(176,16,32,.2)">&#x1F5D1; Borrar</span></div></div>';
     });
     html+='</div>';
     el.innerHTML=html;
@@ -992,10 +1561,10 @@ async function buildVisitas(cartId,container){
     var cl=(CARTERAS[cartId]||{}).clientes||[];
     var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).in('tipo',['visita_agenda','visita_realizada']).order('created_at',{ascending:false});
     if(r.error)throw r.error;
-    var byC={}, byDate={};
+    var byC={},byDate={};
     (r.data||[]).forEach(function(h){
       if(!byC[h.cliente_nombre])byC[h.cliente_nombre]={agenda:[],realizadas:[]};
-      if(h.tipo==='visita_agenda')   byC[h.cliente_nombre].agenda.push(h);
+      if(h.tipo==='visita_agenda')byC[h.cliente_nombre].agenda.push(h);
       if(h.tipo==='visita_realizada'){
         byC[h.cliente_nombre].realizadas.push(h);
         var d=(h.fecha_visita||h.fecha_accion||'').substring(0,10);
@@ -1003,32 +1572,9 @@ async function buildVisitas(cartId,container){
       }
     });
     cl.forEach(function(c){var p=PROMESAS[cartId+'::'+c.nombre];if(p&&p.estado==='visita'&&!byC[c.nombre])byC[c.nombre]={agenda:[],realizadas:[]};});
-
-    // ── BORRAR VISITA ──
-async function borrarVisita(el){
-  var id=el.getAttribute('data-id');
-  var cartId=el.getAttribute('data-cart');
-  if(!id||!supa){alert('No se puede borrar.');return;}
-  if(!confirm('¿Borrar esta visita del historial?'))return;
-  try{
-    await supa.from('historial_clientes').delete().eq('id',id);
-    // Refresh visitas tab
-    var pane=document.getElementById('tp-VISITAS');
-    if(pane&&pane.classList.contains('on')){
-      pane.innerHTML='<div class="empty">Cargando...</div>';
-      buildVisitas(cartId,pane);
-    }
-    // Also refresh visit-day-detail if open
-    var dd=document.getElementById('visit-day-detail');
-    if(dd)dd.innerHTML='';
-  }catch(e){alert('Error: '+e.message);}
-}
-
-// ── VISIT CALENDAR ──
     var calHtml=buildVisitCal(byDate,cartId);
     var html='<div style="margin-bottom:16px">'+calHtml+'</div>';
     html+='<input class="tbl-search" id="S-VIS" onkeyup="fltVis()" placeholder="Busca cliente para agendar visita...">';
-
     if(Object.keys(byC).length){
       html+='<div id="vis-existing">';
       Object.keys(byC).sort().forEach(function(nombre){
@@ -1044,21 +1590,19 @@ async function borrarVisita(el){
         if(fpProx)html+='<div style="font-size:11px;color:var(--blue);margin-top:3px">&#x1F5D3; Proxima: '+fpProx+'</div>';
         if(realizadas.length)html+='<div class="vis-dates">'+realizadas.map(function(d){return '<span class="vd-ok">&#x2713; '+d+'</span>';}).join('')+'</div>';
         else html+='<div style="font-size:11px;color:var(--text3);margin-top:3px">Sin visitas realizadas</div>';
-        html+='</div>';
-        html+='<div style="display:flex;flex-direction:column;gap:4px">';
+        html+='</div><div style="display:flex;flex-direction:column;gap:4px">';
         html+='<span class="add-p" onclick="quickVisita('+qv+')" style="background:var(--greenbg);color:var(--green);border-color:rgba(26,122,60,.3)">&#x1F697; Visita</span>';
         html+='<span class="add-p" onclick="reagendarVisita('+qv+')" style="background:var(--bluebg);color:var(--blue);border-color:rgba(26,85,160,.3)">&#x1F504; Reagendar</span>';
-        // Add delete buttons for each realized visit
         if(v.realizadas.length){
           v.realizadas.forEach(function(rv){
-            if(rv.id) html+='<span class="add-p" data-id="'+rv.id+'" data-cart="'+cartId+'" onclick="borrarVisita(this)" style="background:var(--redbg);color:var(--red);border-color:rgba(176,16,32,.2);font-size:10px">&#x1F5D1; '+new Date((rv.fecha_visita||rv.fecha_accion||rv.created_at)+'').toLocaleDateString('es-HN',{month:'short',day:'numeric'})+'</span>';
+            if(rv.id)html+='<span class="add-p" data-id="'+rv.id+'" data-cart="'+cartId+'" onclick="borrarVisita(this)" style="background:var(--redbg);color:var(--red);border-color:rgba(176,16,32,.2);font-size:10px">&#x1F5D1; '+new Date((rv.fecha_visita||rv.fecha_accion||rv.created_at)+'').toLocaleDateString('es-HN',{month:'short',day:'numeric'})+'</span>';
           });
         }
         html+='</div></div>';
       });
       html+='</div>';
-    } else {
-      html+='<div class="empty">No hay visitas aun. Busca un cliente abajo para agendar.</div>';
+    }else{
+      html+='<div class="empty">No hay visitas aun.</div>';
     }
     html+='<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px"><div class="cart-meta" style="margin-bottom:8px">AGENDAR NUEVA VISITA</div><div id="vis-all" style="display:none">';
     cl.filter(function(c){return c.tramo!=='INACTIVO';}).forEach(function(c){
@@ -1132,22 +1676,7 @@ async function loadClientHist(cartId,nombre,cuota,saldo){
   }catch(e){detEl.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error(e);}
 }
 
-// ══ ECG ══
-async function quickVisita(cartId,nombre,tipo){
-  // Quick visit registration without opening modal
-  var c=((CARTERAS[cartId]||{}).clientes||[]).find(function(x){return x.nombre===nombre;});
-  var fecha=HOY.toISOString().split('T')[0];
-  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:'visita_'+tipo,nota:tipo==='realizada'?'Visita realizada':'Visita agendada',fecha_accion:fecha,fecha_visita:fecha,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
-  setConn(true,'Visita registrada ✓');
-  setTimeout(function(){setConn(true,'Conectado');},2000);
-  // If agenda - ask for date
-  if(tipo==='agenda'){
-    openAccion(cartId,nombre,c?c.cuota:0,c?c.saldo:0);
-    document.getElementById('ac-tipo').value='visita_agenda';
-    toggleAcFields();
-  }
-}
-
+// ══ VISITAS CAL ══
 async function buildVisitasCal(cartId,container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion.</div>';return;}
   try{
@@ -1156,46 +1685,35 @@ async function buildVisitasCal(cartId,container){
     if(r.error)throw r.error;
     var data=r.data||[];
     if(!data.length){container.innerHTML='<div class="empty">No hay visitas registradas aun.</div>';return;}
-
-    // Group by date
     var byDate={};
     data.forEach(function(h){
-      var fecha=h.fecha_visita||h.fecha_accion||'';
-      if(!fecha)return;
+      var fecha=h.fecha_visita||h.fecha_accion||'';if(!fecha)return;
       var d=fecha.substring(0,10);
       if(!byDate[d])byDate[d]={realizadas:[],agendadas:[]};
       if(h.tipo==='visita_realizada')byDate[d].realizadas.push(h);
       else byDate[d].agendadas.push(h);
     });
-
-    // Sort dates descending
     var dates=Object.keys(byDate).sort(function(a,b){return b.localeCompare(a);});
-
-    var html='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px">'+dates.length+' dias con actividad · '+data.filter(function(h){return h.tipo==="visita_realizada";}).length+' visitas realizadas</div>';
-
+    var html='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px">'+dates.length+' dias con actividad · '+data.filter(function(h){return h.tipo==='visita_realizada';}).length+' visitas realizadas</div>';
     dates.forEach(function(dateStr){
       var v=byDate[dateStr];
       var fecha=new Date(dateStr+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-      html+='<div class="sec-card" style="margin-bottom:10px"><div class="sec-title">';
-      html+='<span>📅 '+fecha+'</span>';
-      html+='<span style="font-family:var(--mono);font-size:10px">';
+      html+='<div class="sec-card" style="margin-bottom:10px"><div class="sec-title"><span>📅 '+fecha+'</span><span>';
       if(v.realizadas.length)html+='<span class="b bg" style="margin-right:4px">✅ '+v.realizadas.length+' realizadas</span>';
-      if(v.agendadas.length) html+='<span class="b bb">🗓 '+v.agendadas.length+' agendadas</span>';
+      if(v.agendadas.length)html+='<span class="b bb">🗓 '+v.agendadas.length+' agendadas</span>';
       html+='</span></div>';
-
       if(v.realizadas.length){
         html+='<div style="font-family:var(--mono);font-size:9px;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Visitados</div>';
         v.realizadas.forEach(function(h){
           var c=cl.find(function(x){return x.nombre===h.cliente_nombre;});
           html+='<div class="cli-row"><div><div class="cli-name">'+h.cliente_nombre+'</div>';
-          html+='<div class="cli-detail">'+(c?'Saldo: L '+fmt(c.saldo)+' · Cuota: L '+fmt(c.cuota)+' · '+c.tramo:'')+(h.nota?' · '+h.nota:'')+'</div></div>';
+          html+='<div class="cli-detail">'+(c?'Saldo: L '+fmt(c.saldo)+' · '+c.tramo:'')+(h.nota?' · '+h.nota:'')+'</div></div>';
           html+='<div class="cli-right"><span class="b bg">✅ Visitado</span>';
           var _rqv="'"+cartId+"','"+esc(h.cliente_nombre)+"'";
-          html+='<span class="add-p" style="background:var(--bluebg);border-color:var(--blue);color:var(--blue)" onclick="reagendarVisita('+_rqv+')">&#x1F504; Reagendar</span>';
+          html+='<span class="add-p" onclick="reagendarVisita('+_rqv+')" style="background:var(--bluebg);border-color:var(--blue);color:var(--blue)">&#x1F504; Reagendar</span>';
           html+='</div></div>';
         });
       }
-
       if(v.agendadas.length){
         html+='<div style="font-family:var(--mono);font-size:9px;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px">Agendadas</div>';
         v.agendadas.forEach(function(h){
@@ -1204,29 +1722,27 @@ async function buildVisitasCal(cartId,container){
           html+='<div class="cli-detail">'+(c?'Saldo: L '+fmt(c.saldo)+' · '+c.tramo:'')+(h.nota?' · '+h.nota:'')+'</div></div>';
           html+='<div class="cli-right"><span class="b bb">🗓 Agendada</span>';
           var _mqv="'"+cartId+"','"+esc(h.cliente_nombre)+"'";
-          html+='<span class="add-p" style="background:var(--greenbg);border-color:var(--green);color:var(--green)" onclick="marcarVisitaRealizada('+_mqv+')">&#x2705; Marcar visitado</span>';
+          html+='<span class="add-p" onclick="marcarVisitaRealizada('+_mqv+')" style="background:var(--greenbg);border-color:var(--green);color:var(--green)">&#x2705; Marcar visitado</span>';
           html+='</div></div>';
         });
       }
       html+='</div>';
     });
-
     container.innerHTML=html;
   }catch(e){container.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error(e);}
 }
-
-
 
 async function marcarVisitaRealizada(cartId,nombre){
   var fecha=HOY.toISOString().split('T')[0];
   await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:'visita_realizada',nota:'Visita realizada',fecha_accion:fecha,fecha_visita:fecha,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
   setConn(true,'Visita registrada ✓');
   setTimeout(function(){setConn(true,'Conectado');},2000);
-  // Refresh tab
   var pane=document.getElementById('tp-VISITAS_CAL');
   if(pane&&pane.classList.contains('on')){pane.innerHTML='<div class="empty">Actualizando...</div>';buildVisitasCal(cartId,pane);}
 }
 
+// ══ ECG ══
+// FIX #2: buildEcgGestion excluye clientes que ya pagaron
 async function buildECG(cartId,container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion a Supabase.</div>';return;}
   try{
@@ -1234,9 +1750,7 @@ async function buildECG(cartId,container){
     if(r.error)throw r.error;
     var raw=r.data||[];
     if(!raw.length){container.innerHTML='<div class="empty">📊 Sube al menos 1 PDF para ver el pulso.<br><span style="font-size:11px;color:var(--text3)">Cada carga genera un punto.</span></div>';return;}
-    // Sort by created_at
     raw.sort(function(a,b){return new Date(a.created_at)-new Date(b.created_at);});
-    // Deduplicate by ID only
     var seenIds=new Set();var snaps=[];
     raw.forEach(function(s){if(!seenIds.has(s.id)){seenIds.add(s.id);snaps.push(s);}});
     if(snaps.length===1)snaps.push(snaps[0]);
@@ -1249,11 +1763,8 @@ async function buildECG(cartId,container){
     ];
     var html='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px">'+snaps.length+' punto(s) · '+snaps[0].fecha+' → '+snaps[snaps.length-1].fecha+'</div>';
     TRAMOS.forEach(function(tr){
-      var vals=snaps.map(function(s,idx){
-        return{fecha:s.fecha,created_at:s.created_at,count:(s.tramos&&s.tramos[tr.id])||0,clientes:(s.clientes_por_tramo&&s.clientes_por_tramo[tr.id])||[],idx:idx};
-      });
-      var maxV=Math.max.apply(null,vals.map(function(v){return v.count;}));
-      if(maxV===0)maxV=1;
+      var vals=snaps.map(function(s,idx){return{fecha:s.fecha,created_at:s.created_at,count:(s.tramos&&s.tramos[tr.id])||0,clientes:(s.clientes_por_tramo&&s.clientes_por_tramo[tr.id])||[],idx:idx};});
+      var maxV=Math.max.apply(null,vals.map(function(v){return v.count;}));if(maxV===0)maxV=1;
       var W=600,H=90,PAD=32;
       var stepX=vals.length>1?(W-PAD*2)/(vals.length-1):0;
       var first=vals[0].count,last=vals[vals.length-1].count;
@@ -1263,7 +1774,6 @@ async function buildECG(cartId,container){
       var pts=vals.map(function(v,i){var x=PAD+i*stepX;var y=H-PAD-((v.count/maxV)*(H-PAD*2));return{x:x,y:y,count:v.count,fecha:v.fecha,created_at:v.created_at,clientes:v.clientes,idx:i};});
       var pathD=pts.map(function(p,i){return(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
       var fillD=pathD+' L'+pts[pts.length-1].x.toFixed(1)+','+H+' L'+PAD+','+H+' Z';
-      // Store ECG_DATA
       pts.forEach(function(p){ECG_DATA[cartId+'_'+tr.id+'_'+p.idx]={fecha:p.fecha,count:p.count,clientes:p.clientes,idx:p.idx,cartId:cartId,tramoId:tr.id};});
       var svg='<svg style="width:100%;overflow:visible" viewBox="0 0 '+W+' '+H+'" height="'+H+'">';
       svg+='<defs><linearGradient id="g'+cartId+tr.id+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+lineColor+'" stop-opacity="0.2"/><stop offset="100%" stop-color="'+lineColor+'" stop-opacity="0"/></linearGradient></defs>';
@@ -1282,103 +1792,73 @@ async function buildECG(cartId,container){
       svg+='</svg>';
       html+='<div class="ecg-wrap"><div class="ecg-hdr"><span><span style="width:10px;height:10px;border-radius:50%;background:'+tr.color+';display:inline-block;margin-right:6px"></span>Mora <strong>'+tr.label+'</strong></span><span class="ecg-badge '+trend+'">'+tLbl+'</span></div>'+svg+'<div class="snap-detail" id="snap-'+cartId+'-'+tr.id+'"></div></div>';
     });
-
-    // ── GESTIÓN SECTION ──
-    // Show promesas and visitas trend from snapshots
-    html += buildEcgGestion(snaps, cartId);
-
-        container.innerHTML=html;
+    html+=buildEcgGestion(snaps,cartId);
+    container.innerHTML=html;
   }catch(e){container.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error('buildECG:',e);}
 }
-function buildEcgGestion(snaps, cartId){
-  if(snaps.length < 2) return '';
 
-  // Use snapshot gestion data if available
-  var hasGestion = snaps.some(function(s){return s.gestion;});
-
-  // Also compute from current PROMESAS for latest point
-  var cl = (CARTERAS[cartId]||{}).clientes||[];
-  var nPromesa=0, nVisita=0, nSinGestion=0;
-  var cPromesa=[], cVisita=[], cSinGestion=[];
+function buildEcgGestion(snaps,cartId){
+  if(snaps.length<2)return '';
+  var cl=(CARTERAS[cartId]||{}).clientes||[];
+  var nPromesa=0,nVisita=0,nSinGestion=0;
+  var cPromesa=[],cVisita=[],cSinGestion=[];
   cl.forEach(function(c){
-    if(c.tramo==='MES'||c.tramo==='INACTIVO') return;
+    if(c.tramo==='MES'||c.tramo==='INACTIVO')return;
+    // FIX #2: excluir pagados del pulso de gestión
     var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    if(pagado)return; // ← FIX
+
     if(p&&p.estado==='promesa'){nPromesa++;cPromesa.push(c.nombre);}
     else if(p&&(p.estado==='visita'||p.estado==='visita_agenda')){nVisita++;cVisita.push(c.nombre);}
     else{nSinGestion++;cSinGestion.push(c.nombre);}
   });
-
-  var total = nPromesa+nVisita+nSinGestion;
-  if(total===0) return '';
-
-  var pctPromesa = total>0?Math.round(nPromesa/total*100):0;
-  var pctVisita  = total>0?Math.round(nVisita/total*100):0;
-  var pctSin     = total>0?Math.round(nSinGestion/total*100):0;
-
-  var html = '<div class="ecg-wrap" style="border-left:3px solid var(--purple)">';
-  html += '<div class="ecg-hdr"><span>📋 <strong>Gestión activa</strong> — clientes en mora con y sin acción</span></div>';
-
-  // Summary bar
-  html += '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
-  html += '<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Con promesa</div><div class="kpi-v" style="color:var(--purple)">'+nPromesa+'</div><div class="kpi-s">'+pctPromesa+'% gestionados</div></div>';
-  html += '<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Con visita</div><div class="kpi-v" style="color:var(--blue)">'+nVisita+'</div><div class="kpi-s">'+pctVisita+'% visitados</div></div>';
-  html += '<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Sin gestión</div><div class="kpi-v" style="color:var(--red)">'+nSinGestion+'</div><div class="kpi-s">'+pctSin+'% sin acción</div></div>';
-  html += '</div>';
-
-  // Progress bar
-  html += '<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:12px;gap:1px">';
-  if(pctPromesa>0) html += '<div style="width:'+pctPromesa+'%;background:var(--purple);transition:width .4s" title="Con promesa: '+nPromesa+'"></div>';
-  if(pctVisita>0)  html += '<div style="width:'+pctVisita+'%;background:var(--blue);transition:width .4s" title="Con visita: '+nVisita+'"></div>';
-  if(pctSin>0)     html += '<div style="width:'+pctSin+'%;background:var(--redbg);border:1px solid rgba(176,16,32,.2);transition:width .4s" title="Sin gestión: '+nSinGestion+'"></div>';
-  html += '</div>';
-  html += '<div style="display:flex;gap:12px;font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:12px">';
-  html += '<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--purple);display:inline-block"></span>Promesa</span>';
-  html += '<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></span>Visita</span>';
-  html += '<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--redbg);border:1px solid rgba(176,16,32,.3);display:inline-block"></span>Sin gestión</span>';
-  html += '</div>';
-
-  // Client lists (collapsible)
+  var total=nPromesa+nVisita+nSinGestion;if(total===0)return '';
+  var pctPromesa=total>0?Math.round(nPromesa/total*100):0;
+  var pctVisita=total>0?Math.round(nVisita/total*100):0;
+  var pctSin=total>0?Math.round(nSinGestion/total*100):0;
+  var html='<div class="ecg-wrap" style="border-left:3px solid var(--purple)">';
+  html+='<div class="ecg-hdr"><span>📋 <strong>Gestión activa</strong> — clientes en mora con y sin acción</span></div>';
+  html+='<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
+  html+='<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Con promesa</div><div class="kpi-v" style="color:var(--purple)">'+nPromesa+'</div><div class="kpi-s">'+pctPromesa+'% gestionados</div></div>';
+  html+='<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Con visita</div><div class="kpi-v" style="color:var(--blue)">'+nVisita+'</div><div class="kpi-s">'+pctVisita+'% visitados</div></div>';
+  html+='<div class="kpi-card" style="flex:1;min-width:90px"><div class="kpi-l">Sin gestión</div><div class="kpi-v" style="color:var(--red)">'+nSinGestion+'</div><div class="kpi-s">'+pctSin+'% sin acción</div></div>';
+  html+='</div>';
+  html+='<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:12px;gap:1px">';
+  if(pctPromesa>0)html+='<div style="width:'+pctPromesa+'%;background:var(--purple)" title="Con promesa: '+nPromesa+'"></div>';
+  if(pctVisita>0) html+='<div style="width:'+pctVisita+'%;background:var(--blue)" title="Con visita: '+nVisita+'"></div>';
+  if(pctSin>0)    html+='<div style="width:'+pctSin+'%;background:var(--redbg);border:1px solid rgba(176,16,32,.2)" title="Sin gestión: '+nSinGestion+'"></div>';
+  html+='</div>';
   if(cSinGestion.length){
-    html += '<div style="margin-bottom:8px"><div style="font-family:var(--mono);font-size:9px;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🔴 Sin gestión ('+cSinGestion.length+') — necesitan atención</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    html+='<div style="margin-bottom:8px"><div style="font-family:var(--mono);font-size:9px;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🔴 Sin gestión ('+cSinGestion.length+') — necesitan atención</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     cSinGestion.forEach(function(n){
       var c2=cl.find(function(x){return x.nombre===n;})||{};
-      html += '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--redbg);color:var(--red);cursor:pointer" data-cid="'+cartId+'" data-nom="'+esc(n)+'" data-cuota="'+(c2.cuota||0)+'" data-saldo="'+(c2.saldo||0)+'" onclick="openAccion(this.dataset.cid,this.dataset.nom,+this.dataset.cuota,+this.dataset.saldo)">'+n+'</span>';
+      html+='<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--redbg);color:var(--red);cursor:pointer" data-cid="'+cartId+'" data-nom="'+esc(n)+'" data-cuota="'+(c2.cuota||0)+'" data-saldo="'+(c2.saldo||0)+'" onclick="openAccion(this.dataset.cid,this.dataset.nom,+this.dataset.cuota,+this.dataset.saldo)">'+n+'</span>';
     });
-    html += '</div></div>';
+    html+='</div></div>';
   }
-
   if(cPromesa.length){
-    html += '<div style="margin-bottom:8px"><div style="font-family:var(--mono);font-size:9px;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🟣 Con promesa ('+cPromesa.length+')</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
-    cPromesa.forEach(function(n){
-      var p2=PROMESAS[cartId+'::'+n]||{};
-      var fechaLabel=p2.fecha?(' ('+p2.fecha.substring(5,10).replace('-','/')+')'):'';
-      html += '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--purplebg);color:var(--purple)">'+n+fechaLabel+'</span>';
-    });
-    html += '</div></div>';
+    html+='<div style="margin-bottom:8px"><div style="font-family:var(--mono);font-size:9px;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🟣 Con promesa ('+cPromesa.length+')</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    cPromesa.forEach(function(n){var p2=PROMESAS[cartId+'::'+n]||{};var fl=p2.fecha?(' ('+p2.fecha.substring(5,10).replace('-','/')+')'):'';html+='<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--purplebg);color:var(--purple)">'+n+fl+'</span>';});
+    html+='</div></div>';
   }
-
   if(cVisita.length){
-    html += '<div><div style="font-family:var(--mono);font-size:9px;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🚗 Con visita ('+cVisita.length+')</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
-    cVisita.forEach(function(n){
-      html += '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bluebg);color:var(--blue)">'+n+'</span>';
-    });
-    html += '</div></div>';
+    html+='<div><div style="font-family:var(--mono);font-size:9px;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🚗 Con visita ('+cVisita.length+')</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    cVisita.forEach(function(n){html+='<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bluebg);color:var(--blue)">'+n+'</span>';});
+    html+='</div></div>';
   }
-
-  html += '</div>';
+  html+='</div>';
   return html;
 }
-
 
 function showEcgDetail(key){
   var data=ECG_DATA[key];if(!data)return;
   var el=document.getElementById('snap-'+data.cartId+'-'+data.tramoId);if(!el)return;
   if(el.style.display!=='none'&&el.dataset.key===key){el.style.display='none';return;}
   el.dataset.key=key;el.style.display='block';
-
   var cartId=data.cartId;
   var prevKey=cartId+'_'+data.tramoId+'_'+(data.idx-1);
   var prevData=data.idx>0?ECG_DATA[prevKey]:null;
@@ -1386,58 +1866,43 @@ function showEcgDetail(key){
   var prevNames=prevData?new Set((prevData.clientes||[]).map(function(c){return c.nombre;})):new Set();
   var salieron=prevData?(prevData.clientes||[]).filter(function(c){return !currNames.has(c.nombre);}):[];
   var entraron=prevData?(data.clientes||[]).filter(function(c){return !prevNames.has(c.nombre);}):[];
-  var siguen=data.clientes||[];
-  var dateLabel=data.created_at?new Date(data.created_at).toLocaleDateString('es-HN'):data.fecha;
 
-  // Helper: get gestión badge for a client name using current PROMESAS
+  // FIX #3: filtrar pagados reales del snapshot "siguen en mora"
+  var siguen=(data.clientes||[]).filter(function(c){
+    var cl2=((CARTERAS[cartId]||{}).clientes||[]).find(function(x){return x.nombre===c.nombre;});
+    if(!cl2)return true;
+    var p2=PROMESAS[cartId+'::'+c.nombre];
+    var esPagado=pagoEsteMes(cl2.ultimo_pago)&&!(p2&&p2.mora_pendiente);
+    return !esPagado;
+  });
+
   function gestBadge(nombre){
-    var p=PROMESAS[cartId+'::'+nombre];
-    if(!p||!p.estado) return ''; // no action
-    if(p.estado==='promesa') return ' <span style="font-size:10px">📅</span>';
-    if(p.estado==='visita'||p.estado==='visita_agenda'||p.estado==='visita_realizada') return ' <span style="font-size:10px">🚗</span>';
-    if(p.estado==='pago') return ' <span style="font-size:10px">✅</span>';
-    if(p.estado==='no-contesta'||p.estado==='no_contesta') return ' <span style="font-size:10px">📵</span>';
+    var p=PROMESAS[cartId+'::'+nombre];if(!p||!p.estado)return '';
+    if(p.estado==='promesa')return ' <span style="font-size:10px">📅</span>';
+    if(p.estado==='visita'||p.estado==='visita_agenda'||p.estado==='visita_realizada')return ' <span style="font-size:10px">🚗</span>';
+    if(p.estado==='pago')return ' <span style="font-size:10px">✅</span>';
+    if(p.estado==='no-contesta'||p.estado==='no_contesta')return ' <span style="font-size:10px">📵</span>';
     return '';
   }
-  function hasGestion(nombre){
-    var p=PROMESAS[cartId+'::'+nombre];
-    return p&&p.estado&&p.estado!=='';
-  }
-
-  // Chip builder: red if no gestión, colored badge if has gestión
+  function hasGestion(nombre){var p=PROMESAS[cartId+'::'+nombre];return p&&p.estado&&p.estado!=='';}
   function chip(c,baseClass){
-    var badge=gestBadge(c.nombre);
-    var noAct=!hasGestion(c.nombre);
-    // For "siguen" chips: red background if no action, gray if has action
-    var chipClass=baseClass;
-    if(baseClass==='chip-gray'&&noAct) chipClass='chip-red'; // highlight no-action clients
-    return '<span class="'+chipClass+'" style="'+(noAct&&baseClass==='chip-gray'?'border:1.5px solid rgba(176,16,32,.4);font-weight:600':'')+'">'+c.nombre+badge+' — L '+fmt(c.saldo||0)+'</span>';
+    var badge=gestBadge(c.nombre);var noAct=!hasGestion(c.nombre);
+    var chipClass=baseClass==='chip-gray'&&noAct?'chip-red':baseClass;
+    return '<span class="'+chipClass+'">'+c.nombre+badge+' — L '+fmt(c.saldo||0)+'</span>';
   }
-
+  var dateLabel=data.created_at?new Date(data.created_at).toLocaleDateString('es-HN'):data.fecha;
   var html='<div class="snap-title">📅 '+dateLabel+' — '+data.count+' cliente(s) en mora</div>';
   html+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:6px">📅=promesa &nbsp; 🚗=visita &nbsp; sin ícono = sin gestión</div>';
-
-  if(salieron.length){
-    html+='<div class="snap-section" style="color:var(--green)">✅ Salieron de mora ('+salieron.length+')</div>';
-    html+='<div class="snap-chips">'+salieron.map(function(c){return chip(c,'chip-green');}).join('')+'</div>';
-  }
-  if(entraron.length){
-    html+='<div class="snap-section" style="color:var(--red)">⚠️ Entraron a mora ('+entraron.length+')</div>';
-    html+='<div class="snap-chips">'+entraron.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';
-  }
+  if(salieron.length){html+='<div class="snap-section" style="color:var(--green)">✅ Salieron de mora ('+salieron.length+')</div><div class="snap-chips">'+salieron.map(function(c){return chip(c,'chip-green');}).join('')+'</div>';}
+  if(entraron.length){html+='<div class="snap-section" style="color:var(--red)">⚠️ Entraron a mora ('+entraron.length+')</div><div class="snap-chips">'+entraron.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';}
   if(siguen.length){
     var sinAct=siguen.filter(function(c){return !hasGestion(c.nombre);}).length;
     var lbl=(prevData?'Siguen en mora':'En mora')+' ('+siguen.length+')'+(sinAct?' — <span style="color:var(--red)">'+sinAct+' sin gestión</span>':'');
     html+='<div class="snap-section" style="color:var(--text3)">🔴 '+lbl+'</div>';
-    // Sort: no-action first (red), then with action
-    var sorted=[...siguen].sort(function(a,b){
-      var ha=hasGestion(a.nombre)?1:0, hb=hasGestion(b.nombre)?1:0;
-      return ha-hb; // no-action first
-    });
+    var sorted=[...siguen].sort(function(a,b){return (hasGestion(a.nombre)?1:0)-(hasGestion(b.nombre)?1:0);});
     html+='<div class="snap-chips">'+sorted.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';
   }
-  if(!salieron.length&&!entraron.length&&!siguen.length)
-    html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
+  if(!salieron.length&&!entraron.length&&!siguen.length)html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
   el.innerHTML=html;
 }
 
@@ -1624,8 +2089,6 @@ function promBadge(p){var m={promesa:'<span class="b bp">📅 '+(p.fecha||'—')
 function flt(tid,sid){var q=document.getElementById(sid).value.toLowerCase();document.querySelectorAll('#'+tid+' tbody tr:not(.total-row)').forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';});}
 document.getElementById('modal-accion').addEventListener('click',function(e){if(e.target===this)closeModal('modal-accion');});
 document.getElementById('modal-alerta').addEventListener('click',function(e){if(e.target===this)closeModal('modal-alerta');});
-
 </script>
 </body>
-          var _qr="'"+cartId+"','"+esc(h.cliente_nombre)+"',"+(c?c.cuota:0)+","+(c?c.saldo:0);
-          html+='<span class="add-p" style="background:var(--bluebg);border-color:var(--blue);color:var(--blue)" onclick="reagendarVisita('+_qr+')">&#x1F504; Reagendar</span>';>
+</html>
