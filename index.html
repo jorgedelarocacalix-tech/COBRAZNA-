@@ -88,6 +88,27 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:11px 
 .tab-btn.on{background:var(--bg2);color:var(--green);border-color:rgba(26,122,60,.3);font-weight:600;box-shadow:var(--shadow)}
 .tab-pane{display:none}.tab-pane.on{display:block}
 .tbl-note{font-size:11px;color:var(--text2);font-family:var(--mono);padding:7px 12px;background:var(--bg3);border-radius:var(--r2);border-left:3px solid #22a050;margin-bottom:10px}
+/* ── Grupos y subpestañas ── */
+.grp-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 6px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.grp-btn{padding:7px 14px;border-radius:var(--r2);border:1px solid var(--border2);background:var(--bg2);font-size:12px;font-family:var(--sans);font-weight:500;cursor:pointer;transition:all .15s;color:var(--text2);white-space:nowrap}
+.grp-btn:hover{background:var(--bg3);border-color:var(--border2)}
+.grp-btn.on{background:var(--greenbg);color:var(--green);border-color:rgba(26,122,60,.35);font-weight:600}
+.sub-row{display:flex;gap:5px;flex-wrap:wrap;padding:6px 16px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);min-height:0}
+.sub-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);font-size:11px;font-family:var(--sans);cursor:pointer;transition:all .15s;color:var(--text2);white-space:nowrap}
+.sub-btn:hover{background:var(--bg4)}
+.sub-btn.on{background:var(--text);color:#fff;border-color:var(--text);font-weight:600}
+#tabs-row{padding:0;border-bottom:none}
+.dir-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;overflow:hidden;transition:box-shadow .15s}
+.dir-card:hover{box-shadow:var(--shadow2);border-color:var(--border2)}
+.dir-card-main{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;gap:10px}
+.dir-card-left{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0}
+.dir-idx{font-family:var(--mono);font-size:10px;color:var(--text3);min-width:22px;padding-top:2px}
+.dir-nombre{font-weight:600;font-size:13px;line-height:1.3;cursor:pointer}
+.nombre-link{cursor:pointer;transition:color .12s}
+.nombre-link:hover{color:var(--blue);text-decoration:underline}
+.dir-card-right{text-align:right;flex-shrink:0}
+.dir-saldo{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text)}
+.dir-card-footer{padding:6px 14px 10px 46px;display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border)}
 .tbl-search{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:7px 11px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;margin-bottom:8px;transition:border-color .2s}
 .tbl-search:focus{border-color:#22a050}
 .tbl-search::placeholder{color:var(--text3)}
@@ -140,7 +161,7 @@ tr:hover td{background:#f5f8ff}
 .hist-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start}
 .hist-item:last-child{border-bottom:none}
 .hist-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px}
-.hi-p{background:var(--purplebg)}.hi-g{background:var(--greenbg)}.hi-v{background:var(--bluebg)}.hi-a{background:var(--amberbg)}.hi-n{background:var(--bg4)}
+.hi-p{background:var(--purplebg)}.hi-g{background:var(--greenbg)}.hi-v{background:var(--bluebg)}.hi-a{background:var(--amberbg)}.hi-n{background:var(--bg4)}.hi-r{background:var(--redbg)}
 .hist-body{flex:1}
 .hist-title{font-size:13px;font-weight:500}
 .hist-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px}
@@ -314,9 +335,18 @@ tr:hover td{background:#f5f8ff}
       <label class="form-lbl">Monto (L)</label>
       <input type="number" class="form-inp" id="ac-monto" placeholder="0.00">
     </div>
-    <div class="form-row">
+    <!-- Nota simple (promesa, pago, etc.) -->
+    <div class="form-row" id="ac-row-nota-simple">
       <label class="form-lbl">Nota</label>
       <input type="text" class="form-inp" id="ac-nota" placeholder="Observaciones...">
+    </div>
+    <!-- Comentario extendido para visita realizada -->
+    <div class="form-row" id="ac-row-nota-visita" style="display:none">
+      <label class="form-lbl">📝 Comentario de la visita</label>
+      <textarea class="form-inp" id="ac-nota-visita" rows="5"
+        style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
+        placeholder="¿Qué encontró el gestor?&#10;&#10;Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con portón azul. Acordamos visita de seguimiento el lunes."></textarea>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente para seguimiento.</div>
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-accion')">Cancelar</button>
@@ -660,11 +690,12 @@ async function processPDF(file){
     var existing=CARTERAS[id];
     if(existing&&existing.clientes){
       var prev={};
+      var histPromises=[]; // Fix: colectar todas las escrituras para ejecutar en paralelo
       existing.clientes.forEach(function(c){prev[c.nombre]={saldo:c.saldo,cuota:c.cuota};});
       var newNames=new Set(data.clientes.map(function(c){return c.nombre;}));
       existing.clientes.forEach(function(c){
         if(!newNames.has(c.nombre)){
-          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'pago',monto:c.saldo,nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
+          histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'pago',monto:c.saldo,nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()}));
           var key=id+'::'+c.nombre;
           if(PROMESAS[key]){delete PROMESAS[key];dbSaveProm(id,c.nombre);}
         }
@@ -674,11 +705,26 @@ async function processPDF(file){
         if(ps!==undefined&&c.saldo<ps.saldo){
           var abonado=ps.saldo-c.saldo;
           var tipo=(c.saldo===0||abonado>=ps.cuota*0.9)?'pago':'abono';
-          dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,nota:tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado),fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()});
           var key=id+'::'+c.nombre;var prom=PROMESAS[key];
+          var notaHist=tipo==='pago'?'Pago detectado al subir PDF':'Abono parcial de L '+fmt(abonado);
+          if(prom&&prom.estado==='promesa'){
+            notaHist=tipo==='pago'
+              ?'✅ Promesa CUMPLIDA — había prometido pagar el '+(prom.fecha||'—')+'. Pago detectado al subir PDF.'
+              :'💰 Abono parcial — había prometido pagar el '+(prom.fecha||'—')+'. Abonó L '+fmt(abonado)+'.';
+            histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'promesa_cumplida',monto:abonado,nota:notaHist,fecha_accion:HOY.toISOString().split('T')[0],fecha_promesa:prom.fecha||null,gestor:'Sistema',created_at:new Date().toISOString()}));
+          }
+          histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:tipo,monto:abonado,nota:notaHist,fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()}));
           if(prom){PROMESAS[key]=Object.assign({},prom,{estado:tipo,ts:new Date().toISOString()});dbSaveProm(id,c.nombre);}
+        } else if(ps!==undefined && c.saldo>=ps.saldo){
+          var key2=id+'::'+c.nombre;var prom2=PROMESAS[key2];
+          var hoyStr=HOY.toISOString().split('T')[0];
+          if(prom2&&prom2.estado==='promesa'&&prom2.fecha&&prom2.fecha<hoyStr){
+            histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'promesa_incumplida',monto:null,nota:'🚨 Promesa INCUMPLIDA — había prometido pagar el '+prom2.fecha+'. No se registró pago al subir PDF.',fecha_accion:hoyStr,fecha_promesa:prom2.fecha,gestor:'Sistema',created_at:new Date().toISOString()}));
+          }
         }
       });
+      // Esperar todas las escrituras de historial antes de continuar
+      if(histPromises.length) await Promise.all(histPromises);
     }
     var hist=existing?Array.from(new Set([...(existing.load_history||[]),data.fecha_emision])).slice(-60):[data.fecha_emision];
     CARTERAS[id]=Object.assign({},data,{id:id,load_history:hist});
@@ -724,7 +770,16 @@ function getVisibles(){
     return USER.carteras.some(function(c){var cc=c.toUpperCase().replace(/[^A-Z0-9]/g,'');return idc.includes(cc)||cc.includes(idc)||emp.includes(cc)||cc.includes(emp.substring(0,6));});
   });
 }
-function openCartera(id){if(!CARTERAS[id])return;CURRENT=id;CURRENT_TAB=null;document.getElementById('home-zone').style.display='none';document.getElementById('dash-zone').style.display='block';document.getElementById('back-btn').style.display='';renderDash(id);}
+function openCartera(id){
+  if(!CARTERAS[id])return;
+  // Limpiar caches de la cartera anterior
+  if(CURRENT && CURRENT!==id) limpiarCacheCartera(CURRENT);
+  CURRENT=id;CURRENT_TAB=null;
+  document.getElementById('home-zone').style.display='none';
+  document.getElementById('dash-zone').style.display='block';
+  document.getElementById('back-btn').style.display='';
+  renderDash(id);
+}
 function goHome(){CURRENT=null;renderHome();}
 async function delCart(id){
   if(!confirm('Eliminar esta cartera y todas sus promesas?'))return;
@@ -760,53 +815,199 @@ function renderDash(id){
     {l:'Mora 120-150d',v:G['120'].length+G['150'].length,s:'Visitar',c:'color:var(--red)'},
     {l:'Inactivos',v:G.INACTIVO.length,s:'+180 dias',c:'color:var(--text3)'},
   ].map(function(k){return '<div class="kpi-card"><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
-  var TABS=[
-    {id:'HOY',lbl:'📅 Hoy ('+G.VENCIDO.length+')'},
-    {id:'REPORTE',lbl:'📊 Reporte Cobro'},
-    {id:'VENCIDO',lbl:'🟠 Este mes ('+G.VENCIDO.length+')',cls:'bo'},
-    {id:'MES',lbl:'🟢 Al dia ('+G.MES.length+')',cls:'bg'},
-    {id:'60',lbl:'🟡 60d ('+G['60'].length+')',cls:'ba'},
-    {id:'90',lbl:'🟠 90d ('+G['90'].length+')',cls:'bo'},
-    {id:'120',lbl:'🔴 120d ('+G['120'].length+')',cls:'br'},
-    {id:'150',lbl:'⛔ 150d ('+G['150'].length+')',cls:'br2'},
-    {id:'INACTIVO',lbl:'⚫ +180d ('+G.INACTIVO.length+')',cls:'bx'},
-    {id:'PAGARON',lbl:'✅ Pagaron ('+G.PAGARON.length+')'},
-    {id:'PROMESAS',lbl:'🟣 Promesas ('+nProm+')'},
-    {id:'VISITAS',lbl:'🚗 Visitas'},
-    {id:'VISITAS_CAL',lbl:'📅 Calendario visitas'},
-    {id:'HISTORIAL',lbl:'📋 Historial'},
-    {id:'CAL',lbl:'🗓 Calendario'},
-    {id:'MSG',lbl:'💬 WhatsApp'},
-    {id:'ACT',lbl:'📋 Plan del dia'},
-    {id:'ECG',lbl:'📈 Pulso'},
+  // ── Clasificar promesas: activas vs incumplidas ──
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var mesActual=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var nPromActivas=cl.filter(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    if(!p||p.estado!=='promesa') return false;
+    if(pagoEsteMes(c.ultimo_pago)&&!p.mora_pendiente) return false; // ya pagó → no contar
+    return (!p.fecha||p.fecha.substring(0,7)>=mesActual);
+  }).length;
+  var nPromIncumplidas=cl.filter(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    if(!p||p.estado!=='promesa') return false;
+    if(pagoEsteMes(c.ultimo_pago)&&!p.mora_pendiente) return false; // ya pagó → no es incumplida
+    return p.fecha&&p.fecha.substring(0,7)<mesActual;
+  }).length;
+
+  // ── Estructura de grupos con subpestañas ──
+  var GRUPOS=[
+    {
+      id:'HOY', lbl:'📅 HOY', direct:true,
+      badge: G.VENCIDO.length>0?G.VENCIDO.length:null, badgeColor:'var(--orange)'
+    },
+    {
+      id:'REPORTE', lbl:'📊 Reporte', direct:true
+    },
+    {
+      id:'MORA', lbl:'🔴 Mora', color:'var(--orange)', bgColor:'var(--orangebg)',
+      subs:[
+        {id:'VENCIDO', lbl:'🟠 Este mes',   n:G.VENCIDO.length, cls:'bo'},
+        {id:'60',      lbl:'🟡 60 días',    n:G['60'].length,    cls:'ba'},
+        {id:'90',      lbl:'🟠 90 días',    n:G['90'].length,    cls:'bo'},
+        {id:'120',     lbl:'🔴 120 días',   n:G['120'].length,   cls:'br'},
+        {id:'150',     lbl:'⛔ 150d+',      n:G['150'].length,   cls:'br2'},
+        {id:'INACTIVO',lbl:'⚫ +180d',      n:G.INACTIVO.length, cls:'bx'},
+      ]
+    },
+    {
+      id:'GESTION', lbl:'🤝 Gestión', color:'var(--purple)', bgColor:'var(--purplebg)',
+      subs:[
+        {id:'PROMESAS',    lbl:'📅 Promesas activas',  n:nPromActivas,    cls:''},
+        {id:'INCUMPLIDAS', lbl:'🚨 Incumplidas',       n:nPromIncumplidas,cls:''},
+        {id:'VISITAS',     lbl:'🚗 Visitas',           n:null,            cls:''},
+      ]
+    },
+    {
+      id:'PAGARON', lbl:'✅ Al día', direct:true,
+      badge: G.PAGARON.length>0?G.PAGARON.length:null, badgeColor:'var(--green)'
+    },
+    {
+      id:'HISTORIAL', lbl:'📋 Historial', direct:true
+    },
+    {
+      id:'ANALISIS', lbl:'📊 Análisis', color:'var(--blue)', bgColor:'var(--bluebg)',
+      subs:[
+        {id:'MORA_GLOBAL', lbl:'📉 Mora Global', n:null, cls:''},
+        {id:'DIRECTORIO',  lbl:'📋 Directorio',  n:null, cls:''},
+        {id:'ECG',         lbl:'📈 Pulso ECG',   n:null, cls:''},
+      ]
+    },
+    {
+      id:'HERRAMIENTAS', lbl:'🔧 Herramientas', color:'var(--text2)', bgColor:'var(--bg3)',
+      subs:[
+        {id:'CAL',         lbl:'🗓 Calendario',       n:null, cls:''},
+        {id:'VISITAS_CAL', lbl:'📅 Cal. Visitas',     n:null, cls:''},
+        {id:'MSG',         lbl:'💬 WhatsApp',         n:null, cls:''},
+        {id:'ACT',         lbl:'📋 Plan del día',     n:null, cls:''},
+      ]
+    },
   ];
-  var activeTabId=CURRENT_TAB||'HOY';
-  var activeTabIdx=TABS.findIndex(function(t){return t.id===activeTabId;});
-  if(activeTabIdx<0)activeTabIdx=0;
-  document.getElementById('tabs-row').innerHTML=TABS.map(function(t,i){
-    return '<button class="tab-btn'+(i===activeTabIdx?' on':'')+'" onclick="swTab(\''+t.id+'\',this)">'+t.lbl+'</button>';
+
+  // Determinar grupo y sub activos desde CURRENT_TAB
+  var activeGrupoId=null, activeSubId=null;
+  if(!CURRENT_TAB||CURRENT_TAB==='HOY'){activeGrupoId='HOY';activeSubId='HOY';}
+  else {
+    GRUPOS.forEach(function(g){
+      if(g.direct&&g.id===CURRENT_TAB){activeGrupoId=g.id;activeSubId=g.id;}
+      if(g.subs){g.subs.forEach(function(s){if(s.id===CURRENT_TAB){activeGrupoId=g.id;activeSubId=s.id;}});}
+    });
+    if(!activeGrupoId){activeGrupoId='HOY';activeSubId='HOY';}
+  }
+
+  // Render grupos (fila superior)
+  var grupoHtml=GRUPOS.map(function(g){
+    var isActive=g.id===activeGrupoId;
+    var badgeHtml='';
+    if(g.badge!=null) badgeHtml='<span style="display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;background:'+g.badgeColor+';color:#fff;border-radius:10px;font-size:9px;font-family:var(--mono);font-weight:700;padding:0 4px;margin-left:4px">'+g.badge+'</span>';
+    var nSubs=g.subs?g.subs.reduce(function(s,x){return s+(x.n||0);},0):0;
+    if(g.subs&&nSubs>0) badgeHtml='<span style="display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;background:'+(g.color||'var(--text2)')+';color:#fff;border-radius:10px;font-size:9px;font-family:var(--mono);font-weight:700;padding:0 4px;margin-left:4px">'+nSubs+'</span>';
+    var arrowHtml=g.subs?' <span style="font-size:9px;opacity:.6">▾</span>':'';
+    return '<button class="grp-btn'+(isActive?' on':'')+'" data-grp="'+g.id+'" onclick="swGrupo(\''+g.id+'\',this)" style="'+(isActive&&g.bgColor?'background:'+g.bgColor+';color:'+(g.color||'var(--green)')+';border-color:'+(g.color||'var(--green)')+'44':'')+'">'+g.lbl+arrowHtml+badgeHtml+'</button>';
   }).join('');
+  document.getElementById('tabs-row').innerHTML='<div class="grp-row">'+grupoHtml+'</div><div class="sub-row" id="sub-row"></div>';
+
+  // Render subpestañas del grupo activo
+  function renderSubRow(grupoId, subId){
+    var g=GRUPOS.find(function(x){return x.id===grupoId;});
+    var subRow=document.getElementById('sub-row');
+    if(!g||g.direct||!g.subs){subRow.innerHTML='';return;}
+    subRow.innerHTML=g.subs.map(function(s){
+      var isS=s.id===subId;
+      var nHtml=s.n!=null?' ('+s.n+')':'';
+      return '<button class="sub-btn'+(isS?' on':'')+'" onclick="swSub(\''+g.id+'\',\''+s.id+'\',this)">'+s.lbl+nHtml+'</button>';
+    }).join('');
+  }
+  renderSubRow(activeGrupoId, activeSubId);
+
+  // Todos los panes de contenido (todos los sub IDs posibles)
+  var allPanes=[
+    {id:'HOY',       build:function(d){d.innerHTML=buildHoy(id,cl,G);}},
+    {id:'REPORTE',   build:function(d){d.innerHTML=buildReporte(id,cl,G);}},
+    {id:'VENCIDO',   build:function(d){d.innerHTML=buildTbl(id,G.VENCIDO||[],'bo','');}},
+    {id:'60',        build:function(d){d.innerHTML=buildTbl(id,G['60']||[],'ba','');}},
+    {id:'90',        build:function(d){d.innerHTML=buildTbl(id,G['90']||[],'bo','');}},
+    {id:'120',       build:function(d){d.innerHTML=buildTbl(id,G['120']||[],'br','');}},
+    {id:'150',       build:function(d){d.innerHTML=buildTbl(id,G['150']||[],'br2','');}},
+    {id:'INACTIVO',  build:function(d){d.innerHTML=buildTbl(id,G.INACTIVO||[],'bx','');}},
+    {id:'PAGARON',   build:function(d){d.innerHTML=buildPagaron(id,G.PAGARON);}},
+    {id:'PROMESAS',  build:function(d){d.innerHTML=buildPromeTab(id,cl,'activas');}},
+    {id:'INCUMPLIDAS',build:function(d){d.innerHTML=buildPromeTab(id,cl,'incumplidas');}},
+    {id:'VISITAS',   build:function(d){d.innerHTML='<div class="empty">Cargando visitas...</div>';buildVisitas(id,d);}},
+    {id:'HISTORIAL', build:function(d){d.innerHTML='<div class="empty">Cargando historial...</div>';buildHistorial(id,d);}},
+    {id:'MORA_GLOBAL',build:function(d){d.innerHTML=buildMoraGlobal(id,cl);}},
+    {id:'DIRECTORIO',build:function(d){d.innerHTML=buildDirectorio(id,cl);}},
+    {id:'ECG',       build:function(d){d.innerHTML='<div class="empty">Cargando pulso...</div>';buildECG(id,d);}},
+    {id:'CAL',       build:function(d){d.innerHTML=buildCal(id,cl);}},
+    {id:'VISITAS_CAL',build:function(d){d.innerHTML='<div class="empty">Cargando...</div>';buildVisitasCal(id,d);}},
+    {id:'MSG',       build:function(d){d.innerHTML=buildMsg(id,G);}},
+    {id:'ACT',       build:function(d){d.innerHTML=buildAct(G);}},
+  ];
+
   var tc=document.getElementById('tabs-content');tc.innerHTML='';
-  TABS.forEach(function(t,i){
+  allPanes.forEach(function(p){
     var d=document.createElement('div');
-    d.className='tab-pane'+(i===activeTabIdx?' on':'');
-    d.id='tp-'+t.id;
-    if(t.id==='HOY')d.innerHTML=buildHoy(id,cl,G);
-    else if(t.id==='REPORTE')d.innerHTML=buildReporte(id,cl,G);
-    else if(t.id==='CAL')d.innerHTML=buildCal(id,cl);
-    else if(t.id==='PROMESAS')d.innerHTML=buildPromeTab(id,cl);
-    else if(t.id==='PAGARON')d.innerHTML=buildPagaron(id,G.PAGARON);
-    else if(t.id==='MSG')d.innerHTML=buildMsg(id,G);
-    else if(t.id==='ACT')d.innerHTML=buildAct(G);
-    else if(t.id==='VISITAS'){d.innerHTML='<div class="empty">Cargando visitas...</div>';buildVisitas(id,d);}
-    else if(t.id==='HISTORIAL'){d.innerHTML='<div class="empty">Cargando historial...</div>';buildHistorial(id,d);}
-    else if(t.id==='VISITAS_CAL'){d.innerHTML='<div class="empty">Cargando...</div>';buildVisitasCal(id,d);}
-    else if(t.id==='ECG'){d.innerHTML='<div class="empty">Cargando pulso...</div>';buildECG(id,d);}
-    else d.innerHTML=buildTbl(id,G[t.id]||[],t.cls||'bx','');
+    d.className='tab-pane'+(p.id===activeSubId?' on':'');
+    d.id='tp-'+p.id;
+    if(p.id===activeSubId) p.build(d);
     tc.appendChild(d);
   });
+
+  // exponer buildFns para lazy-load al cambiar subtab
+  window._DASH_PANES=allPanes;
+  window._DASH_ID=id;
+  window._DASH_GRUPOS=GRUPOS;
 }
+
+function swGrupo(grupoId, btn){
+  var grupos=window._DASH_GRUPOS||[];
+  var g=grupos.find(function(x){return x.id===grupoId;});
+  if(!g) return;
+  document.querySelectorAll('.grp-btn').forEach(function(b){b.classList.remove('on');b.style.background='';b.style.color='';b.style.borderColor='';});
+  btn.classList.add('on');
+  if(g.bgColor){btn.style.background=g.bgColor;btn.style.color=g.color||'var(--green)';btn.style.borderColor=(g.color||'var(--green)')+'44';}
+  // Si es directo, activar ese pane
+  if(g.direct){
+    var subRow=document.getElementById('sub-row');if(subRow)subRow.innerHTML='';
+    _activatePan(g.id);
+    CURRENT_TAB=g.id;
+    return;
+  }
+  // Si tiene subs, mostrar sub-row y activar primero
+  var subRow=document.getElementById('sub-row');
+  if(!subRow)return;
+  subRow.innerHTML=g.subs.map(function(s){
+    var isFirst=s===g.subs[0];
+    var nHtml=s.n!=null?' ('+s.n+')':'';
+    return '<button class="sub-btn'+(isFirst?' on':'')+'" onclick="swSub(\''+g.id+'\',\''+s.id+'\',this)">'+s.lbl+nHtml+'</button>';
+  }).join('');
+  _activatePan(g.subs[0].id);
+  CURRENT_TAB=g.subs[0].id;
+}
+
+function swSub(grupoId, subId, btn){
+  document.querySelectorAll('.sub-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  _activatePan(subId);
+  CURRENT_TAB=subId;
+}
+
+function _activatePan(subId){
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('on');});
+  var pane=document.getElementById('tp-'+subId);
+  if(!pane)return;
+  pane.classList.add('on');
+  // Lazy build si está vacío
+  if(!pane.hasAttribute('data-built')){
+    var panes=window._DASH_PANES||[];
+    var entry=panes.find(function(p){return p.id===subId;});
+    if(entry){entry.build(pane);pane.setAttribute('data-built','1');}
+  }
+}
+
 function swTab(id,btn){
+  // legacy compat — redirigir a swSub/swGrupo si viene de código antiguo
   CURRENT_TAB=id;
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('on');});
@@ -814,7 +1015,110 @@ function swTab(id,btn){
   var pane=document.getElementById('tp-'+id);if(pane)pane.classList.add('on');
 }
 
-// ══ HOY ══
+// ══════════════════════════════════════════════════════════
+// ══ refreshSoft — actualiza KPIs + pane activo solamente ══
+// Usar en lugar de renderDash() para acciones simples
+// (guardar promesa, marcar mora, etc.)
+// NO toca la barra de pestañas ni destruye el estado visual
+// ══════════════════════════════════════════════════════════
+function refreshSoft(cartId){
+  if(!cartId||!CARTERAS[cartId]) return;
+  var id=cartId;
+  var data=CARTERAS[id];
+  var cl=data.clientes;
+
+  // 1. Actualizar KPI row (solo texto, no reconstruye pestañas)
+  var G={MES:[],VENCIDO:[],'60':[],'90':[],'120':[],'150':[],INACTIVO:[],PAGARON:[]};
+  cl.forEach(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    var pagado=pagoEsteMes(c.ultimo_pago)&&!(p&&p.mora_pendiente);
+    if(pagado){G.PAGARON.push(c);return;}
+    var t=c.tramo||'MES';if(G[t])G[t].push(c);else G.MES.push(c);
+  });
+  var activos=cl.filter(function(c){return c.tramo!=='INACTIVO';});
+  var sAct=activos.reduce(function(s,c){return s+(c.saldo||0);},0);
+  var nProm=cl.filter(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    return p&&p.estado==='promesa'&&!pagoEsteMes(c.ultimo_pago);
+  }).length;
+  var kpiEl=document.getElementById('kpi-row');
+  if(kpiEl) kpiEl.innerHTML=[
+    {l:'Clientes',v:cl.length,s:'Total',c:'color:var(--text)'},
+    {l:'Saldo activo',v:'L '+fmt(sAct),s:'A cobrar',c:'color:var(--blue)'},
+    {l:'Vencidos hoy',v:G.VENCIDO.length,s:'Cobrar hoy',c:'color:var(--orange)'},
+    {l:'Pagaron',v:G.PAGARON.length,s:'Este mes',c:'color:var(--green)'},
+    {l:'Promesas',v:nProm,s:'Activas',c:'color:var(--purple)'},
+    {l:'Mora 60-90d',v:G['60'].length+G['90'].length,s:'Llamar',c:'color:var(--amber)'},
+    {l:'Mora 120-150d',v:G['120'].length+G['150'].length,s:'Visitar',c:'color:var(--red)'},
+    {l:'Inactivos',v:G.INACTIVO.length,s:'+180 dias',c:'color:var(--text3)'},
+  ].map(function(k){return '<div class="kpi-card"><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
+
+  // 2. Actualizar botones de grupos que tienen contador (MORA, GESTION, PAGARON)
+  // Solo actualiza el label del botón activo sin reconstruir nada
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var mesActual=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var nPromActivas=cl.filter(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    if(!p||p.estado!=='promesa') return false;
+    if(pagoEsteMes(c.ultimo_pago)&&!p.mora_pendiente) return false;
+    return (!p.fecha||p.fecha.substring(0,7)>=mesActual);
+  }).length;
+
+  // 3. Reconstruir SOLO el pane activo (sin tocar los otros)
+  var activeId=CURRENT_TAB||'HOY';
+  var pane=document.getElementById('tp-'+activeId);
+  if(pane){
+    pane.removeAttribute('data-built'); // forzar rebuild
+    var panes=window._DASH_PANES||[];
+    var entry=panes.find(function(p){return p.id===activeId;});
+    if(entry){
+      entry.build(pane);
+      pane.setAttribute('data-built','1');
+    }
+  }
+
+  // 4. Limpiar caches de scores para que se recarguen frescos
+  Object.keys(window).forEach(function(k){
+    if(k.startsWith('hist_score_'+id+'::') || k.startsWith('mg_hist_'+id+'::')) delete window[k];
+  });
+}
+
+// ── Limpiar caches al cambiar de cartera ──
+function limpiarCacheCartera(cartId){
+  Object.keys(window).forEach(function(k){
+    if(k.startsWith('hist_score_'+cartId+'::') ||
+       k.startsWith('mg_hist_'+cartId+'::')) delete window[k];
+  });
+}
+
+// ── Cálculo inline de mora esperada (misma fórmula que Mora Global) ──
+function calcMoraCliente(c, cartId){
+  var hoy=HOY;
+  var ov=MG_OVERRIDES&&MG_OVERRIDES[cartId+'::'+c.nombre]||{};
+  var numCuotas = ov.num_cuotas_real || c.num_cuotas || 0;
+  var totalCredito = ov.total_credito_real || ((c.pagado||0)+(c.saldo||0));
+  if(!totalCredito||!c.cuota||c.cuota<=0) return null;
+  var fFact=parseHNDate(c.fecha_factura);
+  var cuotasTrans=0;
+  if(fFact&&hoy>fFact){
+    var meses=(hoy.getFullYear()-fFact.getFullYear())*12+(hoy.getMonth()-fFact.getMonth());
+    if(c.dia_pago>0&&hoy.getDate()>=c.dia_pago) meses+=1;
+    cuotasTrans=Math.max(0,Math.min(meses,numCuotas||999));
+  }
+  var esperado=Math.max(0,Math.round(totalCredito-cuotasTrans*c.cuota));
+  var diferencia=c.saldo-esperado; // positivo=mora, negativo=adelantado
+  return {esperado:esperado, diferencia:diferencia, cuotasTrans:cuotasTrans};
+}
+
+// ── Badge mora inline ──
+function moraBadge(c, cartId){
+  var m=calcMoraCliente(c, cartId);
+  if(!m) return '';
+  if(m.diferencia>0)  return '<span style="font-family:var(--mono);font-size:10px;color:var(--red);font-weight:700">mora L '+fmt(m.diferencia)+'</span>';
+  if(m.diferencia<0)  return '<span style="font-family:var(--mono);font-size:10px;color:var(--blue)">adelanto L '+fmt(Math.abs(m.diferencia))+'</span>';
+  return '<span style="font-family:var(--mono);font-size:10px;color:var(--green)">✓ al día</span>';
+}
+
 function buildHoy(cartId,cl,G){
   var hD=HOY.getDate();var todStr=HOY.toISOString().split('T')[0];
   var yPO=function(c){return pagoEsteMes(c.ultimo_pago)&&!(PROMESAS[cartId+'::'+c.nombre]||{}).mora_pendiente;};
@@ -843,8 +1147,14 @@ function cliRow(cartId,c,diasLbl){
   var pBadge=p?promBadge(p):'<span class="add-p" onclick="openAccion('+qc+')">+ accion</span>';
   var vBtn='<span class="add-p" onclick="quickVisita(\''+cartId+'\',\''+esc(c.nombre)+'\')" style="background:var(--bluebg);color:var(--blue);border-color:rgba(26,85,160,.3)">🚗</span>';
   var dn=diasLbl?'<span style="font-family:var(--mono);font-size:10px;color:var(--red);margin-left:8px">⏰ '+diasLbl+'</span>':'';
-  return '<div class="cli-row"><div><div class="cli-name">'+c.nombre+dn+'</div>'
-    +'<div class="cli-detail">Cuota: L '+fmt(c.cuota)+' · Saldo: L '+fmt(c.saldo)+(p&&p.nota?' · '+p.nota:'')+'</div></div>'
+  var mb=moraBadge(c,cartId);
+  var upago=c.ultimo_pago
+    ?'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">💳 '+c.ultimo_pago+'</span>'
+    :'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">💳 Sin pago</span>';
+  return '<div class="cli-row"><div><div class="cli-name nombre-link" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">'+c.nombre+dn+'</div>'
+    +'<div class="cli-detail">Cuota: L '+fmt(c.cuota)+' · Saldo: L '+fmt(c.saldo)+(p&&p.nota?' · '+p.nota:'')+'</div>'
+    +'<div style="display:flex;gap:10px;margin-top:2px;align-items:center">'+mb+upago+'</div>'
+    +'</div>'
     +'<div class="cli-right">'+pBadge+vBtn+'<span class="add-p" onclick="openAccion('+qc+')">📋</span></div></div>';
 }
 
@@ -961,10 +1271,11 @@ function buildRepTabla(cartId, pendientes, G){
   html+=thSort('nombre','Cliente');
   html+=thSort('saldo','Saldo');
   html+=thSort('cuota','Cuota');
-  html+=thSort('dia_pago','Dia Pago');
-  html+='<th>Ult. Pago</th>';
+  html+='<th>Mora / Adelanto</th>';
+  html+=thSort('dia_pago','Día Pago');
+  html+='<th>Últ. Pago</th>';
   html+=thSort('tramo','Mora');
-  html+='<th>Promesa / Accion</th>';
+  html+='<th>Promesa / Acción</th>';
   html+='<th>Visita</th>';
   html+='<th>Nota</th>';
   html+='<th></th>';
@@ -1004,16 +1315,24 @@ function buildRepTabla(cartId, pendientes, G){
 
       var tramoCls='tramo-'+c.tramo;
       var tramoLabel=c.tramo==='MES'?'Al dia':c.tramo==='VENCIDO'?'Vencido':(c.tramo||'—')+'d';
-
       var rowStyle=urgente?'background:rgba(184,68,0,.04)':'';
+      var mRep=calcMoraCliente(c,cartId);
+      var difRepHtml='<span style="color:var(--text3);font-size:10px">—</span>';
+      if(mRep){
+        if(mRep.diferencia>0)      difRepHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--red);font-weight:700">mora L '+fmt(mRep.diferencia)+'</span>';
+        else if(mRep.diferencia<0) difRepHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--blue)">adelanto L '+fmt(Math.abs(mRep.diferencia))+'</span>';
+        else                       difRepHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--green)">✓</span>';
+      }
+      var upColor=pagoEsteMes(c.ultimo_pago)?'color:var(--green);font-weight:600':'font-size:11px';
       r+='<tr style="'+rowStyle+'" class="rep-row-prioridad-'+prioridad+'" data-search="'+c.nombre.toLowerCase()+' '+c.tramo.toLowerCase()+'">';
       r+='<td class="mono" style="color:var(--text3);font-size:10px">'+rendered+'</td>';
-      r+='<td class="td-name" style="max-width:160px">'+c.nombre+(urgente&&diasResta===0?'<span style="font-family:var(--mono);font-size:9px;color:var(--red);display:block">HOY</span>':urgente?'<span style="font-family:var(--mono);font-size:9px;color:var(--orange);display:block">en '+diasResta+'d</span>':'')+'</td>';
+      r+='<td class="td-name nombre-link" style="max-width:160px" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">'+c.nombre+(urgente&&diasResta===0?'<span style="font-family:var(--mono);font-size:9px;color:var(--red);display:block">HOY</span>':urgente?'<span style="font-family:var(--mono);font-size:9px;color:var(--orange);display:block">en '+diasResta+'d</span>':'')+'</td>';
       r+='<td class="mono" style="font-weight:700;color:var(--blue)">L '+fmt(c.saldo)+'</td>';
       r+='<td class="mono">L '+fmt(c.cuota)+'</td>';
+      r+='<td>'+difRepHtml+'</td>';
       r+='<td class="mono" style="text-align:center;'+(urgente?'color:var(--orange);font-weight:700':'')+'">'+
           (c.dia_pago?c.dia_pago+(diasResta!==null?' <span style="font-size:9px;opacity:.6">(+'+diasResta+')</span>':''):'—')+'</td>';
-      r+='<td class="mono" style="font-size:11px">'+(c.ultimo_pago||'—')+'</td>';
+      r+='<td class="mono" style="'+upColor+'">'+(c.ultimo_pago||'—')+'</td>';
       r+='<td><span class="tramo-badge '+tramoCls+'">'+tramoLabel+'</span></td>';
       r+='<td>'+promBadgeStr+'</td>';
       r+='<td>'+fechaVisita+'</td>';
@@ -1428,11 +1747,42 @@ function buildTbl(cartId,rows,cls,note){
   var sorted=[...rows].sort(function(a,b){return (b.saldo||0)-(a.saldo||0);});
   var total=sorted.reduce(function(s,r){return s+(r.saldo||0);},0);
   var uid='T'+Math.random().toString(36).slice(2,6);
-  var html=(note?'<div class="tbl-note">'+note+'</div>':'')+'<input class="tbl-search" id="S'+uid+'" onkeyup="flt(\''+uid+'\',\'S'+uid+'\')" placeholder="Buscar..."><div class="tbl-wrap"><table id="'+uid+'"><thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Dias mora</th><th>Ultimo pago</th><th>Dia pago</th><th>Tramo</th><th>Accion</th></tr></thead><tbody>';
+  var html=(note?'<div class="tbl-note">'+note+'</div>':'')
+    +'<input class="tbl-search" id="S'+uid+'" onkeyup="flt(\''+uid+'\',\'S'+uid+'\')" placeholder="Buscar...">'
+    +'<div class="tbl-wrap"><table id="'+uid+'"><thead><tr>'
+    +'<th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th>'
+    +'<th>Mora / Adelanto</th>'
+    +'<th>Último pago</th><th>Día pago</th><th>Tramo</th><th>Acción</th>'
+    +'</tr></thead><tbody>';
   sorted.forEach(function(r,i){
     var p=PROMESAS[cartId+'::'+r.nombre];
     var tl=r.tramo==='INACTIVO'?'+180d':r.tramo==='MES'?'Al dia':r.tramo==='VENCIDO'?'Este mes':(r.tramo||'—')+'d';
-    html+='<tr><td class="mono">'+(i+1)+'</td><td class="td-name">'+r.nombre+'</td><td class="mono" style="font-weight:600">L '+fmt(r.saldo||0)+'</td><td class="mono">L '+fmt(r.cuota||0)+'</td><td class="mono">'+(r.dias_mora!=null?r.dias_mora+'d':'—')+'</td><td class="mono">'+(r.ultimo_pago||'—')+'</td><td class="mono" style="text-align:center">'+(r.dia_pago||'—')+'</td><td><span class="b '+(cls||'bx')+'">'+tl+'</span></td><td style="display:flex;gap:3px">'+(p?promBadge(p):'<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">+ accion</span>')+'<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">📋</span>'+(USER&&USER.rol==='admin'&&p?'<button class="btn btn-red btn-sm" style="font-size:10px;padding:1px 5px" onclick="delPromesa(\''+cartId+'\',\''+esc(r.nombre)+'\')">🗑</button>':'')+'</td></tr>';
+    // Mora calculada inline
+    var m=calcMoraCliente(r,cartId);
+    var difHtml='<span style="color:var(--text3);font-family:var(--mono);font-size:10px">—</span>';
+    if(m){
+      if(m.diferencia>0)       difHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--red);font-weight:700">mora L '+fmt(m.diferencia)+'</span>';
+      else if(m.diferencia<0)  difHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--blue)">adelanto L '+fmt(Math.abs(m.diferencia))+'</span>';
+      else                     difHtml='<span style="font-family:var(--mono);font-size:11px;color:var(--green)">✓ Al día</span>';
+    }
+    // Último pago — resaltar si es de este mes
+    var upStr=r.ultimo_pago||'—';
+    var upColor=pagoEsteMes(r.ultimo_pago)?'color:var(--green);font-weight:600':'color:var(--text2)';
+    html+='<tr>'
+      +'<td class="mono">'+(i+1)+'</td>'
+      +'<td class="td-name nombre-link" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+'</td>'
+      +'<td class="mono" style="font-weight:600">L '+fmt(r.saldo||0)+'</td>'
+      +'<td class="mono">L '+fmt(r.cuota||0)+'</td>'
+      +'<td>'+difHtml+'</td>'
+      +'<td class="mono" style="'+upColor+'">'+upStr+'</td>'
+      +'<td class="mono" style="text-align:center">'+(r.dia_pago||'—')+'</td>'
+      +'<td><span class="b '+(cls||'bx')+'">'+tl+'</span></td>'
+      +'<td style="display:flex;gap:3px">'
+        +(p?promBadge(p):'<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">+ accion</span>')
+        +'<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">📋</span>'
+        +(USER&&USER.rol==='admin'&&p?'<button class="btn btn-red btn-sm" style="font-size:10px;padding:1px 5px" onclick="delPromesa(\''+cartId+'\',\''+esc(r.nombre)+'\')">🗑</button>':'')
+      +'</td>'
+      +'</tr>';
   });
   html+='<tr class="total-row"><td colspan="2">TOTAL · '+sorted.length+'</td><td class="mono">L '+fmt(total)+'</td><td colspan="6"></td></tr></tbody></table></div>';
   return html;
@@ -1446,25 +1796,136 @@ function buildPagaron(cartId,rows){
   var html=delAll+'<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Ultimo pago</th><th>Estado</th><th>Accion</th></tr></thead><tbody>';
   sorted.forEach(function(r,i){
     var p=PROMESAS[cartId+'::'+r.nombre];var mora=p&&p.mora_pendiente;
-    html+='<tr style="'+(mora?'background:rgba(184,68,0,.04)':'')+'"><td class="mono">'+(i+1)+'</td><td class="td-name" style="'+(mora?'':'text-decoration:line-through;color:var(--text3)')+'">'+r.nombre+'</td><td class="mono">L '+fmt(r.saldo||0)+'</td><td class="mono">L '+fmt(r.cuota||0)+'</td><td class="mono">'+(r.ultimo_pago||'—')+'</td><td>'+(mora?'<span class="b bo">⚠️ Cuota anterior</span>':'<span class="b bg">✅ Al dia</span>')+'</td><td>'+(mora?'<button class="btn btn-ghost btn-sm" onclick="quitarMora(\''+cartId+'\',\''+esc(r.nombre)+'\')">✓ Quitar</button>':'<button class="btn btn-amber btn-sm" onclick="marcarMora(\''+cartId+'\',\''+esc(r.nombre)+'\')">⚠️ Era cuota anterior</button>')+'</td></tr>';
+    html+='<tr style="'+(mora?'background:rgba(184,68,0,.04)':'')+'"><td class="mono">'+(i+1)+'</td><td class="td-name nombre-link" style="'+(mora?'':'text-decoration:line-through;color:var(--text3)')+';cursor:pointer" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+'</td><td class="mono">L '+fmt(r.saldo||0)+'</td><td class="mono">L '+fmt(r.cuota||0)+'</td><td class="mono">'+(r.ultimo_pago||'—')+'</td><td>'+(mora?'<span class="b bo">⚠️ Cuota anterior</span>':'<span class="b bg">✅ Al dia</span>')+'</td><td>'+(mora?'<button class="btn btn-ghost btn-sm" onclick="quitarMora(\''+cartId+'\',\''+esc(r.nombre)+'\')">✓ Quitar</button>':'<button class="btn btn-amber btn-sm" onclick="marcarMora(\''+cartId+'\',\''+esc(r.nombre)+'\')">⚠️ Era cuota anterior</button>')+'</td></tr>';
   });
   return html+'</tbody></table></div>';
 }
 
 // ══ PROMESAS TAB ══
-function buildPromeTab(cartId,cl){
-  var conP=cl.filter(function(c){return PROMESAS[cartId+'::'+c.nombre];});
-  if(!conP.length)return '<div class="empty">No hay promesas. Usa accion en cualquier cliente.</div>';
-  var est={promesa:'📅 Prometio',pago:'✅ Pago',no_contesta:'📵 No contesta','no-contesta':'📵 No contesta',negociacion:'🤝 Negocia',visita:'🚗 Visita'};
-  var sorted=[...conP].sort(function(a,b){var pa=PROMESAS[cartId+'::'+a.nombre],pb=PROMESAS[cartId+'::'+b.nombre];return (pa.fecha||'').localeCompare(pb.fecha||'');});
-  var delAll=USER&&USER.rol==='admin'?'<div style="margin-bottom:10px"><button class="btn btn-red btn-sm" onclick="delTodasPromesas(\''+cartId+'\')">🗑️ Borrar todas</button></div>':'';
-  var html=delAll+'<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Estado</th><th>Fecha</th><th>Monto</th><th>Nota</th><th></th></tr></thead><tbody>';
-  sorted.forEach(function(r,i){
-    var p=PROMESAS[cartId+'::'+r.nombre];
-    var dB=USER&&USER.rol==='admin'?'<button class="btn btn-red btn-sm" style="font-size:10px;padding:1px 5px" onclick="delPromesa(\''+cartId+'\',\''+esc(r.nombre)+'\')">🗑</button>':'';
-    html+='<tr><td class="mono">'+(i+1)+'</td><td class="td-name">'+r.nombre+'</td><td class="mono">L '+fmt(r.saldo||0)+'</td><td class="mono">L '+fmt(r.cuota||0)+'</td><td>'+(est[p.estado]||p.estado||'—')+'</td><td class="mono">'+(p.fecha||'—')+'</td><td class="mono">'+(p.monto?'L '+fmt(p.monto):'—')+'</td><td style="max-width:140px;white-space:normal;font-size:11px">'+(p.nota||'—')+'</td><td style="display:flex;gap:3px"><span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">📋</span>'+dB+'</td></tr>';
+function buildPromeTab(cartId,cl,modo){
+  // modo: 'activas' | 'incumplidas'
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var mesActual=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+
+  // Clasificar promesas
+  var activas=[], incumplidas=[];
+  // CRÍTICO: excluir clientes que ya pagaron este mes (aunque promesa diga 'promesa')
+  // Si pagó este mes → la promesa se considera cumplida, no aparece aquí
+  // TAMBIÉN excluir cartera pasiva (INACTIVO = +180d mora incobrable)
+  cl.forEach(function(c){
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    if(!p||p.estado!=='promesa') return;
+    if(c.tramo==='INACTIVO') return; // cartera pasiva — no gestionar aquí
+    var yaPago=pagoEsteMes(c.ultimo_pago)&&!p.mora_pendiente;
+    if(yaPago) return; // no incluir — ya está en "Al día / Pagaron"
+    if(p.fecha && p.fecha.substring(0,7)<mesActual){
+      incumplidas.push(c);
+    } else {
+      activas.push(c);
+    }
   });
-  return html+'</tbody></table></div>';
+
+  var lista = modo==='incumplidas' ? incumplidas : activas;
+  var titulo = modo==='incumplidas' ? '🚨 Promesas incumplidas' : '📅 Promesas activas este mes';
+  var colorTitulo = modo==='incumplidas' ? 'var(--red)' : 'var(--purple)';
+
+  // Botones de modo dentro de la pestaña
+  var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">';
+  html+='<span style="font-size:13px;font-weight:600;color:'+colorTitulo+'">'+titulo+'</span>';
+  html+='<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">'+lista.length+' cliente(s)</span>';
+  if(modo==='incumplidas'&&incumplidas.length>0){
+    html+='<div style="padding:7px 12px;background:var(--redbg);border:1px solid rgba(176,16,32,.2);border-radius:var(--r2);font-family:var(--mono);font-size:11px;color:var(--red);margin-left:auto">⚠️ Estas promesas son de meses anteriores y no se registró pago. Siguen activas hasta que paguen.</div>';
+  }
+  html+='</div>';
+
+  if(!lista.length){
+    html+='<div class="empty">'+(modo==='incumplidas'?'🎉 No hay promesas incumplidas. Todos cumplieron.':'No hay promesas activas este mes. Agrega acciones desde cualquier cliente.')+'</div>';
+    return html;
+  }
+
+  // Ordenar por fecha de promesa
+  lista=[...lista].sort(function(a,b){
+    var pa=PROMESAS[cartId+'::'+a.nombre],pb=PROMESAS[cartId+'::'+b.nombre];
+    return (pa.fecha||'').localeCompare(pb.fecha||'');
+  });
+
+  var delAll=USER&&USER.rol==='admin'?'<div style="margin-bottom:10px"><button class="btn btn-red btn-sm" onclick="delTodasPromesas(\''+cartId+'\')">🗑️ Borrar todas las promesas</button></div>':'';
+  html+=delAll;
+
+  // Tabla con columna de confiabilidad
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th>';
+  html+='<th>Fecha promesa</th><th>Monto prometido</th>';
+  if(modo==='incumplidas') html+='<th>Días vencida</th>';
+  html+='<th>Confiabilidad</th><th>Nota</th><th></th>';
+  html+='</tr></thead><tbody>';
+
+  lista.forEach(function(r,i){
+    var p=PROMESAS[cartId+'::'+r.nombre];
+    // Score de confiabilidad desde caché si existe, sino placeholder
+    var histKey='hist_score_'+cartId+'::'+r.nombre;
+    var score=window[histKey]||null;
+    var scoreHtml='<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">cargando...</span>';
+    if(score!==null){
+      var sc=parseInt(score);
+      var scColor=sc>=80?'var(--green)':sc>=50?'var(--amber)':'var(--red)';
+      scoreHtml='<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+scColor+'">'+sc+'%</span>'
+        +'<span style="font-size:9px;color:var(--text3);margin-left:3px">cumplimiento</span>';
+    }
+
+    var diasVencida='';
+    if(modo==='incumplidas'&&p.fecha){
+      var d=Math.floor((HOY-new Date(p.fecha+'T12:00:00'))/86400000);
+      diasVencida='<td class="mono" style="color:var(--red);font-weight:600">'+d+'d</td>';
+    }
+
+    var promVencida=modo==='incumplidas'||(p.fecha&&p.fecha<hoyStr);
+    var fechaStyle=promVencida?'color:var(--red);font-weight:600':'color:var(--purple)';
+
+    var dB=USER&&USER.rol==='admin'?'<button class="btn btn-red btn-sm" style="font-size:10px;padding:1px 5px" onclick="delPromesa(\''+cartId+'\',\''+esc(r.nombre)+'\')">🗑</button>':'';
+
+    // Botón para mover a pagados manualmente (útil si abonó y el cobrador confirma)
+    var moverBtn='<button class="btn btn-g btn-sm" style="font-size:10px;padding:2px 7px;white-space:nowrap" title="Marcar promesa como cumplida y mover a Pagaron este mes" onclick="mgMarcarCumplida(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">✅ Cumplida</button>';
+    html+='<tr>';
+    html+='<td class="mono">'+(i+1)+'</td>';
+    html+='<td class="td-name" style="cursor:pointer" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+'<div style="font-size:9px;color:var(--blue);font-family:var(--mono)">ver historial →</div></td>';
+    html+='<td class="mono">L '+fmt(r.saldo||0)+'</td>';
+    html+='<td class="mono">L '+fmt(r.cuota||0)+'</td>';
+    html+='<td class="mono" style="'+fechaStyle+'">'+(p.fecha||'—')+'</td>';
+    html+='<td class="mono">'+(p.monto?'L '+fmt(p.monto):'—')+'</td>';
+    if(modo==='incumplidas') html+=diasVencida;
+    html+='<td>'+scoreHtml+'</td>';
+    html+='<td style="max-width:140px;white-space:normal;font-size:11px">'+(p.nota||'—')+'</td>';
+    html+='<td style="display:flex;gap:3px;flex-wrap:wrap">'+moverBtn+'<span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">📋</span>'+dB+'</td>';
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div>';
+
+  // Cargar scores de confiabilidad async
+  if(supa){
+    lista.forEach(function(r){
+      var histKey='hist_score_'+cartId+'::'+r.nombre;
+      if(window[histKey]===undefined){
+        window[histKey]=null; // marcar como en progreso
+        supa.from('historial_clientes').select('tipo').eq('cartera_id',cartId).eq('cliente_nombre',r.nombre)
+          .in('tipo',['promesa','promesa_cumplida','promesa_incumplida'])
+          .then(function(res){
+            if(res.error||!res.data) return;
+            var nP=res.data.filter(function(h){return h.tipo==='promesa';}).length;
+            var nC=res.data.filter(function(h){return h.tipo==='promesa_cumplida';}).length;
+            window[histKey]=nP>0?Math.round(nC/nP*100):-1;
+            // Refrescar solo esta celda si la pestaña sigue visible
+            var pane=document.getElementById('tp-'+(modo==='incumplidas'?'INCUMPLIDAS':'PROMESAS'));
+            if(pane&&pane.classList.contains('on')){
+              pane.innerHTML=buildPromeTab(cartId,(CARTERAS[cartId]||{}).clientes||[],modo);
+            }
+          });
+      }
+    });
+  }
+
+  return html;
 }
 
 // ══ VISITAS ══
@@ -1478,6 +1939,7 @@ function quickVisita(cartId,nombre){
   document.getElementById('ac-fecha').value=HOY.toISOString().split('T')[0];
   document.getElementById('ac-monto').value='';
   document.getElementById('ac-nota').value='';
+  document.getElementById('ac-nota-visita').value='';
   toggleAcFields();
   document.getElementById('modal-accion').classList.add('show');
 }
@@ -1607,7 +2069,7 @@ async function buildVisitas(cartId,container){
     html+='<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px"><div class="cart-meta" style="margin-bottom:8px">AGENDAR NUEVA VISITA</div><div id="vis-all" style="display:none">';
     cl.filter(function(c){return c.tramo!=='INACTIVO';}).forEach(function(c){
       var qv2="'"+cartId+"','"+esc(c.nombre)+"'";
-      html+='<div class="vis-card" style="margin-bottom:4px" data-search="'+c.nombre.toLowerCase()+'"><div><div style="font-size:12px;font-weight:500">'+c.nombre+'</div><div class="cart-meta">L '+fmt(c.saldo)+' · '+c.tramo+'</div></div>';
+      html+='<div class="vis-card nombre-link" style="margin-bottom:4px;cursor:pointer" data-search="'+c.nombre.toLowerCase()+'" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.saldo+','+c.saldo+')"><div><div style="font-size:12px;font-weight:500">'+c.nombre+'</div><div class="cart-meta">L '+fmt(c.saldo)+' · '+c.tramo+'</div></div>';
       html+='<span class="add-p" onclick="quickVisita('+qv2+')" style="background:var(--greenbg);color:var(--green)">&#x1F5D3; Agendar</span></div>';
     });
     html+='</div></div>';
@@ -1630,19 +2092,65 @@ function fltVis(){
 // ══ HISTORIAL ══
 async function buildHistorial(cartId,container){
   var cl=(CARTERAS[cartId]||{}).clientes||[];
-  var html='<input class="tbl-search" id="S-HIST" onkeyup="fltHist()" placeholder="Escribe el nombre del cliente..."><div id="hist-cli-list">';
-  cl.forEach(function(c){
+  var activos  =cl.filter(function(c){return c.tramo!=='INACTIVO';});
+  var pasivos  =cl.filter(function(c){return c.tramo==='INACTIVO';});
+
+  function cardHtml(c){
     var p=PROMESAS[cartId+'::'+c.nombre];
-    html+='<div class="vis-card" style="cursor:pointer;margin-bottom:4px" data-nombre="'+c.nombre.toLowerCase()+'" onclick="loadClientHist(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">';
-    html+='<div style="flex:1"><div style="font-size:13px;font-weight:500">'+c.nombre+(p?' '+promBadge(p):'')+'</div><div class="cart-meta">Saldo: L '+fmt(c.saldo)+' · Dia pago: '+(c.dia_pago||'—')+' · Ultimo pago: '+(c.ultimo_pago||'—')+' · '+c.tramo+'</div></div>';
-    html+='<div style="display:flex;gap:4px;flex-shrink:0"><span class="add-p" onclick="event.stopPropagation();openAccion(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">+ accion</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">Ver →</span></div></div>';
-  });
+    var isPasivo=c.tramo==='INACTIVO';
+    return '<div class="vis-card" style="cursor:pointer;margin-bottom:4px'+(isPasivo?';opacity:.7':'')
+      +'" data-nombre="'+c.nombre.toLowerCase()+'" data-pasivo="'+(isPasivo?'1':'0')+'"'
+      +' onclick="loadClientHist(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:500">'+c.nombre+(p?' '+promBadge(p):'')
+      +(isPasivo?' <span class="b bx" style="font-size:9px">⚫ Pasiva</span>':'')+'</div>'
+      +'<div class="cart-meta">Saldo: L '+fmt(c.saldo)+' · Día pago: '+(c.dia_pago||'—')+' · Últ. pago: '+(c.ultimo_pago||'—')+' · '+c.tramo+'</div></div>'
+      +'<div style="display:flex;gap:4px;flex-shrink:0">'
+      +(isPasivo?'':('<span class="add-p" onclick="event.stopPropagation();openAccion(\''+cartId+'\',\''+esc(c.nombre)+'\','+c.cuota+','+c.saldo+')">+ accion</span>'))
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">Ver →</span></div></div>';
+  }
+
+  var html='<input class="tbl-search" id="S-HIST" onkeyup="fltHist()" placeholder="Buscar cliente...">';
+
+  // Filtros activo/pasivo
+  html+='<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">';
+  html+='<button class="rep-filter-btn on" onclick="histSetFiltro(this,\'todos\')">📋 Todos ('+cl.length+')</button>';
+  html+='<button class="rep-filter-btn" onclick="histSetFiltro(this,\'activo\')">✅ Cartera activa ('+activos.length+')</button>';
+  if(pasivos.length) html+='<button class="rep-filter-btn" onclick="histSetFiltro(this,\'pasivo\')">⚫ Cartera pasiva ('+pasivos.length+')</button>';
+  html+='</div>';
+
+  html+='<div id="hist-cli-list">';
+
+  // Sección cartera activa
+  html+='<div class="hist-section" data-section="activo">';
+  html+='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--green);padding:4px 0 6px;text-transform:uppercase">✅ Cartera activa — '+activos.length+' clientes</div>';
+  activos.forEach(function(c){ html+=cardHtml(c); });
+  html+='</div>';
+
+  // Sección cartera pasiva (inactivos/mora incobrable)
+  if(pasivos.length){
+    html+='<div class="hist-section" data-section="pasivo" style="margin-top:14px">';
+    html+='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text3);padding:4px 0 6px;text-transform:uppercase">⚫ Cartera pasiva / mora incobrable — '+pasivos.length+' clientes · +180 días sin pago</div>';
+    html+='<div style="border:1px solid var(--border);border-radius:var(--r);padding:8px;background:var(--bg3);margin-bottom:6px;font-family:var(--mono);font-size:10px;color:var(--text3)">ℹ️ Estos clientes tienen +180 días sin pago. Se muestran para consulta de historial pero no aplican a gestión activa.</div>';
+    pasivos.forEach(function(c){ html+=cardHtml(c); });
+    html+='</div>';
+  }
+
   html+='</div><div id="hist-detail"></div>';
   container.innerHTML=html;
 }
 function fltHist(){
   var q=(document.getElementById('S-HIST')||{}).value.toLowerCase()||'';
-  document.querySelectorAll('#hist-cli-list [data-nombre]').forEach(function(el){el.style.display=el.dataset.nombre.includes(q)?'':'none';});
+  document.querySelectorAll('#hist-cli-list [data-nombre]').forEach(function(el){
+    el.style.display=el.dataset.nombre.includes(q)?'':'none';
+  });
+}
+function histSetFiltro(btn, tipo){
+  document.querySelectorAll('#hist-cli-list').length&&document.querySelectorAll('.rep-filter-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  document.querySelectorAll('#hist-cli-list .hist-section').forEach(function(sec){
+    var s=sec.getAttribute('data-section');
+    sec.style.display=(tipo==='todos'||s===tipo)?'':'none';
+  });
 }
 async function loadClientHist(cartId,nombre,cuota,saldo){
   var detEl=document.getElementById('hist-detail');if(!detEl)return;
@@ -1651,23 +2159,105 @@ async function loadClientHist(cartId,nombre,cuota,saldo){
   try{
     var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).eq('cliente_nombre',nombre).order('created_at',{ascending:true});
     if(r.error)throw r.error;
-    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',no_contesta:'📵',nota:'📝'};
-    var labels={promesa:'Prometio pagar',posponer:'Pospuso',pago:'Pago',abono:'Abono parcial',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',no_contesta:'No contesta',nota:'Nota'};
-    var tCls={promesa:'hi-p',posponer:'hi-p',pago:'hi-g',abono:'hi-a',visita_agenda:'hi-v',visita_realizada:'hi-v',no_contesta:'hi-n',nota:'hi-n'};
+    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',no_contesta:'📵',no_contesta_old:'📵',nota:'📝',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
+    var labels={promesa:'Prometió pagar',posponer:'Pospuso promesa',pago:'Pago registrado',abono:'Abono parcial',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',no_contesta:'No contesta',no_contesta_old:'No contesta',nota:'Nota',promesa_cumplida:'Promesa CUMPLIDA',promesa_incumplida:'Promesa INCUMPLIDA',arreglo_pago:'Arreglo de pago',cero_prima:'Ingresó a 0 Prima',extension_plazo:'Extensión de plazo'};
+    var tCls={promesa:'hi-p',posponer:'hi-p',pago:'hi-g',abono:'hi-a',visita_agenda:'hi-v',visita_realizada:'hi-v',no_contesta:'hi-n',no_contesta_old:'hi-n',nota:'hi-n',promesa_cumplida:'hi-g',promesa_incumplida:'hi-r',arreglo_pago:'hi-g',cero_prima:'hi-p',extension_plazo:'hi-p'};
+
+    // Leer marcas especiales activas desde historial
+    var tieneArreglo=false, arregloNota='', tieneCeroPrima=false, nExtensiones=0;
+    if(r.data){
+      var ultArreglo=r.data.filter(function(h){return h.tipo==='arreglo_pago';}).pop();
+      tieneArreglo   = !!ultArreglo;
+      // Extraer fecha fin de la nota si existe
+      if(ultArreglo&&ultArreglo.nota){
+        var mFin=ultArreglo.nota.match(/Cancela hasta:\s*(\d{4}-\d{2}-\d{2})/);
+        arregloNota=mFin?'hasta '+mFin[1]:'';
+      }
+      tieneCeroPrima = r.data.some(function(h){return h.tipo==='cero_prima';});
+      nExtensiones   = r.data.filter(function(h){return h.tipo==='extension_plazo';}).length;
+    }
+
     var prom=PROMESAS[cartId+'::'+nombre];
     var clData=((CARTERAS[cartId]||{}).clientes||[]).find(function(c){return c.nombre===nombre;});
-    var html='<div class="hist-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
-    html+='<div><div style="font-size:15px;font-weight:600">👤 '+nombre+'</div><div class="cart-meta">Saldo: L '+fmt(saldo)+' · Cuota: L '+fmt(cuota)+' · Dia pago: '+(clData?clData.dia_pago||'—':'—')+' · Ultimo pago: '+(clData?clData.ultimo_pago||'—':'—')+'</div></div>';
-    html+='<div style="display:flex;gap:6px"><span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(nombre)+'\','+cuota+','+saldo+')">+ accion</span><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'hist-detail\').innerHTML=\'\'">✕</button></div></div>';
-    if(prom)html+='<div style="padding:8px 10px;background:var(--purplebg);border-radius:var(--r2);margin-bottom:10px;font-size:12px"><strong>Promesa activa:</strong> '+promBadge(prom)+(prom.fecha?' '+prom.fecha:'')+(prom.monto?' · L '+fmt(prom.monto):'')+(prom.nota?' · '+prom.nota:'')+'</div>';
+    var html='<div class="hist-wrap">';
+
+    // ── Header cliente ──
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
+    html+='<div><div style="font-size:15px;font-weight:600">👤 '+nombre+'</div>';
+    html+='<div class="cart-meta">Saldo: L '+fmt(saldo)+' · Cuota: L '+fmt(cuota)+' · Día pago: '+(clData?clData.dia_pago||'—':'—')+' · Últ. pago: '+(clData?clData.ultimo_pago||'—':'—')+'</div>';
+    // Badges de marcas especiales activas
+    html+='<div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">';
+    if(tieneCeroPrima) html+='<span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2);font-size:10px">🆕 0 Prima</span>';
+    if(tieneArreglo)   html+='<span class="b bg" style="font-size:10px">🤝 Arreglo de pago'+(arregloNota?' · '+arregloNota:'')+'</span>';
+    if(nExtensiones)   html+='<span class="b bb" style="font-size:10px">📅 '+nExtensiones+' extensión'+(nExtensiones>1?'es':'')+'</span>';
+    html+='</div></div>';
+    html+='<div style="display:flex;gap:5px;flex-wrap:wrap"><span class="add-p" onclick="openAccion(\''+cartId+'\',\''+esc(nombre)+'\','+cuota+','+saldo+')">+ accion</span><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'hist-detail\').innerHTML=\'\'">✕</button></div></div>';
+
+    // ── Botones de marcado especial ──
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r)">';
+    html+='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;width:100%;margin-bottom:5px">Marcar situación especial del cliente</div>';
+    html+='<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="histMarcar(\''+cartId+'\',\''+esc(nombre)+'\',\'arreglo_pago\')">🤝 Arreglo de pago</button>';
+    html+='<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="histMarcar(\''+cartId+'\',\''+esc(nombre)+'\',\'cero_prima\')">🆕 0 Prima</button>';
+    html+='<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="histMarcar(\''+cartId+'\',\''+esc(nombre)+'\',\'extension_plazo\')">📅 +1 Mes de plazo</button>';
+    html+='</div>';
+
+    if(prom) html+='<div style="padding:8px 10px;background:var(--purplebg);border-radius:var(--r2);margin-bottom:10px;font-size:12px"><strong>Promesa activa:</strong> '+promBadge(prom)+(prom.fecha?' '+prom.fecha:'')+(prom.monto?' · L '+fmt(prom.monto):'')+(prom.nota?' · '+prom.nota:'')+'</div>';
+
     if(!r.data||!r.data.length){html+='<div class="cart-meta" style="padding:8px 0">Sin historial registrado.</div>';}
     else{
-      html+='<div class="cart-meta" style="margin-bottom:8px">'+r.data.length+' accion(es)</div>';
-      r.data.forEach(function(h){
+      // ── SCORECARD DE CONFIABILIDAD ──
+      var nPromesas    = r.data.filter(function(h){return h.tipo==='promesa';}).length;
+      var nCumplidas   = r.data.filter(function(h){return h.tipo==='promesa_cumplida';}).length;
+      var nIncumplidas = r.data.filter(function(h){return h.tipo==='promesa_incumplida';}).length;
+      var nVisitas     = r.data.filter(function(h){return h.tipo==='visita_realizada';}).length;
+      var nPagos       = r.data.filter(function(h){return h.tipo==='pago'||h.tipo==='abono';}).length;
+      var nNoContesta  = r.data.filter(function(h){return h.tipo==='no_contesta'||h.tipo==='no-contesta';}).length;
+      var tasa = nPromesas>0 ? Math.round(nCumplidas/nPromesas*100) : null;
+      var tasaColor = tasa===null?'var(--text3)':tasa>=80?'var(--green)':tasa>=50?'var(--amber)':'var(--red)';
+      var tasaLabel = tasa===null?'Sin datos':tasa+'%';
+
+      html+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px">';
+      html+='<div style="font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">📊 Historial de confiabilidad</div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px">';
+      html+='<div style="text-align:center;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)"><div style="font-family:var(--mono);font-size:18px;font-weight:700">'+nPromesas+'</div><div style="font-size:10px;color:var(--text3)">Promesas</div></div>';
+      html+='<div style="text-align:center;padding:8px;background:var(--greenbg);border-radius:6px;border:1px solid rgba(26,122,60,.15)"><div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green)">'+nCumplidas+'</div><div style="font-size:10px;color:var(--green)">Cumplidas</div></div>';
+      html+='<div style="text-align:center;padding:8px;background:var(--redbg);border-radius:6px;border:1px solid rgba(176,16,32,.15)"><div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--red)">'+nIncumplidas+'</div><div style="font-size:10px;color:var(--red)">Incumplidas</div></div>';
+      html+='<div style="text-align:center;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)"><div style="font-family:var(--mono);font-size:18px;font-weight:700;color:'+tasaColor+'">'+tasaLabel+'</div><div style="font-size:10px;color:var(--text3)">Tasa cumplimiento</div></div>';
+      html+='<div style="text-align:center;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)"><div style="font-family:var(--mono);font-size:18px;font-weight:700">'+nPagos+'</div><div style="font-size:10px;color:var(--text3)">Pagos/abonos</div></div>';
+      if(nVisitas) html+='<div style="text-align:center;padding:8px;background:var(--bluebg);border-radius:6px;border:1px solid rgba(26,85,160,.15)"><div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--blue)">'+nVisitas+'</div><div style="font-size:10px;color:var(--blue)">Visitas</div></div>';
+      if(nNoContesta) html+='<div style="text-align:center;padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)"><div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text2)">'+nNoContesta+'</div><div style="font-size:10px;color:var(--text3)">No contesta</div></div>';
+      html+='</div>';
+
+      // Barra de progreso tasa de cumplimiento
+      if(tasa!==null){
+        html+='<div style="margin-top:10px">';
+        html+='<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:4px"><span>Tasa de cumplimiento de promesas</span><span style="color:'+tasaColor+';font-weight:700">'+tasaLabel+'</span></div>';
+        html+='<div style="height:6px;background:var(--bg4);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+tasa+'%;background:'+tasaColor+';border-radius:3px;transition:width .4s"></div></div>';
+        html+='</div>';
+      }
+      html+='</div>'; // /scorecard
+
+      html+='<div class="cart-meta" style="margin-bottom:8px">'+r.data.length+' accion(es) registradas</div>';
+      r.data.slice().reverse().forEach(function(h){
         var ic=icons[h.tipo]||'📝',lb=labels[h.tipo]||h.tipo,tc=tCls[h.tipo]||'hi-n';
-        var fecha=h.fecha_accion?new Date(h.fecha_accion+'T12:00:00').toLocaleDateString('es-HN'):'';
+        var fecha=h.fecha_accion?new Date(h.fecha_accion+'T12:00:00').toLocaleDateString('es-HN',{day:'numeric',month:'short',year:'numeric'}):'';
         var monto=h.monto?' · L '+fmt(h.monto):'';
-        html+='<div class="hist-item"><div class="hist-icon '+tc+'">'+ic+'</div><div class="hist-body"><div class="hist-title">'+lb+monto+'</div><div class="hist-meta">'+(fecha?fecha+' · ':'')+' Gestor: '+(h.gestor||'—')+' · '+new Date(h.created_at).toLocaleDateString('es-HN')+'</div>'+(h.nota?'<div class="hist-nota">'+h.nota+'</div>':'')+'</div></div>';
+        var fechaProm=h.fecha_promesa?'<span style="font-family:var(--mono);font-size:10px;background:var(--purplebg);color:var(--purple);padding:1px 6px;border-radius:10px;margin-left:4px">prometido: '+h.fecha_promesa+'</span>':'';
+        var notaHtml='';
+        if(h.nota&&h.nota!==lb){
+          if(h.tipo==='visita_realizada'){
+            notaHtml='<div style="margin-top:6px;padding:8px 10px;background:var(--bluebg);border-left:3px solid var(--blue);border-radius:0 5px 5px 0;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap;font-family:var(--mono)">'+escHtml(h.nota)+'</div>';
+          } else if(h.tipo==='arreglo_pago'){
+            notaHtml='<div style="margin-top:6px;padding:8px 10px;background:var(--greenbg);border-left:3px solid var(--green);border-radius:0 5px 5px 0;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap">'+escHtml(h.nota)+'</div>';
+          } else if(h.tipo==='cero_prima'){
+            notaHtml='<div style="margin-top:6px;padding:8px 10px;background:var(--purplebg);border-left:3px solid var(--purple);border-radius:0 5px 5px 0;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap">'+escHtml(h.nota)+'</div>';
+          } else if(h.tipo==='extension_plazo'){
+            notaHtml='<div style="margin-top:6px;padding:8px 10px;background:var(--bluebg);border-left:3px solid var(--blue);border-radius:0 5px 5px 0;font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap">'+escHtml(h.nota)+'</div>';
+          } else {
+            notaHtml='<div class="hist-nota">'+h.nota+'</div>';
+          }
+        }
+        html+='<div class="hist-item"><div class="hist-icon '+tc+'">'+ic+'</div><div class="hist-body"><div class="hist-title">'+lb+monto+fechaProm+'</div><div class="hist-meta">'+(fecha?fecha+' · ':'')+' Gestor: '+(h.gestor||'—')+'</div>'+notaHtml+'</div></div>';
       });
     }
     html+='</div>';
@@ -1760,8 +2350,34 @@ async function buildECG(cartId,container){
       {id:'90',label:'90 dias',color:'#e86030'},
       {id:'120',label:'120 dias',color:'#e84040'},
       {id:'150',label:'150 dias',color:'#b01020'},
+      {id:'INACTIVO',label:'+180 días / Incobrable',color:'#4a4a4a',alerta:true},
     ];
     var html='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px">'+snaps.length+' punto(s) · '+snaps[0].fecha+' → '+snaps[snaps.length-1].fecha+'</div>';
+
+    // ── Detectar clientes que pasaron de 150 → INACTIVO entre el penúltimo y último snapshot ──
+    var alertaInactivos=[];
+    if(snaps.length>=2){
+      var snapPrev=snaps[snaps.length-2];
+      var snapLast=snaps[snaps.length-1];
+      var clientesPrev150=(snapPrev.clientes_por_tramo&&snapPrev.clientes_por_tramo['150'])||[];
+      var clientesLastInac=(snapLast.clientes_por_tramo&&snapLast.clientes_por_tramo['INACTIVO'])||[];
+      // Quienes estaban en 150 y ahora están en INACTIVO
+      alertaInactivos=clientesPrev150.filter(function(n){return clientesLastInac.indexOf(n)>=0;});
+    }
+
+    // Mostrar alerta ROJA si hay clientes nuevos en incobrable
+    if(alertaInactivos.length){
+      html+='<div style="background:#fff0f0;border:2px solid #b01020;border-radius:var(--r);padding:12px 14px;margin-bottom:14px">';
+      html+='<div style="font-family:var(--mono);font-size:11px;font-weight:700;color:#b01020;margin-bottom:6px">🚨 ALERTA — '+alertaInactivos.length+' cliente'+(alertaInactivos.length>1?'s':'')+' pasó de 150d → INCOBRABLE (+180d)</div>';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      alertaInactivos.forEach(function(n){
+        html+='<span style="padding:3px 10px;border-radius:20px;background:#b01020;color:#fff;font-size:11px;font-family:var(--mono)">'+n+'</span>';
+      });
+      html+='</div>';
+      html+='<div style="font-size:11px;color:#b01020;margin-top:6px">Estos clientes superaron 180 días sin pago. Requieren gestión legal urgente.</div>';
+      html+='</div>';
+    }
+
     TRAMOS.forEach(function(tr){
       var vals=snaps.map(function(s,idx){return{fecha:s.fecha,created_at:s.created_at,count:(s.tramos&&s.tramos[tr.id])||0,clientes:(s.clientes_por_tramo&&s.clientes_por_tramo[tr.id])||[],idx:idx};});
       var maxV=Math.max.apply(null,vals.map(function(v){return v.count;}));if(maxV===0)maxV=1;
@@ -1769,8 +2385,25 @@ async function buildECG(cartId,container){
       var stepX=vals.length>1?(W-PAD*2)/(vals.length-1):0;
       var first=vals[0].count,last=vals[vals.length-1].count;
       var trend=last>first?'up':last<first?'down':'flat';
-      var tLbl=trend==='up'?'📈 +'+(last-first)+' clientes':trend==='down'?'📉 -'+(first-last)+' clientes':'➡️ Sin cambio';
-      var lineColor=trend==='up'?'#e84040':trend==='down'?'#22a050':'#e8a830';
+
+      // Para INACTIVO: subir = ALERTA ROJA siempre
+      var tLbl,lineColor;
+      if(tr.alerta){
+        if(trend==='up'){
+          tLbl='🚨 +'+(last-first)+' nuevos incobrables';
+          lineColor='#b01020';
+        } else if(trend==='down'){
+          tLbl='📉 -'+(first-last)+' clientes';
+          lineColor='#22a050';
+        } else {
+          tLbl='➡️ Sin cambio';
+          lineColor='#888888';
+        }
+      } else {
+        tLbl=trend==='up'?'📈 +'+(last-first)+' clientes':trend==='down'?'📉 -'+(first-last)+' clientes':'➡️ Sin cambio';
+        lineColor=trend==='up'?'#e84040':trend==='down'?'#22a050':'#e8a830';
+      }
+
       var pts=vals.map(function(v,i){var x=PAD+i*stepX;var y=H-PAD-((v.count/maxV)*(H-PAD*2));return{x:x,y:y,count:v.count,fecha:v.fecha,created_at:v.created_at,clientes:v.clientes,idx:i};});
       var pathD=pts.map(function(p,i){return(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
       var fillD=pathD+' L'+pts[pts.length-1].x.toFixed(1)+','+H+' L'+PAD+','+H+' Z';
@@ -1782,15 +2415,24 @@ async function buildECG(cartId,container){
       [0,0.5,1].forEach(function(f){var y=H-PAD-(f*(H-PAD*2));var v=Math.round(f*maxV);svg+='<line x1="'+PAD+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y.toFixed(1)+'" stroke="rgba(0,0,0,.05)" stroke-width="1"/><text x="'+(PAD-4)+'" y="'+(y+4).toFixed(1)+'" font-size="9" fill="rgba(0,0,0,.3)" text-anchor="end" font-family="monospace">'+v+'</text>';});
       pts.forEach(function(p,i){
         var prev=i>0?pts[i-1].count:p.count;
-        var dc=p.count>prev?'#e84040':p.count<prev?'#22a050':'#e8a830';
+        // Para INACTIVO: si sube = rojo alerta, si baja = verde
+        var dc;
+        if(tr.alerta){
+          dc=p.count>prev?'#b01020':p.count<prev?'#22a050':'#888888';
+        } else {
+          dc=p.count>prev?'#e84040':p.count<prev?'#22a050':'#e8a830';
+        }
         var key=cartId+'_'+tr.id+'_'+p.idx;
         var dateLabel=p.created_at?p.created_at.substring(5,10):p.fecha.substring(0,5);
-        svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5" fill="'+dc+'" stroke="white" stroke-width="2" style="cursor:pointer" onclick="showEcgDetail(\''+key+'\')" />';
+        svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(tr.alerta&&p.count>prev?7:5)+'" fill="'+dc+'" stroke="white" stroke-width="2" style="cursor:pointer" onclick="showEcgDetail(\''+key+'\')" />';
         svg+='<text x="'+p.x.toFixed(1)+'" y="'+(p.y-10).toFixed(1)+'" font-size="9" fill="'+dc+'" text-anchor="middle" font-family="monospace" font-weight="bold">'+p.count+'</text>';
         svg+='<text x="'+p.x.toFixed(1)+'" y="'+(H-6).toFixed(1)+'" font-size="8" fill="rgba(0,0,0,.4)" text-anchor="middle" font-family="monospace">'+dateLabel+'</text>';
       });
       svg+='</svg>';
-      html+='<div class="ecg-wrap"><div class="ecg-hdr"><span><span style="width:10px;height:10px;border-radius:50%;background:'+tr.color+';display:inline-block;margin-right:6px"></span>Mora <strong>'+tr.label+'</strong></span><span class="ecg-badge '+trend+'">'+tLbl+'</span></div>'+svg+'<div class="snap-detail" id="snap-'+cartId+'-'+tr.id+'"></div></div>';
+
+      // Borde especial para INACTIVO si hay clientes
+      var wrapStyle=tr.alerta&&last>0?'border-left:3px solid #b01020;background:rgba(176,16,32,.03)':'';
+      html+='<div class="ecg-wrap" style="'+wrapStyle+'"><div class="ecg-hdr"><span><span style="width:10px;height:10px;border-radius:50%;background:'+tr.color+';display:inline-block;margin-right:6px"></span>Mora <strong>'+tr.label+'</strong>'+(tr.alerta&&last>0?' <span style="background:#b01020;color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-family:var(--mono)">'+last+' incobrables</span>':'')+'</span><span class="ecg-badge '+(tr.alerta&&trend==='up'?'up':trend)+'">'+tLbl+'</span></div>'+svg+'<div class="snap-detail" id="snap-'+cartId+'-'+tr.id+'"></div></div>';
     });
     html+=buildEcgGestion(snaps,cartId);
     container.innerHTML=html;
@@ -1834,7 +2476,9 @@ function buildEcgGestion(snaps,cartId){
     html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     cSinGestion.forEach(function(n){
       var c2=cl.find(function(x){return x.nombre===n;})||{};
-      html+='<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--redbg);color:var(--red);cursor:pointer" data-cid="'+cartId+'" data-nom="'+esc(n)+'" data-cuota="'+(c2.cuota||0)+'" data-saldo="'+(c2.saldo||0)+'" onclick="openAccion(this.dataset.cid,this.dataset.nom,+this.dataset.cuota,+this.dataset.saldo)">'+n+'</span>';
+      html+='<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--redbg);color:var(--red);cursor:pointer" '
+        +'onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(n)+'\',' +(c2.cuota||0)+','+(c2.saldo||0)+')" '
+        +'title="Ver historial de '+n+'">'+n+' 📋</span>';
     });
     html+='</div></div>';
   }
@@ -1907,6 +2551,1006 @@ function showEcgDetail(key){
 }
 
 // ══ CALENDAR ══
+// ══════════════════════════════════════════════════════════
+// ══ MORA GLOBAL ══
+// Lógica: saldo_esperado = total_credito - (cuotas_transcurridas × cuota)
+// diferencia = saldo_esperado - saldo_actual
+//   < 0  → en mora  (debe MÁS de lo esperado)
+//   > 0  → adelantado
+//   = 0  → al día
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// ══ DIRECTORIO — Toda la cartera A→Z con gestión y comentarios ══
+// ══════════════════════════════════════════════════════════
+function buildDirectorio(cartId, cl){
+  var hoy = HOY;
+  var todStr = hoy.toISOString().split('T')[0];
+
+  // Etiquetas legibles para estado de promesa
+  var ESTADO_LABEL = {
+    'promesa':         '📅 Prometió pagar',
+    'pago':            '✅ Pago confirmado',
+    'no-contesta':     '📵 No contesta',
+    'no_contesta':     '📵 No contesta',
+    'visita':          '🚗 Visita agendada',
+    'visita_agenda':   '🗓 Visita agendada',
+    'visita_realizada':'🏠 Visita realizada',
+    'nota':            '📝 Nota',
+    'posponer':        '⏭ Posponer'
+  };
+
+  // Colores por tramo
+  var TRAMO_STYLE = {
+    'MES':     {bg:'var(--greenbg)',  color:'var(--green)',  label:'✅ Al día'},
+    'VENCIDO': {bg:'var(--orangebg)', color:'var(--orange)', label:'🟠 Vencido'},
+    '60':      {bg:'var(--amberbg)',  color:'var(--amber)',  label:'🟡 60 días'},
+    '90':      {bg:'var(--orangebg)', color:'var(--orange)', label:'🟠 90 días'},
+    '120':     {bg:'var(--redbg)',    color:'var(--red)',    label:'🔴 120 días'},
+    '150':     {bg:'#fcc',           color:'#800010',       label:'⛔ 150+ días'},
+    'INACTIVO':{bg:'var(--bg4)',      color:'var(--text2)',  label:'⚫ Inactivo'},
+    'PAGARON': {bg:'var(--greenbg)',  color:'var(--green)',  label:'✅ Pagaron'}
+  };
+
+  // ── Construir filas enriquecidas ──
+  var filas = cl.map(function(c){
+    var p   = PROMESAS[cartId+'::'+c.nombre] || null;
+    var ts  = TRAMO_STYLE[c.tramo] || TRAMO_STYLE['MES'];
+    var pagadoMes = pagoEsteMes(c.ultimo_pago) && !(p && p.mora_pendiente);
+
+    // Tipo de gestión
+    var tienePromesa = p && p.estado === 'promesa';
+    var tieneVisita  = p && (p.estado === 'visita' || p.estado === 'visita_agenda' || p.estado === 'visita_realizada');
+    var tieneGestion = p && p.estado;
+
+    // Comentario principal para mostrar en la tarjeta
+    var comentario = '';
+    if(p && p.nota) comentario = p.nota;
+
+    return {
+      nombre:       c.nombre,
+      saldo:        c.saldo || 0,
+      cuota:        c.cuota || 0,
+      tramo:        c.tramo || 'MES',
+      tramoStyle:   ts,
+      fechaFactura: c.fecha_factura || '',
+      ultimoPago:   c.ultimo_pago || '',
+      diaPago:      c.dia_pago || 0,
+      pagadoMes:    pagadoMes,
+      promesa:      p,
+      estadoLabel:  (p && ESTADO_LABEL[p.estado]) || (pagadoMes ? '✅ Pagó este mes' : '— Sin gestión'),
+      tienePromesa: tienePromesa,
+      tieneVisita:  tieneVisita,
+      tieneGestion: tieneGestion,
+      comentario:   comentario,
+      esCeroPrima:  c.sin_ultimo_pago && (function(){
+        var ff = parseHNDate(c.fecha_factura);
+        return ff && ff.getMonth()===hoy.getMonth() && ff.getFullYear()===hoy.getFullYear();
+      })()
+    };
+  });
+
+  // Ordenar A→Z por nombre
+  filas.sort(function(a,b){ return a.nombre.localeCompare(b.nombre,'es'); });
+
+  // ── KPIs resumen — solo cartera ACTIVA ──
+  var filasActivas  = filas.filter(function(f){ return f.tramo!=='INACTIVO'; });
+  var filasPasivas  = filas.filter(function(f){ return f.tramo==='INACTIVO'; });
+  var total         = filasActivas.length;
+  var totalGlobal   = filas.length;
+  var nAlDia      = filasActivas.filter(function(f){ return f.tramo==='MES'||f.tramo==='PAGARON'; }).length;
+  var nVencido    = filasActivas.filter(function(f){ return f.tramo==='VENCIDO'; }).length;
+  var n60         = filasActivas.filter(function(f){ return f.tramo==='60'; }).length;
+  var n90         = filasActivas.filter(function(f){ return f.tramo==='90'; }).length;
+  var n120        = filasActivas.filter(function(f){ return f.tramo==='120'; }).length;
+  var n150        = filasActivas.filter(function(f){ return f.tramo==='150'; }).length;
+  var nInactivo   = filasPasivas.length;
+  var nConPromesa = filasActivas.filter(function(f){ return f.tienePromesa; }).length;
+  var nConVisita  = filasActivas.filter(function(f){ return f.tieneVisita; }).length;
+  var nSinGestion = filasActivas.filter(function(f){ return !f.tieneGestion && !f.pagadoMes && f.tramo!=='MES' && f.tramo!=='PAGARON'; }).length;
+  var nPagaron    = filasActivas.filter(function(f){ return f.pagadoMes; }).length;
+  var totalSaldo  = filasActivas.reduce(function(s,f){ return s+f.saldo; },0);
+  var saldoMora   = filasActivas.filter(function(f){ return f.tramo!=='MES'&&f.tramo!=='PAGARON'; }).reduce(function(s,f){ return s+f.saldo; },0);
+  var saldoPasivo = filasPasivas.reduce(function(s,f){ return s+f.saldo; },0);
+
+  var html = '';
+
+  // ── ENCABEZADO ──
+  html += '<div class="rep-header">';
+  html += '<div class="rep-title">📋 Directorio de Cartera</div>';
+  html += '<div class="rep-sub">Orden alfabético · ' + hoy.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</div>';
+
+  // KPIs fila 1 — solo cartera activa
+  html += '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--green);padding:8px 0 4px;text-transform:uppercase">✅ Cartera activa</div>';
+  html += '<div class="rep-kpis">';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v">'+ total +'</div><div class="rep-kpi-l">Clientes activos</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--green)">'+ nAlDia +'</div><div class="rep-kpi-l">Al día</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--orange)">'+ nVencido +'</div><div class="rep-kpi-l">Vencido</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--amber)">'+ (n60+n90) +'</div><div class="rep-kpi-l">60–90 días</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--red)">'+ (n120+n150) +'</div><div class="rep-kpi-l">120+ días</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v">L '+ fmtK(totalSaldo) +'</div><div class="rep-kpi-l">Saldo activo</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--red)">L '+ fmtK(saldoMora) +'</div><div class="rep-kpi-l">En mora</div></div>';
+  html += '</div>';
+
+  // KPIs fila 2 — gestión
+  html += '<div class="rep-kpis" style="margin-top:8px">';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#d080ff">'+ nConPromesa +'</div><div class="rep-kpi-l">Con promesa</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--blue)">'+ nConVisita +'</div><div class="rep-kpi-l">Con visita</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--green)">'+ nPagaron +'</div><div class="rep-kpi-l">Pagaron este mes</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:var(--amber)">'+ nSinGestion +'</div><div class="rep-kpi-l">Sin gestión</div></div>';
+  html += '</div>';
+
+  // KPI cartera pasiva — separado visualmente
+  if(nInactivo>0){
+    html += '<div style="margin-top:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--text3);border-radius:var(--r2);display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
+    html += '<span style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text3);text-transform:uppercase">⚫ Cartera pasiva / mora incobrable</span>';
+    html += '<span style="font-family:var(--mono);font-size:12px;color:var(--text2)">'+nInactivo+' clientes</span>';
+    html += '<span style="font-family:var(--mono);font-size:12px;color:var(--text3)">L '+fmtK(saldoPasivo)+' saldo</span>';
+    html += '<span style="font-size:10px;color:var(--text3)">+180 días sin pago · no aplica gestión activa</span>';
+    html += '</div>';
+  }
+  html += '</div>'; // /rep-header
+
+  // ── BARRA MORA POR TRAMO ──
+  var tramosConMora = [
+    {lbl:'Vencido', n:nVencido, bg:'var(--orange)'},
+    {lbl:'60d',     n:n60,      bg:'var(--amber)'},
+    {lbl:'90d',     n:n90,      bg:'#c06000'},
+    {lbl:'120d',    n:n120,     bg:'var(--red)'},
+    {lbl:'150d+',   n:n150,     bg:'#800010'}
+  ].filter(function(t){ return t.n>0; });
+
+  if(tramosConMora.length){
+    html += '<div style="margin:14px 0 10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html += '<span style="font-size:11px;color:var(--text3);font-family:var(--mono)">MORA POR TRAMO</span>';
+    tramosConMora.forEach(function(t){
+      html += '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:'+t.bg+'22;border:1px solid '+t.bg+'44;border-radius:20px;font-family:var(--mono);font-size:11px;color:'+t.bg+'">';
+      html += '<span style="width:7px;height:7px;border-radius:50%;background:'+t.bg+';display:inline-block"></span>';
+      html += t.lbl+' · <strong>'+t.n+'</strong></span>';
+    });
+    html += '</div>';
+  }
+
+  // ── FILTROS — solo cartera activa en los filtros normales ──
+  html += '<div class="rep-filters" id="dir-filters" style="margin-bottom:8px">';
+  html += '<button class="rep-filter-btn on"  onclick="dirFiltro(this,\'activos\')">✅ Activos ('+total+')</button>';
+  html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'mora\')">🔴 En mora ('+(nVencido+n60+n90+n120+n150)+')</button>';
+  html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'promesa\')">📅 Promesa ('+nConPromesa+')</button>';
+  html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'visita\')">🚗 Visita ('+nConVisita+')</button>';
+  html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'sin_gestion\')">⚠️ Sin gestión ('+nSinGestion+')</button>';
+  html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'aldia\')">✅ Al día ('+nAlDia+')</button>';
+  if(nInactivo) html += '<button class="rep-filter-btn" onclick="dirFiltro(this,\'pasivos\')">⚫ Pasiva ('+nInactivo+')</button>';
+  html += '</div>';
+
+  // ── BARRA BÚSQUEDA + EXPORT ──
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">';
+  html += '<input class="tbl-search" id="dir-search" style="margin:0;flex:1;min-width:180px" placeholder="Buscar cliente..." onkeyup="dirBuscar()">';
+  html += '<button class="btn btn-ghost btn-sm" onclick="dirExportCSV()" style="color:var(--green);border-color:rgba(26,122,60,.3)">📗 Exportar CSV</button>';
+  html += '</div>';
+
+  // ── TARJETAS DE CLIENTES — primero activos, luego pasivos al final ──
+  html += '<div id="dir-lista">';
+
+  // Sección cartera activa
+  html += '<div class="dir-section" data-section="activos">';
+  filasActivas.forEach(function(f, i){
+    // data-tags para filtrado
+    var tags = [];
+    if(f.tramo==='MES'||f.tramo==='PAGARON') tags.push('aldia');
+    if(f.tramo!=='MES'&&f.tramo!=='PAGARON'&&f.tramo!=='INACTIVO') tags.push('mora');
+    if(f.tienePromesa) tags.push('promesa');
+    if(f.tieneVisita)  tags.push('visita');
+    if(!f.tieneGestion && !f.pagadoMes && f.tramo!=='MES' && f.tramo!=='INACTIVO' && f.tramo!=='PAGARON') tags.push('sin_gestion');
+
+    var ts = f.tramoStyle;
+
+    // Badge de gestión principal
+    var gestionBadge = '';
+    if(f.pagadoMes && !(f.promesa && f.promesa.mora_pendiente)){
+      gestionBadge = '<span class="b bg" style="font-size:10px">✅ Pagó este mes</span>';
+    } else if(f.tienePromesa){
+      var fp = f.promesa;
+      var promVencida = fp.fecha && fp.fecha < todStr;
+      gestionBadge = '<span class="b bp" style="font-size:10px">'+(promVencida?'⚠️':'📅')+' Promesa'+(fp.fecha?' · '+fp.fecha:'')+(fp.monto?' · L'+fmt(fp.monto):'')+'</span>';
+      if(fp.mora_pendiente) gestionBadge += ' <span class="b bo" style="font-size:10px">⚠️ Mora pendiente</span>';
+    } else if(f.tieneVisita){
+      var vp = f.promesa;
+      var vlbl = ESTADO_LABEL[vp.estado]||vp.estado;
+      gestionBadge = '<span class="b bb" style="font-size:10px">'+vlbl+(vp.fecha?' · '+vp.fecha:'')+'</span>';
+    } else if(f.promesa && f.promesa.estado){
+      gestionBadge = '<span class="b bx" style="font-size:10px">'+(ESTADO_LABEL[f.promesa.estado]||f.promesa.estado)+'</span>';
+    } else if(f.tramo!=='MES'&&f.tramo!=='INACTIVO'&&f.tramo!=='PAGARON'){
+      gestionBadge = '<span class="b bx" style="font-size:10px;opacity:.7">— Sin gestión</span>';
+    }
+
+    // Comentario/nota
+    var comentarioHtml = f.comentario
+      ? '<div style="margin-top:5px;padding:5px 9px;background:var(--amberbg);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:11px;color:var(--amber);font-family:var(--mono)">💬 '+escHtml(f.comentario)+'</div>'
+      : '';
+
+    // Badge 0 prima
+    var primaHtml = f.esCeroPrima
+      ? '<span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2);font-size:10px">🆕 0 Prima</span> '
+      : '';
+
+    html += '<div class="dir-card" data-tags="'+tags.join(' ')+'" data-nombre="'+escHtml(f.nombre.toLowerCase())+'">';
+    html += '<div class="dir-card-main">';
+
+    // Izquierda: número + nombre
+    html += '<div class="dir-card-left">';
+    html += '<div class="dir-idx">'+(i+1)+'</div>';
+    html += '<div>';
+    html += '<div class="dir-nombre" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(f.nombre)+'\','+f.cuota+','+f.saldo+')">'+escHtml(f.nombre)+'</div>';
+    html += '<div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">';
+    html += primaHtml;
+    html += '<span class="tramo-badge tramo-'+f.tramo+'">'+ts.label+'</span>';
+    if(f.diaPago) html += '<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">Pago día '+f.diaPago+'</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>'; // /dir-card-left
+
+    // Derecha: saldo + cuota
+    html += '<div class="dir-card-right">';
+    html += '<div class="dir-saldo">L '+fmt(f.saldo)+'</div>';
+    html += '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">cuota L '+fmt(f.cuota)+'</div>';
+    if(f.ultimoPago) html += '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">últ. pago: '+f.ultimoPago+'</div>';
+    html += '</div>'; // /dir-card-right
+
+    html += '</div>'; // /dir-card-main
+
+    // Segunda línea: gestión + comentario
+    html += '<div class="dir-card-footer">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">'+gestionBadge+'</div>';
+    html += comentarioHtml;
+    html += '</div>';
+
+    html += '</div>'; // /dir-card
+  }); // end filasActivas
+
+  html += '</div>'; // /dir-section activos
+
+  // ── Sección cartera pasiva ──
+  if(filasPasivas.length){
+    html += '<div class="dir-section" data-section="pasivos" style="margin-top:20px">';
+    html += '<div style="padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--text3);border-radius:var(--r);margin-bottom:10px">';
+    html += '<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;margin-bottom:3px">⚫ Cartera pasiva — mora incobrable (+180 días)</div>';
+    html += '<div style="font-size:11px;color:var(--text3)">Estos '+filasPasivas.length+' clientes tienen +180 días sin pago. Se muestran solo para referencia · L '+fmtK(saldoPasivo)+' saldo total</div>';
+    html += '</div>';
+    filasPasivas.forEach(function(f, i){
+      // Construir tarjeta pasiva (sin botones de acción activa, diseño opaco)
+      html += '<div class="dir-card" data-tags="pasivos" data-nombre="'+escHtml(f.nombre.toLowerCase())+'" style="opacity:.65;filter:grayscale(.3)">';
+      html += '<div class="dir-card-main">';
+      html += '<div class="dir-card-left">';
+      html += '<div class="dir-idx">'+(i+1)+'</div>';
+      html += '<div>';
+      html += '<div class="dir-nombre" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(f.nombre)+'\','+f.cuota+','+f.saldo+')">'+escHtml(f.nombre)+'</div>';
+      html += '<div style="margin-top:3px"><span class="tramo-badge tramo-INACTIVO">⚫ Pasiva +180d</span>'+(f.diaPago?' <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">Día pago: '+f.diaPago+'</span>':'')+'</div>';
+      html += '</div></div>';
+      html += '<div class="dir-card-right">';
+      html += '<div class="dir-saldo" style="color:var(--text2)">L '+fmt(f.saldo)+'</div>';
+      if(f.ultimoPago) html += '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">últ. pago: '+f.ultimoPago+'</div>';
+      html += '</div></div>';
+      html += '<div class="dir-card-footer"><div style="font-size:10px;color:var(--text3)">'+f.estadoLabel+'</div></div>';
+      html += '</div>';
+    });
+    html += '</div>'; // /dir-section pasivos
+  }
+
+  html += '</div>'; // /dir-lista
+
+  // Guardar datos para export en variable JS directamente (no script inyectado en innerHTML)
+  var mesActual=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var hoyStr=HOY.toISOString().split('T')[0];
+  window._dirFilas = filas.map(function(f){
+    var p=f.promesa;
+    var pEstado=p?p.estado:'';
+    var esPromesa=pEstado==='promesa';
+    var esVisita=pEstado==='visita'||pEstado==='visita_agenda'||pEstado==='visita_realizada';
+    var promIncumplida=esPromesa&&p.fecha&&p.fecha.substring(0,7)<mesActual&&!f.pagadoMes;
+    // Calcular mora esperada
+    var mCalc=calcMoraCliente({
+      nombre:f.nombre,saldo:f.saldo,cuota:f.cuota,
+      pagado:0,fecha_factura:f.fechaFactura,
+      dia_pago:f.diaPago,num_cuotas:0
+    }, cartId);
+    return {
+      nombre:          f.nombre,
+      tramo:           f.tramo,
+      saldo:           f.saldo,
+      cuota:           f.cuota,
+      fechaFactura:    f.fechaFactura,
+      ultimoPago:      f.ultimoPago,
+      diaPago:         f.diaPago,
+      pagadoMes:       f.pagadoMes,
+      estadoGestion:   f.estadoLabel,
+      // Promesa
+      tienePromesa:    esPromesa,
+      promesaFecha:    (p&&p.fecha)||'',
+      promesaMonto:    (p&&p.monto)||'',
+      promesaIncumplida: promIncumplida,
+      // Visita
+      tieneVisita:     esVisita,
+      visitaFecha:     (esVisita&&p&&p.fecha)||'',
+      visitaNota:      (esVisita&&p&&p.nota)||'',
+      // No contesta
+      noContesta:      pEstado==='no-contesta'||pEstado==='no_contesta',
+      // Mora global
+      moraAdelanto:    mCalc?mCalc.diferencia:null,
+      // Nota general
+      comentario:      f.comentario||''
+    };
+  });
+  window._dirCartId = cartId;
+
+  return html;
+}
+
+// ── Helpers Directorio ──
+function dirFiltro(btn, tipo){
+  document.querySelectorAll('#dir-filters .rep-filter-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  if(tipo==='pasivos'){
+    // Mostrar solo sección pasiva
+    document.querySelectorAll('#dir-lista .dir-section').forEach(function(sec){
+      sec.style.display=sec.getAttribute('data-section')==='pasivos'?'':'none';
+    });
+    return;
+  }
+  // Para todos los otros filtros: siempre mostrar sección activos, ocultar pasivos
+  document.querySelectorAll('#dir-lista .dir-section').forEach(function(sec){
+    sec.style.display=sec.getAttribute('data-section')==='pasivos'?'none':'';
+  });
+  document.querySelectorAll('#dir-lista .dir-section[data-section="activos"] .dir-card').forEach(function(card){
+    var tags = card.getAttribute('data-tags') || '';
+    var show = tipo==='activos'
+      || (tipo==='mora'        && tags.includes('mora'))
+      || (tipo==='promesa'     && tags.includes('promesa'))
+      || (tipo==='visita'      && tags.includes('visita'))
+      || (tipo==='sin_gestion' && tags.includes('sin_gestion'))
+      || (tipo==='aldia'       && tags.includes('aldia'));
+    card.style.display = show ? '' : 'none';
+  });
+}
+function dirBuscar(){
+  var q = (document.getElementById('dir-search').value||'').toLowerCase();
+  document.querySelectorAll('#dir-lista .dir-card').forEach(function(card){
+    var n = card.getAttribute('data-nombre')||'';
+    card.style.display = n.includes(q) ? '' : 'none';
+  });
+}
+function dirExportCSV(){
+  if(!window._dirFilas||!window._dirFilas.length){ alert('Sin datos para exportar. Abre la pestaña Directorio primero.'); return; }
+  function doExport(){
+    var cartId=window._dirCartId||'';
+    var empresa=(CARTERAS[cartId]||{}).empresa||cartId;
+    var fecha=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var hoyStr=HOY.toISOString().split('T')[0];
+
+    // ── Hoja 1: Todos los clientes ──
+    var cols=[
+      '#','Cliente','Tramo / Estado','Saldo (L)','Cuota (L)',
+      'Mora/Adelanto (L)',
+      'Fecha Factura','Día Pago','Último Pago','Pagó este mes',
+      'Estado gestión',
+      '¿Tiene promesa?','Fecha promesa','Monto prometido (L)','Promesa incumplida',
+      '¿Tiene visita?','Fecha visita','Nota de visita',
+      '¿No contesta?',
+      'Comentario / Nota'
+    ];
+    var wsData=[[empresa+' — Reporte de Seguimiento'],['Generado: '+fecha],[],cols];
+
+    window._dirFilas.forEach(function(f,i){
+      var tramoLabel=f.tramo==='MES'?'Al día':f.tramo==='VENCIDO'?'Vencido':f.tramo==='INACTIVO'?'+180d Pasiva':(f.tramo||'—')+'d';
+      var mora=f.moraAdelanto!=null?(f.moraAdelanto>0?f.moraAdelanto:f.moraAdelanto<0?f.moraAdelanto:0):'';
+      wsData.push([
+        i+1, f.nombre, tramoLabel, f.saldo, f.cuota,
+        mora,
+        f.fechaFactura, f.diaPago, f.ultimoPago, f.pagadoMes?'Sí':'No',
+        f.estadoGestion,
+        f.tienePromesa?'Sí':'No', f.promesaFecha||'', f.promesaMonto||'', f.promesaIncumplida?'INCUMPLIDA':'',
+        f.tieneVisita?'Sí':'No', f.visitaFecha||'', f.visitaNota||'',
+        f.noContesta?'Sí':'No',
+        f.comentario||''
+      ]);
+    });
+
+    var ws1=XLSX.utils.aoa_to_sheet(wsData);
+    ws1['!cols']=[
+      {wch:4},{wch:36},{wch:13},{wch:12},{wch:11},
+      {wch:14},
+      {wch:13},{wch:8},{wch:13},{wch:10},
+      {wch:22},
+      {wch:10},{wch:14},{wch:16},{wch:14},
+      {wch:10},{wch:13},{wch:36},
+      {wch:10},
+      {wch:40}
+    ];
+    ws1['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Hoja 2: Solo promesas incumplidas ──
+    var incumplidas=window._dirFilas.filter(function(f){return f.promesaIncumplida;});
+    var ws2Data=[
+      [empresa+' — Promesas Incumplidas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo (L)','Cuota (L)','Fecha Promesa','Monto Prometido (L)','Último Pago','Días vencida']
+    ];
+    incumplidas.forEach(function(f,i){
+      var tramoLabel=f.tramo==='MES'?'Al día':f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      var diasVencida=f.promesaFecha?Math.floor((HOY-new Date(f.promesaFecha+'T12:00:00'))/86400000):'';
+      ws2Data.push([i+1,f.nombre,tramoLabel,f.saldo,f.cuota,f.promesaFecha,f.promesaMonto||'',f.ultimoPago,diasVencida]);
+    });
+    var ws2=XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols']=[{wch:4},{wch:36},{wch:13},{wch:12},{wch:11},{wch:14},{wch:16},{wch:13},{wch:12}];
+    ws2['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Hoja 3: Solo visitas ──
+    var conVisita=window._dirFilas.filter(function(f){return f.tieneVisita;});
+    var ws3Data=[
+      [empresa+' — Registro de Visitas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo (L)','Cuota (L)','Fecha Visita','Comentario de visita','Último Pago']
+    ];
+    conVisita.forEach(function(f,i){
+      var tramoLabel=f.tramo==='MES'?'Al día':f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      ws3Data.push([i+1,f.nombre,tramoLabel,f.saldo,f.cuota,f.visitaFecha,f.visitaNota,f.ultimoPago]);
+    });
+    var ws3=XLSX.utils.aoa_to_sheet(ws3Data);
+    ws3['!cols']=[{wch:4},{wch:36},{wch:13},{wch:12},{wch:11},{wch:13},{wch:50},{wch:13}];
+    ws3['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Hoja 4: Sin gestión (mora activa sin ninguna acción) ──
+    var sinGestion=window._dirFilas.filter(function(f){
+      return !f.pagadoMes && !f.tienePromesa && !f.tieneVisita && !f.noContesta
+        && f.tramo!=='MES' && f.tramo!=='INACTIVO' && f.tramo!=='PAGARON';
+    });
+    var ws4Data=[
+      [empresa+' — Sin Gestión (requieren atención)'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo (L)','Cuota (L)','Mora/Adelanto (L)','Fecha Factura','Día Pago','Último Pago']
+    ];
+    sinGestion.forEach(function(f,i){
+      var tramoLabel=f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      var mora=f.moraAdelanto!=null?f.moraAdelanto:'';
+      ws4Data.push([i+1,f.nombre,tramoLabel,f.saldo,f.cuota,mora,f.fechaFactura,f.diaPago,f.ultimoPago]);
+    });
+    var ws4=XLSX.utils.aoa_to_sheet(ws4Data);
+    ws4['!cols']=[{wch:4},{wch:36},{wch:13},{wch:12},{wch:11},{wch:14},{wch:13},{wch:8},{wch:13}];
+    ws4['!freeze']={xSplit:0,ySplit:4};
+
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws1,'Todos los clientes');
+    if(incumplidas.length) XLSX.utils.book_append_sheet(wb,ws2,'Promesas incumplidas');
+    if(conVisita.length)   XLSX.utils.book_append_sheet(wb,ws3,'Visitas');
+    if(sinGestion.length)  XLSX.utils.book_append_sheet(wb,ws4,'Sin gestión');
+    XLSX.writeFile(wb,'seguimiento_cartera_'+HOY.toISOString().split('T')[0]+'.xlsx');
+  }
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=doExport; document.head.appendChild(s);
+  } else { doExport(); }
+}
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+
+// Guardados en Supabase tabla: mora_overrides
+// Clave: cartera_id + cliente_nombre
+// Campos: num_cuotas_real, total_credito_real, nota
+// ══════════════════════════════════════════════════════════
+var MG_OVERRIDES = {}; // key = cartId+'::'+nombre
+
+async function mgLoadOverrides(cartId){
+  if(!supa) return;
+  try{
+    var r = await supa.from('mora_overrides').select('*').eq('cartera_id', cartId);
+    if(r.error) throw r.error;
+    (r.data||[]).forEach(function(o){
+      MG_OVERRIDES[cartId+'::'+o.cliente_nombre] = {
+        num_cuotas_real: o.num_cuotas_real,
+        total_credito_real: o.total_credito_real,
+        nota: o.nota || ''
+      };
+    });
+  }catch(e){ console.warn('mgLoadOverrides:', e.message); }
+}
+
+async function mgSaveOverride(cartId, nombre, numCuotasReal, totalCreditoReal, nota){
+  if(!supa){ alert('Sin conexión a base de datos'); return; }
+  var key = cartId+'::'+nombre;
+  MG_OVERRIDES[key] = { num_cuotas_real: numCuotasReal, total_credito_real: totalCreditoReal, nota: nota };
+  try{
+    await supa.from('mora_overrides').upsert({
+      cartera_id: cartId,
+      cliente_nombre: nombre,
+      num_cuotas_real: numCuotasReal,
+      total_credito_real: totalCreditoReal,
+      nota: nota,
+      updated_at: new Date().toISOString()
+    },{ onConflict: 'cartera_id,cliente_nombre' });
+    // Refrescar la pestaña
+    var pane = document.getElementById('tp-MORA_GLOBAL');
+    if(pane && CURRENT && CARTERAS[CURRENT]){
+      pane.innerHTML = buildMoraGlobal(CURRENT, CARTERAS[CURRENT].clientes);
+    }
+  }catch(e){ alert('Error guardando: '+e.message); }
+}
+
+async function mgDeleteOverride(cartId, nombre){
+  if(!supa) return;
+  var key = cartId+'::'+nombre;
+  delete MG_OVERRIDES[key];
+  try{
+    await supa.from('mora_overrides').delete()
+      .eq('cartera_id', cartId).eq('cliente_nombre', nombre);
+    var pane = document.getElementById('tp-MORA_GLOBAL');
+    if(pane && CURRENT && CARTERAS[CURRENT]){
+      pane.innerHTML = buildMoraGlobal(CURRENT, CARTERAS[CURRENT].clientes);
+    }
+  }catch(e){ console.warn('mgDeleteOverride:', e.message); }
+}
+
+// Modal de edición de refinanciamiento
+function mgOpenEditModal(cartId, nombre, cuotaPDF, totalPDF, numCuotasPDF){
+  var key = cartId+'::'+nombre;
+  var ov = MG_OVERRIDES[key] || {};
+  var curCuotas = ov.num_cuotas_real || numCuotasPDF;
+  var curTotal  = ov.total_credito_real || totalPDF;
+  var curNota   = ov.nota || '';
+
+  // Crear overlay inline
+  var old = document.getElementById('mg-edit-overlay');
+  if(old) old.remove();
+
+  var div = document.createElement('div');
+  div.id = 'mg-edit-overlay';
+  div.className = 'overlay show';
+  div.innerHTML =
+    '<div class="modal-card" style="max-width:400px">' +
+      '<button class="modal-x" onclick="document.getElementById(\'mg-edit-overlay\').remove()">×</button>' +
+      '<div class="modal-title">✏️ Editar datos reales</div>' +
+      '<div class="modal-sub" style="margin-bottom:16px">' + nombre + '</div>' +
+      '<div style="background:var(--amberbg);border:1px solid rgba(138,95,0,.2);border-radius:5px;padding:9px 12px;font-family:var(--mono);font-size:11px;color:var(--amber);margin-bottom:16px">' +
+        '⚠️ Solo afecta el cálculo en <strong>Mora Global</strong>. El resto de la app usa los datos del PDF.' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-lbl">Crédito total real (L)</label>' +
+        '<input type="number" class="form-inp" id="mg-inp-total" value="' + curTotal + '" placeholder="Ej: 43280">' +
+        '<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px">Del PDF: L ' + fmt(totalPDF) + '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-lbl">Número de cuotas reales</label>' +
+        '<input type="number" class="form-inp" id="mg-inp-cuotas" value="' + curCuotas + '" placeholder="Ej: 24" min="1" max="60">' +
+        '<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px">Del PDF: ' + numCuotasPDF + ' cuotas · Cuota mensual: L ' + fmt(cuotaPDF) + '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-lbl">Nota (opcional)</label>' +
+        '<input type="text" class="form-inp" id="mg-inp-nota" value="' + curNota + '" placeholder="Ej: Refinanciamiento motors enero 2026">' +
+      '</div>' +
+      '<div class="form-actions">' +
+        (ov.num_cuotas_real ? '<button class="btn btn-red btn-sm" onclick="mgDeleteOverride(\''+cartId+'\',\''+esc(nombre)+'\');document.getElementById(\'mg-edit-overlay\').remove()">🗑 Quitar corrección</button>' : '') +
+        '<button class="btn btn-ghost" onclick="document.getElementById(\'mg-edit-overlay\').remove()">Cancelar</button>' +
+        '<button class="btn btn-g" onclick="mgConfirmEdit(\''+cartId+'\',\''+esc(nombre)+'\')">💾 Guardar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(div);
+}
+
+function mgConfirmEdit(cartId, nombre){
+  var total  = parseFloat(document.getElementById('mg-inp-total').value) || 0;
+  var cuotas = parseInt(document.getElementById('mg-inp-cuotas').value) || 0;
+  var nota   = document.getElementById('mg-inp-nota').value || '';
+  if(total <= 0 || cuotas <= 0){ alert('Ingresa valores válidos'); return; }
+  document.getElementById('mg-edit-overlay').remove();
+  mgSaveOverride(cartId, nombre, cuotas, total, nota);
+}
+
+// ── buildMoraGlobal principal ──
+function irAHistorialCliente(cartId, nombre, cuota, saldo){
+  // Activar grupo HISTORIAL y el pane
+  var grupos=window._DASH_GRUPOS||[];
+  // Marcar botón de grupo activo
+  document.querySelectorAll('.grp-btn').forEach(function(b){
+    b.classList.remove('on');
+    b.style.background=''; b.style.color=''; b.style.borderColor='';
+    if(b.getAttribute('data-grp')==='HISTORIAL') b.classList.add('on');
+  });
+  // Limpiar sub-row (HISTORIAL es directo, sin subs)
+  var subRow=document.getElementById('sub-row');
+  if(subRow) subRow.innerHTML='';
+  // Activar pane
+  _activatePan('HISTORIAL');
+  CURRENT_TAB='HISTORIAL';
+  // Cargar el historial del cliente con un pequeño delay para que el pane esté visible
+  setTimeout(function(){
+    loadClientHist(cartId, nombre, cuota, saldo);
+  }, 120);
+  // Scroll al pane
+  var pane=document.getElementById('tp-HISTORIAL');
+  if(pane) pane.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function buildMoraGlobal(cartId, cl){
+  var hoy = HOY;
+  var filas = [];
+  var cerosPrima = [];
+
+  // Cargar overrides desde Supabase si aún no están (async, refrescará al volver)
+  mgLoadOverrides(cartId);
+
+  cl.forEach(function(c){
+    if(c.tramo === 'INACTIVO') return;
+
+    var fFact = parseHNDate(c.fecha_factura);
+
+    // ── DETECCIÓN 0 PRIMA ──
+    // Compró este mes y no hay ningún pago registrado → primera cuota aún no vence
+    var facturaEsteMes = fFact &&
+      fFact.getMonth()     === hoy.getMonth() &&
+      fFact.getFullYear()  === hoy.getFullYear();
+    if(c.sin_ultimo_pago && facturaEsteMes){
+      cerosPrima.push(c);
+      return;
+    }
+
+    // ── DATOS: usar override si existe, sino datos del PDF ──
+    var key = cartId+'::'+c.nombre;
+    var ov  = MG_OVERRIDES[key] || {};
+    var numCuotasUsar   = ov.num_cuotas_real  || c.num_cuotas || 0;
+    var totalCreditoUsar = ov.total_credito_real || ((c.pagado||0) + (c.saldo||0));
+    var esOverride = !!ov.num_cuotas_real;
+
+    if(totalCreditoUsar <= 0 || !c.cuota || c.cuota <= 0) return;
+
+    // ── CUOTAS TRANSCURRIDAS ──
+    var cuotasTranscurridas = 0;
+    if(fFact && hoy > fFact){
+      var meses = (hoy.getFullYear() - fFact.getFullYear()) * 12 + (hoy.getMonth() - fFact.getMonth());
+      if(c.dia_pago > 0 && hoy.getDate() >= c.dia_pago) meses += 1;
+      cuotasTranscurridas = Math.max(0, Math.min(meses, numCuotasUsar));
+    }
+
+    // ── SALDO ESPERADO ──
+    var saldoEsperado = Math.round(totalCreditoUsar - cuotasTranscurridas * c.cuota);
+    saldoEsperado = Math.max(0, saldoEsperado);
+
+    var saldoActual  = c.saldo || 0;
+    var diferencia   = saldoActual - saldoEsperado;
+
+    // ── Datos de gestión desde PROMESAS en memoria ──
+    var pKey = cartId+'::'+c.nombre;
+    var prom = PROMESAS[pKey] || null;
+    var mesActualMG = hoy.getFullYear()+'-'+(hoy.getMonth()<9?'0':'')+(hoy.getMonth()+1);
+    var hoyStrMG = hoy.toISOString().split('T')[0];
+
+    var tienePromesa   = prom && prom.estado === 'promesa';
+    var tieneVisita    = prom && (prom.estado === 'visita' || prom.estado === 'visita_agenda' || prom.estado === 'visita_realizada');
+    var noContesta     = prom && (prom.estado === 'no-contesta' || prom.estado === 'no_contesta');
+    var promIncumplida = tienePromesa && prom.fecha && prom.fecha.substring(0,7) < mesActualMG && !pagoEsteMes(c.ultimo_pago);
+
+    filas.push({
+      nombre: c.nombre,
+      cuota: c.cuota,
+      numCuotas: numCuotasUsar,
+      numCuotasPDF: c.num_cuotas || 0,
+      cuotasTranscurridas: cuotasTranscurridas,
+      totalCredito: totalCreditoUsar,
+      totalCreditoPDF: (c.pagado||0)+(c.saldo||0),
+      saldoEsperado: saldoEsperado,
+      saldoActual: saldoActual,
+      diferencia: diferencia,
+      tramo: c.tramo,
+      fechaFactura: c.fecha_factura || '—',
+      esOverride: esOverride,
+      ovNota: ov.nota || '',
+      ultimoPago: c.ultimo_pago || '',
+      // Gestión
+      estadoGestion:    prom ? (prom.estado||'') : '',
+      tienePromesa:     tienePromesa,
+      promesaFecha:     (prom && prom.fecha)  || '',
+      promesaMonto:     (prom && prom.monto)  || '',
+      promesaNota:      (prom && prom.nota)   || '',
+      promesaIncumplida:promIncumplida,
+      tieneVisita:      tieneVisita,
+      visitaFecha:      (tieneVisita && prom && prom.fecha) || '',
+      visitaNota:       (tieneVisita && prom && prom.nota)  || '',
+      noContesta:       noContesta
+    });
+  });
+
+  // ── TOTALES (solo filas con cálculo normal, no 0-prima) ──
+  var totalMora      = filas.filter(function(f){ return f.diferencia > 0; }).reduce(function(s,f){ return s+f.diferencia; },0);
+  var totalAdelantado= filas.filter(function(f){ return f.diferencia < 0; }).reduce(function(s,f){ return s+Math.abs(f.diferencia); },0);
+  var nMora          = filas.filter(function(f){ return f.diferencia > 0; }).length;
+  var nAlDia         = filas.filter(function(f){ return f.diferencia === 0; }).length;
+  var nAdelantado    = filas.filter(function(f){ return f.diferencia < 0; }).length;
+  var nOverride      = filas.filter(function(f){ return f.esOverride; }).length;
+
+  filas.sort(function(a,b){ return b.diferencia - a.diferencia; });
+
+  var html = '';
+
+  // ── HEADER ──
+  html += '<div class="rep-header">';
+  html += '<div class="rep-title">📉 Análisis de Mora Global</div>';
+  html += '<div class="rep-sub">' + hoy.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</div>';
+  html += '<div class="rep-kpis" style="margin-top:14px">';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v">'+ filas.length +'</div><div class="rep-kpi-l">Analizados</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ffcc66">'+ nMora +'</div><div class="rep-kpi-l">En mora</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#88eebb">'+ nAlDia +'</div><div class="rep-kpi-l">Al día</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#88ccff">'+ nAdelantado +'</div><div class="rep-kpi-l">Adelantados</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ffaaaa">L '+ fmtK(totalMora) +'</div><div class="rep-kpi-l">Mora acumulada</div></div>';
+  html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#d0b0ff">'+ cerosPrima.length +'</div><div class="rep-kpi-l">0 Prima (nuevos)</div></div>';
+  if(nOverride) html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ffd080">'+ nOverride +'</div><div class="rep-kpi-l">Refinanciados</div></div>';
+  html += '</div></div>';
+
+  // ── LEYENDA ──
+  html += '<div class="tbl-note" style="margin-top:12px;margin-bottom:10px">';
+  html += '💡 <strong>Fórmula:</strong> Saldo esperado = Crédito total − (cuotas transcurridas × cuota). ';
+  html += 'Usa ✏️ para corregir datos de clientes refinanciados (solo afecta este reporte).';
+  html += '</div>';
+
+  // ── FILTROS ──
+  html += '<div class="rep-filters" id="mg-filters">';
+  html += '<button class="rep-filter-btn on"  onclick="mgSetFiltro(this,\'todos\')">📋 Todos ('+ filas.length +')</button>';
+  html += '<button class="rep-filter-btn" onclick="mgSetFiltro(this,\'mora\')">🔴 En mora ('+ nMora +')</button>';
+  html += '<button class="rep-filter-btn" onclick="mgSetFiltro(this,\'aldia\')">🟢 Al día ('+ nAlDia +')</button>';
+  html += '<button class="rep-filter-btn" onclick="mgSetFiltro(this,\'adelantado\')">🔵 Adelantados ('+ nAdelantado +')</button>';
+  html += '<button class="rep-filter-btn" onclick="mgSetFiltro(this,\'ceroprima\')">🆕 0 Prima ('+ cerosPrima.length +')</button>';
+  if(nOverride) html += '<button class="rep-filter-btn" onclick="mgSetFiltro(this,\'override\')">✏️ Refinanciados ('+ nOverride +')</button>';
+  html += '</div>';
+
+  // ── BARRA BUSQUEDA + EXPORT ──
+  html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">';
+  html += '<input class="tbl-search" id="mg-search" style="margin:0;flex:1;min-width:180px" placeholder="Buscar cliente..." onkeyup="mgFiltrar()">';
+  html += '<button class="btn btn-ghost btn-sm" onclick="mgExportCSV()" style="color:var(--green);border-color:rgba(26,122,60,.3)">📗 Exportar CSV</button>';
+  html += '</div>';
+
+  // ── TABLA PRINCIPAL ──
+  html += '<div class="rep-tbl-wrap"><table class="rep-tbl" id="mg-tabla"><thead><tr>';
+  html += '<th>#</th><th>Cliente</th><th>Crédito total</th><th>Cuota</th>';
+  html += '<th>Cuotas totales</th><th>Cuotas transcurridas</th>';
+  html += '<th>Saldo esperado</th><th>Saldo actual</th><th>Mora / Adelanto</th><th>Estado</th><th>Gestión</th><th>Acción</th>';
+  html += '</tr></thead><tbody id="mg-tbody">';
+
+  // Filas normales
+  filas.forEach(function(f, i){
+    var estado, estadoClass, difStr, difColor;
+    if(f.diferencia > 0){
+      estado='🔴 En mora'; estadoClass='br';
+      difStr='mora L '+fmt(f.diferencia); difColor='color:var(--red);font-weight:700';
+    } else if(f.diferencia < 0){
+      estado='🔵 Adelantado'; estadoClass='bb';
+      difStr='adelanto L '+fmt(Math.abs(f.diferencia)); difColor='color:var(--blue);font-weight:700';
+    } else {
+      estado='🟢 Al día'; estadoClass='bg';
+      difStr='L 0'; difColor='color:var(--green)';
+    }
+
+    var overrideBadge = f.esOverride
+      ? '<div style="margin-top:3px"><span class="b" style="background:#fff8e0;color:#a07000;border:1px solid #e0c040;font-size:9px">✏️ Refinanciado'+(f.ovNota?' · '+f.ovNota:'')+'</span></div>'
+      : '';
+    var cuotasTxt = f.esOverride
+      ? '<strong>'+f.cuotasTranscurridas+'</strong> de '+f.numCuotas+' <span style="color:var(--text3);font-size:9px">(PDF:'+f.numCuotasPDF+')</span>'
+      : '<strong>'+f.cuotasTranscurridas+'</strong> de '+f.numCuotas;
+
+    var qEdit = "'"+cartId+"','"+esc(f.nombre)+"',"+f.cuota+","+f.totalCreditoPDF+","+f.numCuotasPDF;
+
+    // Gestión desde PROMESAS en memoria
+    var pMG = PROMESAS[cartId+'::'+f.nombre] || null;
+    var gestionBadges = '';
+    if(pMG){
+      if(pMG.estado==='promesa'){
+        var pVenc = pMG.fecha && pMG.fecha < hoy.toISOString().split('T')[0];
+        gestionBadges += '<span class="b bp" style="font-size:9px">'+(pVenc?'⚠️':'📅')+'Promesa'+(pMG.fecha?' '+pMG.fecha:'')+'</span> ';
+      } else if(pMG.estado==='visita'||pMG.estado==='visita_agenda'){
+        gestionBadges += '<span class="b bb" style="font-size:9px">🗓 Visita'+(pMG.fecha?' '+pMG.fecha:'')+'</span> ';
+      } else if(pMG.estado==='pago'){
+        gestionBadges += '<span class="b bg" style="font-size:9px">✅ Pagó</span> ';
+      } else if(pMG.estado==='no-contesta'||pMG.estado==='no_contesta'){
+        gestionBadges += '<span class="b bx" style="font-size:9px">📵 No contesta</span> ';
+      }
+    }
+    // Historial cacheado
+    var hKey='mg_hist_'+cartId+'::'+f.nombre;
+    if(window[hKey]){
+      var hd=window[hKey];
+      if(hd.nVisitas)  gestionBadges += '<span class="b bb" style="font-size:9px">🚗 '+hd.nVisitas+' visita'+(hd.nVisitas>1?'s':'')+'</span> ';
+      if(hd.nPromesas) gestionBadges += '<span class="b bp" style="font-size:9px">📅 '+hd.nPromesas+' prom.</span> ';
+      if(hd.tasa!==null) gestionBadges += '<span class="b" style="font-size:9px;background:var(--bg3)">'+(hd.tasa>=80?'🟢':hd.tasa>=50?'🟡':'🔴')+' '+hd.tasa+'%</span>';
+    } else if(window[hKey]===undefined){
+      window[hKey]=null; // en progreso
+      if(supa){
+        supa.from('historial_clientes').select('tipo')
+          .eq('cartera_id',cartId).eq('cliente_nombre',f.nombre)
+          .then(function(res){
+            if(!res.error&&res.data){
+              var nV=res.data.filter(function(x){return x.tipo==='visita_realizada';}).length;
+              var nP=res.data.filter(function(x){return x.tipo==='promesa';}).length;
+              var nC=res.data.filter(function(x){return x.tipo==='promesa_cumplida';}).length;
+              window[hKey]={nVisitas:nV,nPromesas:nP,tasa:nP>0?Math.round(nC/nP*100):null};
+              // Refrescar pestaña si sigue visible
+              var pane=document.getElementById('tp-MORA_GLOBAL');
+              if(pane&&pane.classList.contains('on')&&CURRENT){
+                pane.innerHTML=buildMoraGlobal(CURRENT,(CARTERAS[CURRENT]||{}).clientes||[]);
+              }
+            }
+          });
+      }
+      gestionBadges += '<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">cargando...</span>';
+    }
+    if(!gestionBadges) gestionBadges='<span style="font-size:9px;color:var(--text3)">—</span>';
+
+    html += '<tr class="mg-row" data-estado="'+(f.diferencia>0?'mora':f.diferencia<0?'adelantado':'aldia')+'" data-override="'+(f.esOverride?'override':'')+'">';
+    html += '<td class="mono" style="color:var(--text3)">'+(i+1)+'</td>';
+    html += '<td class="td-name" style="cursor:pointer" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(f.nombre)+'\','+f.cuota+','+f.saldoActual+')">';
+    html += '<div style="font-weight:600">'+f.nombre+'</div>';
+    html += '<div style="font-family:var(--mono);font-size:10px;color:var(--blue)">ver historial →</div>';
+    html += '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">Desde: '+f.fechaFactura+'</div>'+overrideBadge+'</td>';
+    html += '<td class="mono">L '+fmt(f.totalCredito)+'</td>';
+    html += '<td class="mono">L '+fmt(f.cuota)+'</td>';
+    html += '<td class="mono" style="text-align:center">'+f.numCuotas+'</td>';
+    html += '<td class="mono" style="text-align:center">'+cuotasTxt+'</td>';
+    html += '<td class="mono" style="color:var(--text2)">L '+fmt(f.saldoEsperado)+'</td>';
+    html += '<td class="mono" style="font-weight:600">L '+fmt(f.saldoActual)+'</td>';
+    html += '<td class="mono" style="'+difColor+'">'+difStr+'</td>';
+    html += '<td><span class="b '+estadoClass+'">'+estado+'</span></td>';
+    html += '<td style="min-width:110px">'+gestionBadges+'</td>';
+    html += '<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="mgOpenEditModal('+qEdit+')">✏️ Editar</button></td>';
+    html += '</tr>';
+  });
+
+  // Filas 0 prima (sección separada al final)
+  if(cerosPrima.length){
+    html += '<tr class="rep-subtotal mg-row" data-estado="ceroprima" data-override="">';
+    html += '<td colspan="11" style="color:var(--purple);border-left:3px solid var(--purple)">🆕 Facturas nuevas — 0 Prima · '+cerosPrima.length+' clientes · Primera cuota vence el próximo mes</td>';
+    html += '</tr>';
+    cerosPrima.forEach(function(c, i){
+      var qEdit2 = "'"+cartId+"','"+esc(c.nombre)+"',"+c.cuota+","+((c.pagado||0)+(c.saldo||0))+","+(c.num_cuotas||0);
+      html += '<tr class="mg-row" data-estado="ceroprima" data-override="" style="opacity:.85">';
+      html += '<td class="mono" style="color:var(--text3)">—</td>';
+      html += '<td class="td-name"><div style="font-weight:600">'+c.nombre+'</div>';
+      html += '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">Desde: '+(c.fecha_factura||'—')+'</div></td>';
+      html += '<td class="mono">L '+fmt((c.pagado||0)+(c.saldo||0))+'</td>';
+      html += '<td class="mono">L '+fmt(c.cuota)+'</td>';
+      html += '<td class="mono" style="text-align:center">'+(c.num_cuotas||'—')+'</td>';
+      html += '<td class="mono" style="text-align:center;color:var(--text3)">0 de '+(c.num_cuotas||'—')+'</td>';
+      html += '<td colspan="3" style="text-align:center"><span class="b bp">🆕 0 Prima · aún no vence</span></td>';
+      html += '<td><span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2)">Nuevo</span></td>';
+      html += '<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="mgOpenEditModal('+qEdit2+')">✏️ Editar</button></td>';
+      html += '</tr>';
+    });
+  }
+
+  html += '</tbody></table></div>';
+  // Guardar datos para export en variable JS directamente (no script inyectado en innerHTML)
+  window._mgFilas = filas;
+  window._mgCerosPrima = cerosPrima.map(function(c){ return c.nombre; });
+  window._mgCartId = cartId;
+  return html;
+}
+
+// ── Filtros Mora Global ──
+function mgSetFiltro(btn, tipo){
+  document.querySelectorAll('#mg-filters .rep-filter-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  document.querySelectorAll('#mg-tbody .mg-row').forEach(function(r){
+    var est = r.getAttribute('data-estado');
+    var ov  = r.getAttribute('data-override');
+    var show = tipo==='todos'
+      || est===tipo
+      || (tipo==='override' && ov==='override');
+    r.style.display = show ? '' : 'none';
+  });
+}
+function mgFiltrar(){
+  var q = (document.getElementById('mg-search').value||'').toLowerCase();
+  document.querySelectorAll('#mg-tbody .mg-row').forEach(function(r){
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function mgExportCSV(){
+  if(!window._mgFilas||!window._mgFilas.length){ alert('Sin datos para exportar. Abre la pestaña Mora Global primero.'); return; }
+  function doExport(){
+    var cartId=window._mgCartId||'';
+    var empresa=(CARTERAS[cartId]||{}).empresa||cartId;
+    var fecha=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+    // ── Hoja 1: Todos los clientes con mora y seguimiento ──
+    var ws1Data=[
+      [empresa+' — Mora Global + Seguimiento'],
+      ['Generado: '+fecha],
+      [],
+      ['#','Cliente','Fecha Factura','Último Pago','Tramo',
+       'Crédito Total (L)','Cuota (L)','Cuotas Totales','Cuotas Transcurridas',
+       'Saldo Esperado (L)','Saldo Actual (L)','Mora / Adelanto (L)','Estado mora',
+       'Refinanciado','Nota refinanciamiento',
+       'Estado gestión',
+       '¿Promesa?','Fecha promesa','Monto prometido (L)','Nota promesa','¿Incumplida?',
+       '¿Visita?','Fecha visita','Nota de visita',
+       '¿No contesta?']
+    ];
+    window._mgFilas.forEach(function(f,i){
+      var estMora=f.diferencia>0?'En mora':f.diferencia<0?'Adelantado':'Al día';
+      var tramoLabel=f.tramo==='MES'?'Al día':f.tramo==='VENCIDO'?'Vencido':f.tramo==='INACTIVO'?'+180d':(f.tramo||'—')+'d';
+      var estGestion=f.estadoGestion||'Sin gestión';
+      ws1Data.push([
+        i+1, f.nombre, f.fechaFactura, f.ultimoPago||'', tramoLabel,
+        f.totalCredito, f.cuota, f.numCuotas, f.cuotasTranscurridas,
+        f.saldoEsperado, f.saldoActual, f.diferencia, estMora,
+        f.esOverride?'Sí':'No', f.ovNota||'',
+        estGestion,
+        f.tienePromesa?'Sí':'No', f.promesaFecha||'', f.promesaMonto||'', f.promesaNota||'', f.promesaIncumplida?'INCUMPLIDA':'',
+        f.tieneVisita?'Sí':'No', f.visitaFecha||'', f.visitaNota||'',
+        f.noContesta?'Sí':'No'
+      ]);
+    });
+    // 0 Prima al final
+    if(window._mgCerosPrima&&window._mgCerosPrima.length){
+      ws1Data.push([]);
+      ws1Data.push(['— 0 Prima: primera cuota aún no vence —']);
+      window._mgCerosPrima.forEach(function(n,i){
+        ws1Data.push([i+1,n,'','','0 Prima','','','','','','','','0 Prima','No','','','No','','','','','No','','','No']);
+      });
+    }
+    var ws1=XLSX.utils.aoa_to_sheet(ws1Data);
+    ws1['!cols']=[
+      {wch:4},{wch:36},{wch:13},{wch:13},{wch:10},
+      {wch:15},{wch:11},{wch:8},{wch:13},
+      {wch:15},{wch:13},{wch:15},{wch:12},
+      {wch:10},{wch:28},
+      {wch:16},
+      {wch:9},{wch:14},{wch:16},{wch:36},{wch:12},
+      {wch:9},{wch:13},{wch:40},
+      {wch:10}
+    ];
+    ws1['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Hoja 2: Solo clientes con promesas (activas + incumplidas) ──
+    var conPromesa=window._mgFilas.filter(function(f){return f.tienePromesa;});
+    var ws2Data=[
+      [empresa+' — Promesas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo Actual (L)','Mora/Adelanto (L)',
+       'Fecha promesa','Monto prometido (L)','Nota','¿Incumplida?','Días vencida','Último pago']
+    ];
+    conPromesa.forEach(function(f,i){
+      var tramoLabel=f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      var diasVencida=f.promesaFecha?Math.floor((HOY-new Date(f.promesaFecha+'T12:00:00'))/86400000):'';
+      ws2Data.push([
+        i+1,f.nombre,tramoLabel,f.saldoActual,f.diferencia,
+        f.promesaFecha,f.promesaMonto||'',f.promesaNota||'',
+        f.promesaIncumplida?'INCUMPLIDA':'Activa',
+        f.promesaIncumplida?diasVencida:'',
+        f.ultimoPago||''
+      ]);
+    });
+    var ws2=XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols']=[{wch:4},{wch:36},{wch:10},{wch:13},{wch:14},{wch:14},{wch:16},{wch:36},{wch:12},{wch:12},{wch:13}];
+    ws2['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Hoja 3: Solo visitas ──
+    var conVisita=window._mgFilas.filter(function(f){return f.tieneVisita;});
+    var ws3Data=[
+      [empresa+' — Visitas registradas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo Actual (L)','Mora/Adelanto (L)','Fecha visita','Comentario de visita','Último pago']
+    ];
+    conVisita.forEach(function(f,i){
+      var tramoLabel=f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      ws3Data.push([i+1,f.nombre,tramoLabel,f.saldoActual,f.diferencia,f.visitaFecha||'',f.visitaNota||'',f.ultimoPago||'']);
+    });
+    var ws3=XLSX.utils.aoa_to_sheet(ws3Data);
+    ws3['!cols']=[{wch:4},{wch:36},{wch:10},{wch:13},{wch:14},{wch:13},{wch:50},{wch:13}];
+    ws3['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Armar libro ──
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws1,'Mora + Seguimiento');
+    if(conPromesa.length) XLSX.utils.book_append_sheet(wb,ws2,'Promesas');
+    if(conVisita.length)  XLSX.utils.book_append_sheet(wb,ws3,'Visitas');
+    XLSX.writeFile(wb,'mora_global_'+HOY.toISOString().split('T')[0]+'.xlsx');
+  }
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=doExport; document.head.appendChild(s);
+  } else { doExport(); }
+}
+
 function buildCal(cartId,cl){
   var first=new Date(CAL_Y,CAL_M,1),last=new Date(CAL_Y,CAL_M+1,0);
   var hD=HOY.getDate(),isCur=CAL_M===HOY.getMonth()&&CAL_Y===HOY.getFullYear();
@@ -1975,7 +3619,7 @@ function buildMsg(cartId,G){
 function buildAct(G){
   function top(arr,n){return [...arr].sort(function(a,b){return (a.dia_pago||31)-(b.dia_pago||31);}).slice(0,n||8);}
   function topS(arr,n){return [...arr].sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,n||6);}
-  function ac(title,color,list,empty){return '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid '+color+';border-radius:var(--r);padding:13px;box-shadow:var(--shadow)"><div style="font-family:var(--mono);font-size:11px;font-weight:600;color:'+color+';margin-bottom:9px">'+title+'</div><ul style="list-style:none;display:flex;flex-direction:column;gap:4px">'+(list.length?list.map(function(c){return '<li style="font-size:12px;color:var(--text2);padding-left:12px;position:relative">'+c.nombre+' <span style="color:var(--text3);font-family:var(--mono);font-size:10px">· dia '+(c.dia_pago||'?')+' · L '+fmt(c.saldo||0)+'</span></li>';}).join(''):'<li style="color:var(--text3)">'+empty+'</li>')+'</ul></div>';}
+  function ac(title,color,list,empty){return '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid '+color+';border-radius:var(--r);padding:13px;box-shadow:var(--shadow)"><div style="font-family:var(--mono);font-size:11px;font-weight:600;color:'+color+';margin-bottom:9px">'+title+'</div><ul style="list-style:none;display:flex;flex-direction:column;gap:4px">'+(list.length?list.map(function(c){return '<li style="font-size:12px;color:var(--text2);padding-left:12px;position:relative;cursor:pointer" onclick="irAHistorialCliente(\''+CURRENT+'\',\''+esc(c.nombre)+'\','+( c.cuota||0)+','+(c.saldo||0)+')">'+c.nombre+' <span style="color:var(--text3);font-family:var(--mono);font-size:10px">· dia '+(c.dia_pago||'?')+' · L '+fmt(c.saldo||0)+'</span> <span style="color:var(--blue);font-size:9px">📋</span></li>';}).join(''):'<li style="color:var(--text3)">'+empty+'</li>')+'</ul></div>';}
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">'+ac('📞 Llamar HOY — vencidos este mes','var(--orange)',top(G.VENCIDO),'Todos al dia')+ac('🚨 Visitar / Negociar (120-150d)','var(--red)',topS([...(G['150']||[]),...(G['120']||[])]),'Sin criticos')+ac('📞 Llamar esta semana (60-90d)','var(--amber)',topS([...(G['90']||[]),...(G['60']||[])]),'Sin mora media')+ac('⚖️ Gestion especial (+180d)','var(--text3)',topS(G.INACTIVO||[]),'Sin inactivos')+'</div>';
 }
 
@@ -1989,6 +3633,7 @@ function openAccion(cartId,nombre,cuota,saldo){
   document.getElementById('ac-fecha').value=ex.fecha||HOY.toISOString().split('T')[0];
   document.getElementById('ac-monto').value=ex.monto||cuota;
   document.getElementById('ac-nota').value=ex.nota||'';
+  document.getElementById('ac-nota-visita').value=''; // siempre limpio para nueva visita
   toggleAcFields();
   document.getElementById('modal-accion').classList.add('show');
 }
@@ -1996,10 +3641,15 @@ function toggleAcFields(){
   var tipo=document.getElementById('ac-tipo').value;
   var showF=['promesa','posponer','visita_agenda','visita_realizada','pago','abono'].includes(tipo);
   var showM=['promesa','pago','abono'].includes(tipo);
-  var lbl=tipo==='visita_agenda'?'Fecha de visita':tipo==='visita_realizada'?'Fecha visitado':'Fecha comprometida';
+  var esVisitaReal=tipo==='visita_realizada';
+  var lbl=tipo==='visita_agenda'?'Fecha de visita':tipo==='visita_realizada'?'Fecha de la visita':'Fecha comprometida';
   document.getElementById('ac-row-fecha').style.display=showF?'':'none';
   document.getElementById('ac-row-monto').style.display=showM?'':'none';
   document.getElementById('ac-fecha-lbl').textContent=lbl;
+  // Alternar entre nota simple y textarea de visita
+  document.getElementById('ac-row-nota-simple').style.display=esVisitaReal?'none':'';
+  document.getElementById('ac-row-nota-visita').style.display=esVisitaReal?'':'none';
+  if(esVisitaReal) setTimeout(function(){document.getElementById('ac-nota-visita').focus();},50);
 }
 async function saveAccion(){
   if(!MODAL_AC)return;
@@ -2007,26 +3657,188 @@ async function saveAccion(){
   var tipo=document.getElementById('ac-tipo').value;
   var fecha=document.getElementById('ac-fecha').value;
   var monto=parseFloat(document.getElementById('ac-monto').value)||0;
-  var nota=document.getElementById('ac-nota').value.trim();
+  // Leer nota desde el campo correcto según el tipo
+  var esVisitaReal=tipo==='visita_realizada';
+  var nota=esVisitaReal
+    ?(document.getElementById('ac-nota-visita').value.trim())
+    :(document.getElementById('ac-nota').value.trim());
+  var hoyStr=HOY.toISOString().split('T')[0];
   var key=cartId+'::'+nombre;
-  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:nota||null,monto:monto||null,fecha_accion:fecha||null,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
+  // Construir texto de nota enriquecido según tipo
+  var notaFinal;
+  if(tipo==='promesa')       notaFinal='📅 Prometió pagar el '+(fecha||'—')+(monto?' por L '+fmt(monto):'')+(nota?' — '+nota:'');
+  else if(tipo==='posponer') notaFinal='⏭ Pospuso promesa al '+(fecha||'—')+(nota?' — '+nota:'');
+  else if(esVisitaReal)      notaFinal=nota||'Visita realizada sin comentario';
+  else                       notaFinal=nota||null;
+  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:notaFinal,monto:monto||null,fecha_accion:fecha||null,fecha_promesa:['promesa','posponer'].includes(tipo)?fecha:null,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
   var ex=PROMESAS[key]||{};
   if(['promesa','posponer'].includes(tipo)){PROMESAS[key]=Object.assign({},ex,{estado:'promesa',fecha:fecha,monto:monto,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
-  else if(tipo==='pago'){PROMESAS[key]=Object.assign({},ex,{estado:'pago',fecha:fecha,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
+  else if(tipo==='pago'){
+    // Si tenía promesa activa → registrar como promesa_cumplida en historial
+    if(ex&&ex.estado==='promesa'){
+      await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:'promesa_cumplida',monto:monto||null,
+        nota:'✅ Promesa CUMPLIDA manualmente — había prometido pagar el '+(ex.fecha||'—')+(monto?' · pagó L '+fmt(monto):'')+(nota?' — '+nota:''),
+        fecha_accion:fecha||hoyStr,fecha_promesa:ex.fecha||null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
+    }
+    PROMESAS[key]=Object.assign({},ex,{estado:'pago',fecha:fecha,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);
+  }
   else if(tipo==='no_contesta'){PROMESAS[key]=Object.assign({},ex,{estado:'no-contesta',nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   else if(tipo==='visita'||tipo==='visita_agenda'){PROMESAS[key]=Object.assign({},ex,{estado:'visita',fecha:fecha,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   closeModal('modal-accion');
-  if(CURRENT)renderDash(CURRENT);
+  if(CURRENT) refreshSoft(CURRENT);
   setConn(true,'Guardado ✓');setTimeout(function(){setConn(true,'Conectado');},2000);
 }
-async function marcarMora(cartId,nombre){var key=cartId+'::'+nombre;PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{mora_pendiente:true,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);renderDash(cartId);}
-async function quitarMora(cartId,nombre){var key=cartId+'::'+nombre;if(PROMESAS[key])delete PROMESAS[key].mora_pendiente;await dbSaveProm(cartId,nombre);renderDash(cartId);}
-async function delPromesa(cartId,nombre){if(!confirm('Borrar promesa de '+nombre+'?'))return;delete PROMESAS[cartId+'::'+nombre];await dbSaveProm(cartId,nombre);if(CURRENT)renderDash(CURRENT);}
+async function marcarMora(cartId,nombre){var key=cartId+'::'+nombre;PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{mora_pendiente:true,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);refreshSoft(cartId);}
+async function quitarMora(cartId,nombre){var key=cartId+'::'+nombre;if(PROMESAS[key])delete PROMESAS[key].mora_pendiente;await dbSaveProm(cartId,nombre);refreshSoft(cartId);}
+async function delPromesa(cartId,nombre){if(!confirm('Borrar promesa de '+nombre+'?'))return;delete PROMESAS[cartId+'::'+nombre];await dbSaveProm(cartId,nombre);if(CURRENT)refreshSoft(CURRENT);}
+async function histMarcar(cartId, nombre, tipo){
+  var LABELS={
+    arreglo_pago:   {title:'🤝 Arreglo de pago / Financiamiento', color:'var(--green)'},
+    cero_prima:     {title:'🆕 0 Prima', placeholder:'Ej: Ingresó sin pago inicial. Promo mayo 2026.', color:'var(--purple)'},
+    extension_plazo:{title:'📅 Extensión de plazo', placeholder:'Ej: Se le extiende un mes. Autorizado por gerencia.', color:'var(--blue)'}
+  };
+  var cfg=LABELS[tipo];
+  if(!cfg) return;
+
+  var old=document.getElementById('hist-marcar-overlay');
+  if(old) old.remove();
+  var div=document.createElement('div');
+  div.id='hist-marcar-overlay';
+  div.className='overlay show';
+
+  var body;
+  if(tipo==='arreglo_pago'){
+    var clData=((CARTERAS[cartId]||{}).clientes||[]).find(function(c){return c.nombre===nombre;});
+    var cuotaRef=clData?clData.cuota:0;
+    body='<div class="form-row">'
+      +'<label class="form-lbl">💰 Cuota del arreglo (L)</label>'
+      +'<input type="number" class="form-inp" id="hm-cuota" placeholder="Ej: 1500" value="'+(cuotaRef||'')+'" min="0">'
+      +'<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px">Cuota original del crédito: L '+fmt(cuotaRef)+'</div>'
+      +'</div>'
+      +'<div class="form-row">'
+      +'<label class="form-lbl">🔁 Frecuencia de pago</label>'
+      +'<select class="form-inp" id="hm-frecuencia">'
+      +'<option value="mensual">Mensual</option>'
+      +'<option value="quincenal">Quincenal</option>'
+      +'<option value="semanal">Semanal</option>'
+      +'<option value="único">Pago único</option>'
+      +'</select>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="form-row" style="margin:0">'
+      +'<label class="form-lbl">📅 Fecha inicio</label>'
+      +'<input type="date" class="form-inp" id="hm-inicio" value="'+HOY.toISOString().split('T')[0]+'">'
+      +'</div>'
+      +'<div class="form-row" style="margin:0">'
+      +'<label class="form-lbl">🏁 Cancela hasta</label>'
+      +'<input type="date" class="form-inp" id="hm-fin">'
+      +'</div>'
+      +'</div>'
+      +'<div class="form-row">'
+      +'<label class="form-lbl">Nota adicional (opcional)</label>'
+      +'<textarea class="form-inp" id="hm-nota" rows="2" style="resize:vertical;font-family:var(--mono);font-size:12px" placeholder="Ej: Comprometido a pagar los viernes."></textarea>'
+      +'</div>';
+  } else {
+    body='<div class="form-row">'
+      +'<label class="form-lbl">Nota (opcional)</label>'
+      +'<textarea class="form-inp" id="hm-nota" rows="3" style="resize:vertical;font-family:var(--mono);font-size:12px" placeholder="'+(cfg.placeholder||'')+'"></textarea>'
+      +'</div>'
+      +(tipo==='extension_plazo'?
+        '<div class="form-row"><label class="form-lbl">Fecha referencia</label>'
+        +'<input type="date" class="form-inp" id="hm-fecha" value="'+HOY.toISOString().split('T')[0]+'"></div>'
+        : '');
+  }
+
+  div.innerHTML=
+    '<div class="modal-card" style="max-width:440px">'
+    +'<button class="modal-x" onclick="document.getElementById(\'hist-marcar-overlay\').remove()">×</button>'
+    +'<div class="modal-title" style="color:'+cfg.color+'">'+cfg.title+'</div>'
+    +'<div class="modal-sub" style="margin-bottom:14px">'+nombre+'</div>'
+    +body
+    +'<div class="form-actions">'
+    +'<button class="btn btn-ghost" onclick="document.getElementById(\'hist-marcar-overlay\').remove()">Cancelar</button>'
+    +'<button class="btn btn-g" onclick="histMarcarConfirm(\''+cartId+'\',\''+esc(nombre)+'\',\''+tipo+'\')">✅ Registrar</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(div);
+  setTimeout(function(){ var t=document.getElementById('hm-cuota')||document.getElementById('hm-nota'); if(t) t.focus(); }, 60);
+}
+
+async function histMarcarConfirm(cartId, nombre, tipo){
+  var nota=(document.getElementById('hm-nota')||{}).value||'';
+  document.getElementById('hist-marcar-overlay').remove();
+
+  var notaFinal, fechaAccion, montoGuardar=null;
+
+  if(tipo==='arreglo_pago'){
+    var cuota=parseFloat((document.getElementById('hm-cuota')||{}).value)||0;
+    var freq=(document.getElementById('hm-frecuencia')||{}).value||'mensual';
+    var inicio=(document.getElementById('hm-inicio')||{}).value||HOY.toISOString().split('T')[0];
+    var fin=(document.getElementById('hm-fin')||{}).value||'';
+    fechaAccion=inicio;
+    montoGuardar=cuota||null;
+    var freqLabel={mensual:'mensual',quincenal:'quincenal',semanal:'semanal','único':'pago único'}[freq]||freq;
+    notaFinal='🤝 Arreglo de pago — L '+fmt(cuota)+' '+freqLabel
+      +' · Inicia: '+inicio
+      +(fin?' · Cancela hasta: '+fin:'')
+      +(nota?' · '+nota:'');
+  } else if(tipo==='extension_plazo'){
+    var fecha=(document.getElementById('hm-fecha')||{}).value||HOY.toISOString().split('T')[0];
+    fechaAccion=fecha;
+    notaFinal='📅 Extensión de plazo hasta '+fecha+(nota?' — '+nota:'');
+  } else {
+    fechaAccion=HOY.toISOString().split('T')[0];
+    notaFinal='🆕 Cliente ingresó a 0 Prima'+(nota?' — '+nota:'');
+  }
+
+  await dbSaveHist({
+    cartera_id:cartId, cliente_nombre:nombre, tipo:tipo,
+    nota:notaFinal, monto:montoGuardar,
+    fecha_accion:fechaAccion,
+    fecha_promesa:null, fecha_visita:null,
+    gestor:(USER&&USER.nombre)||'—',
+    created_at:new Date().toISOString()
+  });
+
+  var clData=((CARTERAS[cartId]||{}).clientes||[]).find(function(c){return c.nombre===nombre;});
+  if(clData) await loadClientHist(cartId, nombre, clData.cuota, clData.saldo);
+  setConn(true,'✅ Arreglo registrado en historial');
+  setTimeout(function(){setConn(true,'Conectado');},2000);
+}
+async function mgMarcarCumplida(cartId, nombre, cuota, saldo){
+  if(!confirm('¿Marcar promesa de '+nombre+' como CUMPLIDA?\n\nEsto la moverá a "Al día / Pagaron" y quedará registrado en su historial.')) return;
+  var key=cartId+'::'+nombre;
+  var prom=PROMESAS[key]||{};
+  var hoyStr=HOY.toISOString().split('T')[0];
+  // Grabar promesa_cumplida en historial
+  await dbSaveHist({
+    cartera_id:cartId, cliente_nombre:nombre, tipo:'promesa_cumplida',
+    monto:prom.monto||null,
+    nota:'✅ Promesa CUMPLIDA (marcada manualmente por cobrador) — prometido el '+(prom.fecha||'—')+(prom.monto?' por L '+fmt(prom.monto):''),
+    fecha_accion:hoyStr, fecha_promesa:prom.fecha||null,
+    gestor:(USER&&USER.nombre)||'—', created_at:new Date().toISOString()
+  });
+  // Grabar pago manual en historial
+  await dbSaveHist({
+    cartera_id:cartId, cliente_nombre:nombre, tipo:'pago',
+    monto:saldo||null,
+    nota:'💰 Pago registrado manualmente por cobrador',
+    fecha_accion:hoyStr, gestor:(USER&&USER.nombre)||'—', created_at:new Date().toISOString()
+  });
+  // Actualizar estado de promesa a 'pago' (queda fuera de lista de promesas activas)
+  PROMESAS[key]=Object.assign({},prom,{estado:'pago',ts:new Date().toISOString()});
+  await dbSaveProm(cartId,nombre);
+  // Limpiar caché de scores para refrescar
+  delete window['hist_score_'+key];
+  if(CURRENT) refreshSoft(CURRENT);
+  setConn(true,'✅ Promesa marcada como cumplida');
+  setTimeout(function(){setConn(true,'Conectado');},2500);
+}
 async function delTodasPromesas(cartId){
   if(!confirm('Borrar TODAS las promesas de esta cartera?'))return;
   Object.keys(PROMESAS).forEach(function(k){if(k.startsWith(cartId+'::'))delete PROMESAS[k];});
   if(supa)await supa.from('promesas').delete().eq('cartera_id',cartId);
-  if(CURRENT)renderDash(CURRENT);
+  if(CURRENT)refreshSoft(CURRENT);
 }
 
 // ══ ALERTAS ══
