@@ -483,7 +483,7 @@ async function loadData(){
     var r2=await supa.from('promesas').select('*');
     if(r2.error)throw r2.error;
     PROMESAS={};
-    (r2.data||[]).forEach(function(p){PROMESAS[p.cartera_id+'::'+p.cliente_nombre]={estado:p.estado,fecha:p.fecha,monto:p.monto,nota:p.nota,mora_pendiente:p.mora_pendiente||false,adelantado:p.adelantado||false,ts:p.updated_at};});
+    (r2.data||[]).forEach(function(p){PROMESAS[p.cartera_id+'::'+p.cliente_nombre]={estado:p.estado,fecha:p.fecha,monto:p.monto,nota:p.nota,mora_pendiente:p.mora_pendiente||false,adelantado:p.adelantado||false,cero_prima:p.cero_prima||false,ts:p.updated_at};});
     DB_OK=true;setConn(true,'Conectado');
   }catch(e){DB_OK=false;setConn(false,'Sin conexión');console.error('loadData:',e);}
 }
@@ -519,7 +519,7 @@ async function dbSaveProm(cartId,nombre){
   if(!supa)return;var key=cartId+'::'+nombre;var p=PROMESAS[key];
   try{
     if(!p){await supa.from('promesas').delete().eq('cartera_id',cartId).eq('cliente_nombre',nombre);return;}
-    await supa.from('promesas').upsert({cartera_id:cartId,cliente_nombre:nombre,estado:p.estado||null,fecha:p.fecha||null,monto:p.monto||null,nota:p.nota||null,mora_pendiente:p.mora_pendiente||false,adelantado:p.adelantado||false,updated_at:new Date().toISOString()},{onConflict:'cartera_id,cliente_nombre'});
+    await supa.from('promesas').upsert({cartera_id:cartId,cliente_nombre:nombre,estado:p.estado||null,fecha:p.fecha||null,monto:p.monto||null,nota:p.nota||null,mora_pendiente:p.mora_pendiente||false,adelantado:p.adelantado||false,cero_prima:p.cero_prima||false,updated_at:new Date().toISOString()},{onConflict:'cartera_id,cliente_nombre'});
   }catch(e){console.error('saveProm:',e);}
 }
 async function dbSaveHist(entry){if(!supa)return;try{await supa.from('historial_clientes').insert(entry);}catch(e){console.error('saveHist:',e);}}
@@ -1104,7 +1104,8 @@ function refreshSoft(cartId){
 function limpiarCacheCartera(cartId){
   Object.keys(window).forEach(function(k){
     if(k.startsWith('hist_score_'+cartId+'::') ||
-       k.startsWith('mg_hist_'+cartId+'::')) delete window[k];
+       k.startsWith('mg_hist_'+cartId+'::') ||
+       k.startsWith('hist_cp_'+cartId+'::')) delete window[k];
   });
 }
 
@@ -1902,7 +1903,7 @@ function buildSinPagoInt(cartId,cl){
   }
 
   html+='<div class="tbl-wrap"><table><thead><tr>';
-  html+='<th>#</th><th>Cliente</th><th>F. Factura</th><th>Saldo</th><th>Cuota</th><th>Días sin pago</th><th>Último pago</th><th>Interés</th><th></th>';
+  html+='<th>#</th><th>Cliente</th><th>F. Factura</th><th>Saldo</th><th>Cuota</th><th>Días sin pago</th><th>Último pago</th><th>0 Prima</th><th>Acción</th>';
   html+='</tr></thead><tbody>';
 
   lista.forEach(function(r,i){
@@ -1912,34 +1913,50 @@ function buildSinPagoInt(cartId,cl){
       :'<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">—</span>';
     var upColor=r.ultimo_pago?'color:var(--red)':'color:var(--text3)';
 
-    // 0 Prima: sin_ultimo_pago=true Y fecha_factura en mes actual
-    var esCeroPrima=r.sin_ultimo_pago&&(function(){
-      var ff=parseHNDate(r.fecha_factura);
-      return ff&&ff.getMonth()===HOY.getMonth()&&ff.getFullYear()===HOY.getFullYear();
-    })();
-    var primaBadge=esCeroPrima
-      ?'<span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2);font-size:10px;display:block;margin-top:3px">🆕 0 Prima</span>'
-      :'';
+    // 0 Prima: detectar por campo cero_prima en PROMESAS (ya viene de Supabase)
+    var pCP=PROMESAS[cartId+'::'+r.nombre]||{};
+    var yaEsCeroPrima=pCP.cero_prima===true;
 
     var ffDisplay=r.fecha_factura||'—';
 
     html+='<tr>';
     html+='<td class="mono">'+(i+1)+'</td>';
-    html+='<td class="td-name nombre-link" style="cursor:pointer" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+primaBadge+'</td>';
+    html+='<td class="td-name nombre-link" style="cursor:pointer" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+'</td>';
     html+='<td class="mono" style="color:var(--text2)">'+ffDisplay+'</td>';
     html+='<td class="mono">L '+fmt(r.saldo||0)+'</td>';
     html+='<td class="mono">L '+fmt(r.cuota||0)+'</td>';
     html+='<td class="mono">'+diasHtml+'</td>';
     html+='<td class="mono" style="'+upColor+'">'+(r.ultimo_pago||'—')+'</td>';
-    html+='<td><span style="font-family:var(--mono);font-size:11px;color:var(--text3);font-style:italic">Pendiente gestor</span></td>';
+    var ceroPrimaBtn=yaEsCeroPrima
+      ?'<span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2);font-size:11px">🆕 0 Prima</span>'
+      :'<button class="btn btn-ghost btn-sm" style="white-space:nowrap;color:var(--purple);border-color:rgba(96,48,176,.4)" onclick="marcarCeroPrima(\''+cartId+'\',\''+esc(r.nombre)+'\')">🆕 0 Prima</button>';
+    html+='<td>'+ceroPrimaBtn+'</td>';
     html+='<td><button class="btn btn-ghost btn-sm" style="white-space:nowrap;border-color:var(--green);color:var(--green)" onclick="marcarAdelantado(\''+cartId+'\',\''+esc(r.nombre)+'\')">✅ Va Adelantado</button></td>';
     html+='</tr>';
   });
 
   html+='</tbody></table></div>';
+
   return html;
 }
 
+async function marcarCeroPrima(cartId,nombre){
+  var key=cartId+'::'+nombre;
+  PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{cero_prima:true,ts:new Date().toISOString()});
+  await dbSaveProm(cartId,nombre);
+  // Registrar también en historial
+  await dbSaveHist({
+    cartera_id:cartId, cliente_nombre:nombre, tipo:'cero_prima',
+    nota:'🆕 Cliente ingresó a 0 Prima',
+    monto:null, fecha_accion:HOY.toISOString().split('T')[0],
+    fecha_promesa:null, fecha_visita:null,
+    gestor:(USER&&USER.nombre)||'—',
+    created_at:new Date().toISOString()
+  });
+  refreshSoft(cartId);
+  setConn(true,'✅ 0 Prima registrado');
+  setTimeout(function(){setConn(true,'Conectado');},2000);
+}
 async function marcarAdelantado(cartId,nombre){
   var key=cartId+'::'+nombre;
   PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{adelantado:true,ts:new Date().toISOString()});
@@ -3952,9 +3969,14 @@ async function histMarcarConfirm(cartId, nombre, tipo){
     created_at:new Date().toISOString()
   });
 
+  // Limpiar scores para que se recarguen
+  delete window['hist_score_'+cartId+'::'+nombre];
+
   var clData=((CARTERAS[cartId]||{}).clientes||[]).find(function(c){return c.nombre===nombre;});
   if(clData) await loadClientHist(cartId, nombre, clData.cuota, clData.saldo);
-  setConn(true,'✅ Arreglo registrado en historial');
+  if(CURRENT) refreshSoft(CURRENT);
+  var lbl=tipo==='cero_prima'?'✅ 0 Prima registrado':tipo==='extension_plazo'?'✅ Extensión registrada':'✅ Arreglo registrado en historial';
+  setConn(true,lbl);
   setTimeout(function(){setConn(true,'Conectado');},2000);
 }
 async function mgMarcarCumplida(cartId, nombre, cuota, saldo){
