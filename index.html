@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0054)file:///Users/jorgecalix/Downloads/COBRAZNA_index.html -->
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="La Roca">
@@ -241,9 +241,9 @@ tr:hover td{background:#f5f8ff}
 .rep-row-prioridad-4 td:first-child{border-left:3px solid var(--green)}
 .rep-export-row{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap}
 </style>
-</head>
+<script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script></head>
 <body>
-<div id="login-screen">
+<div id="login-screen" style="display: flex;">
   <div class="login-card">
     <div class="login-mark">LR</div>
     <div class="login-title">La Roca Cobranza</div>
@@ -257,32 +257,32 @@ tr:hover td{background:#f5f8ff}
       <button class="pin-btn" data-v="1">1</button><button class="pin-btn" data-v="2">2</button><button class="pin-btn" data-v="3">3</button>
       <button class="pin-btn" data-v="4">4</button><button class="pin-btn" data-v="5">5</button><button class="pin-btn" data-v="6">6</button>
       <button class="pin-btn" data-v="7">7</button><button class="pin-btn" data-v="8">8</button><button class="pin-btn" data-v="9">9</button>
-      <button class="pin-btn del" data-v="del">&#x232B;</button><button class="pin-btn" data-v="0">0</button><button class="pin-btn ok" data-v="ok">&#x2713;</button>
+      <button class="pin-btn del" data-v="del">⌫</button><button class="pin-btn" data-v="0">0</button><button class="pin-btn ok" data-v="ok">✓</button>
     </div>
     <div class="pin-err" id="pin-err"></div>
   </div>
 </div>
-<header id="main-header">
+<header id="main-header" style="display: none;">
   <div class="logo"><div class="logo-m">LR</div>LA ROCA COBRANZA</div>
   <div class="hright">
     <span class="conn-dot" id="conn-dot"></span>
     <span id="conn-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)"></span>
-    <button class="hbtn" onclick="syncNow()">&#x1F504; Sync</button>
-    <div class="hdate" id="hdate"></div>
-    <div class="user-chip" id="user-chip" onclick="logout()"><span id="user-lbl">&#x2014;</span> <span style="color:var(--text3)">&#x2715;</span></div>
-    <button class="hbtn" id="back-btn" style="display:none" onclick="goHome()">&#x21A9; Inicio</button>
+    <button class="hbtn" onclick="syncNow()">🔄 Sync</button>
+    <div class="hdate" id="hdate">SÁB, 6 JUN 2026</div>
+    <div class="user-chip" id="user-chip" onclick="logout()"><span id="user-lbl">—</span> <span style="color:var(--text3)">✕</span></div>
+    <button class="hbtn" id="back-btn" style="display:none" onclick="goHome()">↩ Inicio</button>
   </div>
 </header>
-<div id="home-zone">
+<div id="home-zone" style="display: none;">
   <p style="font-family:var(--mono);font-size:10px;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Sistema de cobranza</p>
   <h1 style="font-size:24px;font-weight:300;margin-bottom:4px">Cartera <strong style="font-weight:600;color:var(--green)">La Roca</strong></h1>
   <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Subi el PDF del dia para actualizar la cartera. Las promesas se conservan siempre.</p>
   <div id="role-note" class="role-note"></div>
   <div class="drop-zone" id="drop-zone" onclick="dropClick()">
-    <span style="font-size:28px;margin-bottom:8px;display:block">&#x1F4C4;</span>
+    <span style="font-size:28px;margin-bottom:8px;display:block">📄</span>
     <p style="font-size:14px;font-weight:500;margin-bottom:3px" id="drop-lbl">Arrastra el PDF aqui o haz clic</p>
     <p style="font-size:11px;color:var(--text3)">Solo archivos .pdf del sistema</p>
-    <input type="file" id="file-input" accept=".pdf" multiple style="display:none">
+    <input type="file" id="file-input" accept=".pdf" multiple="" style="display:none">
   </div>
   <div class="prog-wrap" id="prog-wrap">
     <div class="prog-bg"><div class="prog-fill" id="prog-fill"></div></div>
@@ -297,12 +297,12 @@ tr:hover td{background:#f5f8ff}
     <div id="cart-list"></div>
   </div>
 </div>
-<div id="dash-zone">
+<div id="dash-zone" style="display: none;">
   <div class="dash-top">
-    <div><div class="dash-empresa" id="dash-emp">&#x2014;</div><div class="dash-meta" id="dash-meta">&#x2014;</div></div>
+    <div><div class="dash-empresa" id="dash-emp">—</div><div class="dash-meta" id="dash-meta">—</div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">&#x2B07; CSV</button>
-      <button class="btn btn-blue btn-sm" id="btn-alerta" style="display:none" onclick="openAlertaModal()">&#x1F4E3; Alerta</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-blue btn-sm" id="btn-alerta" style="display:none" onclick="openAlertaModal()">📣 Alerta</button>
     </div>
   </div>
   <div class="kpi-row" id="kpi-row"></div>
@@ -311,20 +311,20 @@ tr:hover td{background:#f5f8ff}
 </div>
 <div class="overlay" id="modal-accion">
   <div class="modal-card">
-    <button class="modal-x" onclick="closeModal('modal-accion')">&#xD7;</button>
-    <div class="modal-title" id="ac-nombre">&#x2014;</div>
-    <div class="modal-sub" id="ac-info">&#x2014;</div>
+    <button class="modal-x" onclick="closeModal(&#39;modal-accion&#39;)">×</button>
+    <div class="modal-title" id="ac-nombre">—</div>
+    <div class="modal-sub" id="ac-info">—</div>
     <div class="form-row">
       <label class="form-lbl">Tipo de accion</label>
       <select class="form-inp" id="ac-tipo" onchange="toggleAcFields()">
-        <option value="promesa">&#x1F4C5; Prometio pagar</option>
-        <option value="posponer">&#x23ED; Posponer promesa</option>
-        <option value="pago">&#x2705; Registrar pago</option>
-        <option value="abono">&#x1F4B0; Abono parcial</option>
-        <option value="visita_agenda">&#x1F5D3; Agendar visita</option>
-        <option value="visita_realizada">&#x1F697; Visita realizada</option>
-        <option value="no_contesta">&#x1F4F5; No contesta</option>
-        <option value="nota">&#x1F4DD; Nota</option>
+        <option value="promesa">📅 Prometio pagar</option>
+        <option value="posponer">⏭ Posponer promesa</option>
+        <option value="pago">✅ Registrar pago</option>
+        <option value="abono">💰 Abono parcial</option>
+        <option value="visita_agenda">🗓 Agendar visita</option>
+        <option value="visita_realizada">🚗 Visita realizada</option>
+        <option value="no_contesta">📵 No contesta</option>
+        <option value="nota">📝 Nota</option>
       </select>
     </div>
     <div class="form-row" id="ac-row-fecha">
@@ -343,28 +343,28 @@ tr:hover td{background:#f5f8ff}
     <!-- Comentario extendido para visita realizada -->
     <div class="form-row" id="ac-row-nota-visita" style="display:none">
       <label class="form-lbl">📝 Comentario de la visita</label>
-      <textarea class="form-inp" id="ac-nota-visita" rows="5"
-        style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
-        placeholder="¿Qué encontró el gestor?&#10;&#10;Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con portón azul. Acordamos visita de seguimiento el lunes."></textarea>
+      <textarea class="form-inp" id="ac-nota-visita" rows="5" style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6" placeholder="¿Qué encontró el gestor?
+
+Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con portón azul. Acordamos visita de seguimiento el lunes."></textarea>
       <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente para seguimiento.</div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeModal('modal-accion')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="closeModal(&#39;modal-accion&#39;)">Cancelar</button>
       <button class="btn btn-g" onclick="saveAccion()">Guardar</button>
     </div>
   </div>
 </div>
 <div class="overlay" id="modal-alerta">
   <div class="modal-card">
-    <button class="modal-x" onclick="closeModal('modal-alerta')">&#xD7;</button>
-    <div class="modal-title">&#x1F4E3; Alerta para el equipo</div>
+    <button class="modal-x" onclick="closeModal(&#39;modal-alerta&#39;)">×</button>
+    <div class="modal-title">📣 Alerta para el equipo</div>
     <div class="form-row"><label class="form-lbl">Tipo</label>
-      <select class="form-inp" id="al-tipo"><option value="animo">&#x1F4AA; Animo</option><option value="info">&#x1F4CB; Info</option><option value="urgente">&#x1F6A8; Urgente</option></select></div>
+      <select class="form-inp" id="al-tipo"><option value="animo">💪 Animo</option><option value="info">📋 Info</option><option value="urgente">🚨 Urgente</option></select></div>
     <div class="form-row"><label class="form-lbl">Titulo</label><input type="text" class="form-inp" id="al-titulo" placeholder="Titulo..."></div>
     <div class="form-row"><label class="form-lbl">Mensaje</label><textarea class="form-inp" id="al-mensaje" rows="3"></textarea></div>
     <div class="form-row"><label class="form-lbl">Cliente (opcional)</label><input type="text" class="form-inp" id="al-cliente"></div>
     <div class="form-actions">
-      <button class="btn btn-ghost" onclick="closeModal('modal-alerta')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="closeModal(&#39;modal-alerta&#39;)">Cancelar</button>
       <button class="btn btn-g" onclick="sendAlerta()">Enviar</button>
     </div>
   </div>
@@ -4076,5 +4076,6 @@ function flt(tid,sid){var q=document.getElementById(sid).value.toLowerCase();doc
 document.getElementById('modal-accion').addEventListener('click',function(e){if(e.target===this)closeModal('modal-accion');});
 document.getElementById('modal-alerta').addEventListener('click',function(e){if(e.target===this)closeModal('modal-alerta');});
 </script>
-</body>
-</html>
+
+
+</body></html>
