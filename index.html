@@ -476,10 +476,10 @@ async function loadData(){
   if(!supa){setConn(false,'Sin Supabase');return;}
   setConn(null,'Cargando...');
   try{
-    var r1=await supa.from('carteras').select('*');
+    var r1=await supa.from('carteras').select('id,empresa,fecha_emision,load_history,updated_at');
     if(r1.error)throw r1.error;
     CARTERAS={};
-    (r1.data||[]).forEach(function(c){CARTERAS[c.id]={id:c.id,empresa:c.empresa,fecha_emision:c.fecha_emision,clientes:c.clientes||[],load_history:c.load_history||[]};});
+    (r1.data||[]).forEach(function(c){CARTERAS[c.id]={id:c.id,empresa:c.empresa,fecha_emision:c.fecha_emision,clientes:[],load_history:c.load_history||[],_cargados:false};});
     var r2=await supa.from('promesas').select('*');
     if(r2.error)throw r2.error;
     PROMESAS={};
@@ -487,7 +487,21 @@ async function loadData(){
     DB_OK=true;setConn(true,'Conectado');
   }catch(e){DB_OK=false;setConn(false,'Sin conexión');console.error('loadData:',e);}
 }
-async function syncNow(){setConn(null,'Sincronizando...');await loadData();if(CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);else renderHome();}
+
+// ── Lazy load: clientes se cargan solo al abrir una cartera ───────────────
+async function loadClientesCartera(cartId){
+  if(!supa)return;
+  var c=CARTERAS[cartId];
+  if(!c||c._cargados)return; // ya cargados, no repetir
+  try{
+    var r=await supa.from('carteras').select('clientes').eq('id',cartId).single();
+    if(r.error)throw r.error;
+    c.clientes=r.data.clientes||[];
+    c._cargados=true;
+  }catch(e){console.error('loadClientesCartera:',e);}
+}
+
+async function syncNow(){setConn(null,'Sincronizando...');await loadData();if(CURRENT&&CARTERAS[CURRENT]){loadClientesCartera(CURRENT).then(function(){renderDash(CURRENT);});}else renderHome();}
 function startSync(){
   stopSync();
   SYNC_T=setInterval(async function(){
@@ -504,7 +518,7 @@ function startSync(){
       if(changed&&CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);
       checkAlertas();
     }catch(e){}
-  },3000);
+  },300000); // 5 min — reduce egress
 }
 function stopSync(){if(SYNC_T){clearInterval(SYNC_T);SYNC_T=null;}}
 async function dbSaveCartera(id){
