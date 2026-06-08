@@ -323,7 +323,10 @@ tr:hover td{background:#f5f8ff}
         <option value="abono">&#x1F4B0; Abono parcial</option>
         <option value="visita_agenda">&#x1F5D3; Agendar visita</option>
         <option value="visita_realizada">&#x1F697; Visita realizada</option>
-        <option value="no_contesta">&#x1F4F5; No contesta</option>
+        <option value="llamada_no_contesta">&#x1F4DE; Llamada — No contesta</option>
+        <option value="llamada_sin_fecha">&#x1F4DE; Llamada — No da fecha de pago</option>
+        <option value="llamada_realizada">&#x1F4DE; Llamada realizada</option>
+        <option value="no_contesta">&#x1F4F5; No contesta (otro canal)</option>
         <option value="nota">&#x1F4DD; Nota</option>
       </select>
     </div>
@@ -347,6 +350,14 @@ tr:hover td{background:#f5f8ff}
         style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
         placeholder="¿Qué encontró el gestor?&#10;&#10;Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con portón azul. Acordamos visita de seguimiento el lunes."></textarea>
       <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente para seguimiento.</div>
+    </div>
+    <!-- Comentario extendido para llamada realizada -->
+    <div class="form-row" id="ac-row-nota-llamada" style="display:none">
+      <label class="form-lbl">📞 Comentario de la llamada</label>
+      <textarea class="form-inp" id="ac-nota-llamada" rows="4"
+        style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
+        placeholder="¿Qué pasó en la llamada?&#10;&#10;Ej: Cliente contestó, dice que no tiene dinero. Prometió llamar la próxima semana."></textarea>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente.</div>
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-accion')">Cancelar</button>
@@ -2329,7 +2340,7 @@ async function loadClientHist(cartId,nombre,cuota,saldo){
   try{
     var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).eq('cliente_nombre',nombre).order('created_at',{ascending:true});
     if(r.error)throw r.error;
-    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',no_contesta:'📵',no_contesta_old:'📵',nota:'📝',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
+    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',llamada_realizada:'📞',llamada_no_contesta:'📞',llamada_sin_fecha:'📞',no_contesta:'📵',no_contesta_old:'📵',nota:'📝',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
     var labels={promesa:'Prometió pagar',posponer:'Pospuso promesa',pago:'Pago registrado',abono:'Abono parcial',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',no_contesta:'No contesta',no_contesta_old:'No contesta',nota:'Nota',promesa_cumplida:'Promesa CUMPLIDA',promesa_incumplida:'Promesa INCUMPLIDA',arreglo_pago:'Arreglo de pago',cero_prima:'Ingresó a 0 Prima',extension_plazo:'Extensión de plazo'};
     var tCls={promesa:'hi-p',posponer:'hi-p',pago:'hi-g',abono:'hi-a',visita_agenda:'hi-v',visita_realizada:'hi-v',no_contesta:'hi-n',no_contesta_old:'hi-n',nota:'hi-n',promesa_cumplida:'hi-g',promesa_incumplida:'hi-r',arreglo_pago:'hi-g',cero_prima:'hi-p',extension_plazo:'hi-p'};
 
@@ -3454,13 +3465,7 @@ function buildMoraGlobal(cartId, cl){
   html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#88ccff">'+ nAdelantado +'</div><div class="rep-kpi-l">Adelantados</div></div>';
   html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ffaaaa">L '+ fmtK(totalMora) +'</div><div class="rep-kpi-l">Mora acumulada</div></div>';
   html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#d0b0ff">'+ cerosPrima.length +'</div><div class="rep-kpi-l">0 Prima (nuevos)</div></div>';
-  var nAlertas = filas.filter(function(f){
-    if(f.diferencia<=0) return false;
-    var d = f.ultimoPago ? daysSince(f.ultimoPago) : null;
-    return d===null||d>30;
-  }).length;
   if(nOverride) html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ffd080">'+ nOverride +'</div><div class="rep-kpi-l">Refinanciados</div></div>';
-  if(nAlertas) html += '<div class="rep-kpi"><div class="rep-kpi-v" style="color:#ff4444">'+ nAlertas +'</div><div class="rep-kpi-l">🚨 Alerta +30d</div></div>';
   html += '</div></div>';
 
   // ── LEYENDA ──
@@ -3489,7 +3494,7 @@ function buildMoraGlobal(cartId, cl){
   html += '<div class="rep-tbl-wrap"><table class="rep-tbl" id="mg-tabla"><thead><tr>';
   html += '<th>#</th><th>Cliente</th><th>Crédito total</th><th>Cuota</th>';
   html += '<th>Cuotas totales</th><th>Cuotas transcurridas</th>';
-  html += '<th>Saldo esperado</th><th>Saldo actual</th><th>Mora / Adelanto</th><th>Último pago</th><th>Estado</th><th>Gestión</th><th>Acción</th>';
+  html += '<th>Saldo esperado</th><th>Saldo actual</th><th>Mora / Adelanto</th><th>Estado</th><th>Gestión</th><th>Acción</th>';
   html += '</tr></thead><tbody id="mg-tbody">';
 
   // Filas normales
@@ -3573,23 +3578,6 @@ function buildMoraGlobal(cartId, cl){
     html += '<td class="mono" style="color:var(--text2)">L '+fmt(f.saldoEsperado)+'</td>';
     html += '<td class="mono" style="font-weight:600">L '+fmt(f.saldoActual)+'</td>';
     html += '<td class="mono" style="'+difColor+'">'+difStr+'</td>';
-    // Último pago + alerta 30 días
-    var upRaw = f.ultimoPago;
-    var diasUP = upRaw ? daysSince(upRaw) : null;
-    var alertaMora = f.diferencia > 0 && (diasUP === null || diasUP > 30);
-    var upHtml;
-    if(!upRaw){
-      upHtml = alertaMora
-        ? '<span class="b br" style="font-size:10px">🚨 Sin pago</span>'
-        : '<span style="color:var(--text3);font-family:var(--mono);font-size:11px">—</span>';
-    } else if(alertaMora){
-      upHtml = '<span style="color:var(--red);font-family:var(--mono);font-size:11px;font-weight:700">'+upRaw+'</span>'
-              +'<br><span class="b br" style="font-size:10px">🚨 '+diasUP+'d sin pagar</span>';
-    } else {
-      upHtml = '<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">'+upRaw+'</span>'
-              +(diasUP!==null?'<br><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+diasUP+'d</span>':'');
-    }
-    html += '<td>'+upHtml+'</td>';
     html += '<td><span class="b '+estadoClass+'">'+estado+'</span></td>';
     html += '<td style="min-width:110px">'+gestionBadges+'</td>';
     html += '<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="mgOpenEditModal('+qEdit+')">✏️ Editar</button></td>';
@@ -3611,7 +3599,6 @@ function buildMoraGlobal(cartId, cl){
       html += '<td class="mono">L '+fmt(c.cuota)+'</td>';
       html += '<td class="mono" style="text-align:center">'+(c.num_cuotas||'—')+'</td>';
       html += '<td class="mono" style="text-align:center;color:var(--text3)">0 de '+(c.num_cuotas||'—')+'</td>';
-      html += '<td></td><td></td><td><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">'+(c.ultimo_pago||'—')+'</span></td>';
       html += '<td colspan="3" style="text-align:center"><span class="b bp">🆕 0 Prima · aún no vence</span></td>';
       html += '<td><span class="b" style="background:var(--purplebg);color:var(--purple);border:1px solid rgba(96,48,176,.2)">Nuevo</span></td>';
       html += '<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="mgOpenEditModal('+qEdit2+')">✏️ Editar</button></td>';
@@ -3647,77 +3634,105 @@ function mgFiltrar(){
   });
 }
 function mgExportCSV(){
-  if(!window._mgFilas||!window._mgFilas.length){ alert('Sin datos. Abre Mora Global primero.'); return; }
+  if(!window._mgFilas||!window._mgFilas.length){ alert('Sin datos para exportar. Abre la pestaña Mora Global primero.'); return; }
   function doExport(){
     var cartId=window._mgCartId||'';
     var empresa=(CARTERAS[cartId]||{}).empresa||cartId;
-    var fecha=HOY.toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'});
+    var fecha=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-    // ── Exactamente lo que se ve en pantalla ──
-    var rows=[
-      [empresa+' — Mora Global'],
+    // ── Hoja 1: Todos los clientes con mora y seguimiento ──
+    var ws1Data=[
+      [empresa+' — Mora Global + Seguimiento'],
       ['Generado: '+fecha],
       [],
-      ['#','Cliente','F. Factura','Saldo','Cuota','Cuotas tot.','Cuotas trans.','Saldo esperado','Saldo actual','Mora / Adelanto','Último pago','Días sin pago','Estado','Gestión']
+      ['#','Cliente','Fecha Factura','Último Pago','Tramo',
+       'Crédito Total (L)','Cuota (L)','Cuotas Totales','Cuotas Transcurridas',
+       'Saldo Esperado (L)','Saldo Actual (L)','Mora / Adelanto (L)','Estado mora',
+       'Refinanciado','Nota refinanciamiento',
+       'Estado gestión',
+       '¿Promesa?','Fecha promesa','Monto prometido (L)','Nota promesa','¿Incumplida?',
+       '¿Visita?','Fecha visita','Nota de visita',
+       '¿No contesta?']
     ];
-
     window._mgFilas.forEach(function(f,i){
-      var estado=f.diferencia>0?'En mora':f.diferencia<0?'Adelantado':'Al día';
-      var diasUP=f.ultimoPago?Math.floor((HOY-parseHNDate(f.ultimoPago))/86400000):null;
-      var gestion=f.estadoGestion||'Sin gestión';
-      if(f.tienePromesa) gestion='Promesa '+(f.promesaFecha||'')+(f.promesaIncumplida?' ⚠️ INCUMPLIDA':'');
-      else if(f.tieneVisita) gestion='Visita '+(f.visitaFecha||'');
-      else if(f.noContesta) gestion='No contesta';
-      rows.push([
-        i+1,
-        f.nombre,
-        f.fechaFactura,
-        f.saldoActual,
-        f.cuota,
-        f.numCuotas,
-        f.cuotasTranscurridas,
-        f.saldoEsperado,
-        f.saldoActual,
-        f.diferencia,
-        f.ultimoPago||'—',
-        diasUP!==null?diasUP:'—',
-        estado,
-        gestion
+      var estMora=f.diferencia>0?'En mora':f.diferencia<0?'Adelantado':'Al día';
+      var tramoLabel=f.tramo==='MES'?'Al día':f.tramo==='VENCIDO'?'Vencido':f.tramo==='INACTIVO'?'+180d':(f.tramo||'—')+'d';
+      var estGestion=f.estadoGestion||'Sin gestión';
+      ws1Data.push([
+        i+1, f.nombre, f.fechaFactura, f.ultimoPago||'', tramoLabel,
+        f.totalCredito, f.cuota, f.numCuotas, f.cuotasTranscurridas,
+        f.saldoEsperado, f.saldoActual, f.diferencia, estMora,
+        f.esOverride?'Sí':'No', f.ovNota||'',
+        estGestion,
+        f.tienePromesa?'Sí':'No', f.promesaFecha||'', f.promesaMonto||'', f.promesaNota||'', f.promesaIncumplida?'INCUMPLIDA':'',
+        f.tieneVisita?'Sí':'No', f.visitaFecha||'', f.visitaNota||'',
+        f.noContesta?'Sí':'No'
       ]);
     });
-
     // 0 Prima al final
     if(window._mgCerosPrima&&window._mgCerosPrima.length){
-      rows.push([]);
-      rows.push(['— 0 Prima (primera cuota aún no vence) —']);
-      window._mgCerosPrima.forEach(function(c,i){
-        rows.push([i+1,c.nombre,c.fecha_factura||'—',c.saldo,c.cuota,c.num_cuotas||'—',0,'—',c.saldo,'—','—','—','0 Prima','—']);
+      ws1Data.push([]);
+      ws1Data.push(['— 0 Prima: primera cuota aún no vence —']);
+      window._mgCerosPrima.forEach(function(n,i){
+        ws1Data.push([i+1,n,'','','0 Prima','','','','','','','','0 Prima','No','','','No','','','','','No','','','No']);
       });
     }
-
-    var ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[
-      {wch:4},{wch:36},{wch:13},{wch:13},{wch:11},
-      {wch:10},{wch:12},{wch:14},{wch:13},{wch:15},
-      {wch:13},{wch:12},{wch:11},{wch:30}
+    var ws1=XLSX.utils.aoa_to_sheet(ws1Data);
+    ws1['!cols']=[
+      {wch:4},{wch:36},{wch:13},{wch:13},{wch:10},
+      {wch:15},{wch:11},{wch:8},{wch:13},
+      {wch:15},{wch:13},{wch:15},{wch:12},
+      {wch:10},{wch:28},
+      {wch:16},
+      {wch:9},{wch:14},{wch:16},{wch:36},{wch:12},
+      {wch:9},{wch:13},{wch:40},
+      {wch:10}
     ];
-    ws['!freeze']={xSplit:0,ySplit:4};
+    ws1['!freeze']={xSplit:0,ySplit:4};
 
-    // Formato moneda en columnas de números (D,E,H,I,J)
-    var moedaCols=[3,4,7,8,9];
-    for(var r=4;r<rows.length;r++){
-      moedaCols.forEach(function(c){
-        var addr=XLSX.utils.encode_cell({r:r,c:c});
-        if(ws[addr]&&typeof ws[addr].v==='number')
-          ws[addr].z='#,##0.00';
-      });
-    }
+    // ── Hoja 2: Solo clientes con promesas (activas + incumplidas) ──
+    var conPromesa=window._mgFilas.filter(function(f){return f.tienePromesa;});
+    var ws2Data=[
+      [empresa+' — Promesas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo Actual (L)','Mora/Adelanto (L)',
+       'Fecha promesa','Monto prometido (L)','Nota','¿Incumplida?','Días vencida','Último pago']
+    ];
+    conPromesa.forEach(function(f,i){
+      var tramoLabel=f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      var diasVencida=f.promesaFecha?Math.floor((HOY-new Date(f.promesaFecha+'T12:00:00'))/86400000):'';
+      ws2Data.push([
+        i+1,f.nombre,tramoLabel,f.saldoActual,f.diferencia,
+        f.promesaFecha,f.promesaMonto||'',f.promesaNota||'',
+        f.promesaIncumplida?'INCUMPLIDA':'Activa',
+        f.promesaIncumplida?diasVencida:'',
+        f.ultimoPago||''
+      ]);
+    });
+    var ws2=XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols']=[{wch:4},{wch:36},{wch:10},{wch:13},{wch:14},{wch:14},{wch:16},{wch:36},{wch:12},{wch:12},{wch:13}];
+    ws2['!freeze']={xSplit:0,ySplit:4};
 
+    // ── Hoja 3: Solo visitas ──
+    var conVisita=window._mgFilas.filter(function(f){return f.tieneVisita;});
+    var ws3Data=[
+      [empresa+' — Visitas registradas'],['Generado: '+fecha],[],
+      ['#','Cliente','Tramo','Saldo Actual (L)','Mora/Adelanto (L)','Fecha visita','Comentario de visita','Último pago']
+    ];
+    conVisita.forEach(function(f,i){
+      var tramoLabel=f.tramo==='VENCIDO'?'Vencido':(f.tramo||'—')+'d';
+      ws3Data.push([i+1,f.nombre,tramoLabel,f.saldoActual,f.diferencia,f.visitaFecha||'',f.visitaNota||'',f.ultimoPago||'']);
+    });
+    var ws3=XLSX.utils.aoa_to_sheet(ws3Data);
+    ws3['!cols']=[{wch:4},{wch:36},{wch:10},{wch:13},{wch:14},{wch:13},{wch:50},{wch:13}];
+    ws3['!freeze']={xSplit:0,ySplit:4};
+
+    // ── Armar libro ──
     var wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,'Mora Global');
-    XLSX.writeFile(wb,'mora_global_'+cartId+'_'+HOY.toISOString().split('T')[0]+'.xlsx');
+    XLSX.utils.book_append_sheet(wb,ws1,'Mora + Seguimiento');
+    if(conPromesa.length) XLSX.utils.book_append_sheet(wb,ws2,'Promesas');
+    if(conVisita.length)  XLSX.utils.book_append_sheet(wb,ws3,'Visitas');
+    XLSX.writeFile(wb,'mora_global_'+HOY.toISOString().split('T')[0]+'.xlsx');
   }
-
   if(typeof XLSX==='undefined'){
     var s=document.createElement('script');
     s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -3816,14 +3831,17 @@ function toggleAcFields(){
   var showF=['promesa','posponer','visita_agenda','visita_realizada','pago','abono'].includes(tipo);
   var showM=['promesa','pago','abono'].includes(tipo);
   var esVisitaReal=tipo==='visita_realizada';
+  var esLlamada=['llamada_realizada','llamada_no_contesta','llamada_sin_fecha'].includes(tipo);
   var lbl=tipo==='visita_agenda'?'Fecha de visita':tipo==='visita_realizada'?'Fecha de la visita':'Fecha comprometida';
   document.getElementById('ac-row-fecha').style.display=showF?'':'none';
   document.getElementById('ac-row-monto').style.display=showM?'':'none';
   document.getElementById('ac-fecha-lbl').textContent=lbl;
-  // Alternar entre nota simple y textarea de visita
-  document.getElementById('ac-row-nota-simple').style.display=esVisitaReal?'none':'';
+  // Alternar entre nota simple, textarea visita y textarea llamada
+  document.getElementById('ac-row-nota-simple').style.display=(esVisitaReal||esLlamada)?'none':'';
   document.getElementById('ac-row-nota-visita').style.display=esVisitaReal?'':'none';
+  document.getElementById('ac-row-nota-llamada').style.display=esLlamada?'':'none';
   if(esVisitaReal) setTimeout(function(){document.getElementById('ac-nota-visita').focus();},50);
+  if(esLlamada) setTimeout(function(){document.getElementById('ac-nota-llamada').focus();},50);
 }
 async function saveAccion(){
   if(!MODAL_AC)return;
@@ -3833,18 +3851,24 @@ async function saveAccion(){
   var monto=parseFloat(document.getElementById('ac-monto').value)||0;
   // Leer nota desde el campo correcto según el tipo
   var esVisitaReal=tipo==='visita_realizada';
+  var esLlamada=['llamada_realizada','llamada_no_contesta','llamada_sin_fecha'].includes(tipo);
   var nota=esVisitaReal
     ?(document.getElementById('ac-nota-visita').value.trim())
-    :(document.getElementById('ac-nota').value.trim());
+    :esLlamada
+      ?(document.getElementById('ac-nota-llamada').value.trim())
+      :(document.getElementById('ac-nota').value.trim());
   var hoyStr=HOY.toISOString().split('T')[0];
   var key=cartId+'::'+nombre;
   // Construir texto de nota enriquecido según tipo
   var notaFinal;
-  if(tipo==='promesa')       notaFinal='📅 Prometió pagar el '+(fecha||'—')+(monto?' por L '+fmt(monto):'')+(nota?' — '+nota:'');
-  else if(tipo==='posponer') notaFinal='⏭ Pospuso promesa al '+(fecha||'—')+(nota?' — '+nota:'');
-  else if(esVisitaReal)      notaFinal=nota||'Visita realizada sin comentario';
-  else                       notaFinal=nota||null;
-  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:notaFinal,monto:monto||null,fecha_accion:fecha||null,fecha_promesa:['promesa','posponer'].includes(tipo)?fecha:null,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
+  if(tipo==='promesa')               notaFinal='📅 Prometió pagar el '+(fecha||'—')+(monto?' por L '+fmt(monto):'')+(nota?' — '+nota:'');
+  else if(tipo==='posponer')         notaFinal='⏭ Pospuso promesa al '+(fecha||'—')+(nota?' — '+nota:'');
+  else if(esVisitaReal)              notaFinal=nota||'Visita realizada sin comentario';
+  else if(tipo==='llamada_no_contesta') notaFinal='📞 Llamada — No contesta'+(nota?' — '+nota:'');
+  else if(tipo==='llamada_sin_fecha')   notaFinal='📞 Llamada — No da fecha de pago'+(nota?' — '+nota:'');
+  else if(tipo==='llamada_realizada')   notaFinal='📞 Llamada realizada'+(nota?' — '+nota:'');
+  else                               notaFinal=nota||null;
+  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:notaFinal,monto:monto||null,fecha_accion:fecha||hoyStr,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
   var ex=PROMESAS[key]||{};
   if(['promesa','posponer'].includes(tipo)){PROMESAS[key]=Object.assign({},ex,{estado:'promesa',fecha:fecha,monto:monto,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   else if(tipo==='pago'){
@@ -3858,6 +3882,7 @@ async function saveAccion(){
   }
   else if(tipo==='no_contesta'){PROMESAS[key]=Object.assign({},ex,{estado:'no-contesta',nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   else if(tipo==='visita'||tipo==='visita_agenda'){PROMESAS[key]=Object.assign({},ex,{estado:'visita',fecha:fecha,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
+  else if(esLlamada){PROMESAS[key]=Object.assign({},ex,{estado:'no-contesta',nota:notaFinal,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   closeModal('modal-accion');
   if(CURRENT) refreshSoft(CURRENT);
   setConn(true,'Guardado ✓');setTimeout(function(){setConn(true,'Conectado');},2000);
