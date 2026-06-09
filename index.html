@@ -323,10 +323,7 @@ tr:hover td{background:#f5f8ff}
         <option value="abono">&#x1F4B0; Abono parcial</option>
         <option value="visita_agenda">&#x1F5D3; Agendar visita</option>
         <option value="visita_realizada">&#x1F697; Visita realizada</option>
-        <option value="llamada_no_contesta">&#x1F4DE; Llamada — No contesta</option>
-        <option value="llamada_sin_fecha">&#x1F4DE; Llamada — No da fecha de pago</option>
-        <option value="llamada_realizada">&#x1F4DE; Llamada realizada</option>
-        <option value="no_contesta">&#x1F4F5; No contesta (otro canal)</option>
+        <option value="no_contesta">&#x1F4F5; No contesta</option>
         <option value="nota">&#x1F4DD; Nota</option>
       </select>
     </div>
@@ -350,14 +347,6 @@ tr:hover td{background:#f5f8ff}
         style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
         placeholder="¿Qué encontró el gestor?&#10;&#10;Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con portón azul. Acordamos visita de seguimiento el lunes."></textarea>
       <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente para seguimiento.</div>
-    </div>
-    <!-- Comentario extendido para llamada realizada -->
-    <div class="form-row" id="ac-row-nota-llamada" style="display:none">
-      <label class="form-lbl">📞 Comentario de la llamada</label>
-      <textarea class="form-inp" id="ac-nota-llamada" rows="4"
-        style="resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.6"
-        placeholder="¿Qué pasó en la llamada?&#10;&#10;Ej: Cliente contestó, dice que no tiene dinero. Prometió llamar la próxima semana."></textarea>
-      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">Este comentario quedará registrado en el historial del cliente.</div>
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-accion')">Cancelar</button>
@@ -2340,7 +2329,7 @@ async function loadClientHist(cartId,nombre,cuota,saldo){
   try{
     var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).eq('cliente_nombre',nombre).order('created_at',{ascending:true});
     if(r.error)throw r.error;
-    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',llamada_realizada:'📞',llamada_no_contesta:'📞',llamada_sin_fecha:'📞',no_contesta:'📵',no_contesta_old:'📵',nota:'📝',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
+    var icons={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',no_contesta:'📵',no_contesta_old:'📵',nota:'📝',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
     var labels={promesa:'Prometió pagar',posponer:'Pospuso promesa',pago:'Pago registrado',abono:'Abono parcial',visita_agenda:'Visita agendada',visita_realizada:'Visita realizada',no_contesta:'No contesta',no_contesta_old:'No contesta',nota:'Nota',promesa_cumplida:'Promesa CUMPLIDA',promesa_incumplida:'Promesa INCUMPLIDA',arreglo_pago:'Arreglo de pago',cero_prima:'Ingresó a 0 Prima',extension_plazo:'Extensión de plazo'};
     var tCls={promesa:'hi-p',posponer:'hi-p',pago:'hi-g',abono:'hi-a',visita_agenda:'hi-v',visita_realizada:'hi-v',no_contesta:'hi-n',no_contesta_old:'hi-n',nota:'hi-n',promesa_cumplida:'hi-g',promesa_incumplida:'hi-r',arreglo_pago:'hi-g',cero_prima:'hi-p',extension_plazo:'hi-p'};
 
@@ -3494,7 +3483,7 @@ function buildMoraGlobal(cartId, cl){
   html += '<div class="rep-tbl-wrap"><table class="rep-tbl" id="mg-tabla"><thead><tr>';
   html += '<th>#</th><th>Cliente</th><th>Crédito total</th><th>Cuota</th>';
   html += '<th>Cuotas totales</th><th>Cuotas transcurridas</th>';
-  html += '<th>Saldo esperado</th><th>Saldo actual</th><th>Mora / Adelanto</th><th>Estado</th><th>Gestión</th><th>Acción</th>';
+  html += '<th>Saldo esperado</th><th>Saldo actual</th><th>Mora / Adelanto</th><th>Último pago</th><th>Estado</th><th>Gestión</th><th>Acción</th>';
   html += '</tr></thead><tbody id="mg-tbody">';
 
   // Filas normales
@@ -3578,6 +3567,21 @@ function buildMoraGlobal(cartId, cl){
     html += '<td class="mono" style="color:var(--text2)">L '+fmt(f.saldoEsperado)+'</td>';
     html += '<td class="mono" style="font-weight:600">L '+fmt(f.saldoActual)+'</td>';
     html += '<td class="mono" style="'+difColor+'">'+difStr+'</td>';
+    var _up=f.ultimoPago;
+    var _dias=_up?Math.floor((HOY-parseHNDate(_up))/86400000):null;
+    var _alerta=f.diferencia>0&&(_dias===null||_dias>30);
+    var _upCell;
+    if(!_up){
+      _upCell=_alerta
+        ?'<span class="b br" style="font-size:10px;white-space:nowrap">🚨 Sin pago</span>'
+        :'<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">—</span>';
+    } else {
+      var _upColor=_alerta?'color:var(--red);font-weight:700':'color:var(--text2)';
+      var _diasLabel=_dias!==null?'<div style="font-family:var(--mono);font-size:10px;color:'+(_alerta?'var(--red)':'var(--text3)')+'">'+_dias+'d sin abonar</div>':'';
+      _upCell='<div style="font-family:var(--mono);font-size:11px;'+_upColor+'">'+_up+'</div>'+_diasLabel;
+      if(_alerta) _upCell+='<span class="b br" style="font-size:9px;margin-top:2px;display:inline-block">🚨 +30d</span>';
+    }
+    html += '<td style="min-width:110px">'+_upCell+'</td>';
     html += '<td><span class="b '+estadoClass+'">'+estado+'</span></td>';
     html += '<td style="min-width:110px">'+gestionBadges+'</td>';
     html += '<td><button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:10px" onclick="mgOpenEditModal('+qEdit+')">✏️ Editar</button></td>';
@@ -3831,17 +3835,14 @@ function toggleAcFields(){
   var showF=['promesa','posponer','visita_agenda','visita_realizada','pago','abono'].includes(tipo);
   var showM=['promesa','pago','abono'].includes(tipo);
   var esVisitaReal=tipo==='visita_realizada';
-  var esLlamada=['llamada_realizada','llamada_no_contesta','llamada_sin_fecha'].includes(tipo);
   var lbl=tipo==='visita_agenda'?'Fecha de visita':tipo==='visita_realizada'?'Fecha de la visita':'Fecha comprometida';
   document.getElementById('ac-row-fecha').style.display=showF?'':'none';
   document.getElementById('ac-row-monto').style.display=showM?'':'none';
   document.getElementById('ac-fecha-lbl').textContent=lbl;
-  // Alternar entre nota simple, textarea visita y textarea llamada
-  document.getElementById('ac-row-nota-simple').style.display=(esVisitaReal||esLlamada)?'none':'';
+  // Alternar entre nota simple y textarea de visita
+  document.getElementById('ac-row-nota-simple').style.display=esVisitaReal?'none':'';
   document.getElementById('ac-row-nota-visita').style.display=esVisitaReal?'':'none';
-  document.getElementById('ac-row-nota-llamada').style.display=esLlamada?'':'none';
   if(esVisitaReal) setTimeout(function(){document.getElementById('ac-nota-visita').focus();},50);
-  if(esLlamada) setTimeout(function(){document.getElementById('ac-nota-llamada').focus();},50);
 }
 async function saveAccion(){
   if(!MODAL_AC)return;
@@ -3851,24 +3852,18 @@ async function saveAccion(){
   var monto=parseFloat(document.getElementById('ac-monto').value)||0;
   // Leer nota desde el campo correcto según el tipo
   var esVisitaReal=tipo==='visita_realizada';
-  var esLlamada=['llamada_realizada','llamada_no_contesta','llamada_sin_fecha'].includes(tipo);
   var nota=esVisitaReal
     ?(document.getElementById('ac-nota-visita').value.trim())
-    :esLlamada
-      ?(document.getElementById('ac-nota-llamada').value.trim())
-      :(document.getElementById('ac-nota').value.trim());
+    :(document.getElementById('ac-nota').value.trim());
   var hoyStr=HOY.toISOString().split('T')[0];
   var key=cartId+'::'+nombre;
   // Construir texto de nota enriquecido según tipo
   var notaFinal;
-  if(tipo==='promesa')               notaFinal='📅 Prometió pagar el '+(fecha||'—')+(monto?' por L '+fmt(monto):'')+(nota?' — '+nota:'');
-  else if(tipo==='posponer')         notaFinal='⏭ Pospuso promesa al '+(fecha||'—')+(nota?' — '+nota:'');
-  else if(esVisitaReal)              notaFinal=nota||'Visita realizada sin comentario';
-  else if(tipo==='llamada_no_contesta') notaFinal='📞 Llamada — No contesta'+(nota?' — '+nota:'');
-  else if(tipo==='llamada_sin_fecha')   notaFinal='📞 Llamada — No da fecha de pago'+(nota?' — '+nota:'');
-  else if(tipo==='llamada_realizada')   notaFinal='📞 Llamada realizada'+(nota?' — '+nota:'');
-  else                               notaFinal=nota||null;
-  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:notaFinal,monto:monto||null,fecha_accion:fecha||hoyStr,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
+  if(tipo==='promesa')       notaFinal='📅 Prometió pagar el '+(fecha||'—')+(monto?' por L '+fmt(monto):'')+(nota?' — '+nota:'');
+  else if(tipo==='posponer') notaFinal='⏭ Pospuso promesa al '+(fecha||'—')+(nota?' — '+nota:'');
+  else if(esVisitaReal)      notaFinal=nota||'Visita realizada sin comentario';
+  else                       notaFinal=nota||null;
+  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:tipo,nota:notaFinal,monto:monto||null,fecha_accion:fecha||null,fecha_promesa:['promesa','posponer'].includes(tipo)?fecha:null,fecha_visita:['visita_agenda','visita_realizada'].includes(tipo)?fecha:null,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
   var ex=PROMESAS[key]||{};
   if(['promesa','posponer'].includes(tipo)){PROMESAS[key]=Object.assign({},ex,{estado:'promesa',fecha:fecha,monto:monto,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   else if(tipo==='pago'){
@@ -3882,7 +3877,6 @@ async function saveAccion(){
   }
   else if(tipo==='no_contesta'){PROMESAS[key]=Object.assign({},ex,{estado:'no-contesta',nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   else if(tipo==='visita'||tipo==='visita_agenda'){PROMESAS[key]=Object.assign({},ex,{estado:'visita',fecha:fecha,nota:nota,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
-  else if(esLlamada){PROMESAS[key]=Object.assign({},ex,{estado:'no-contesta',nota:notaFinal,ts:new Date().toISOString()});await dbSaveProm(cartId,nombre);}
   closeModal('modal-accion');
   if(CURRENT) refreshSoft(CURRENT);
   setConn(true,'Guardado ✓');setTimeout(function(){setConn(true,'Conectado');},2000);
