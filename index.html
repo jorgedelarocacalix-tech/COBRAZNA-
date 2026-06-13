@@ -374,11 +374,7 @@ tr:hover td{background:#f5f8ff}
 // ══ CONFIG ══
 var SUPA_URL='https://ixskgawbpwwxdjnkiixt.supabase.co';
 var SUPA_KEY='sb_publishable_-JUaSYPPkq8n4wJIKPtXGw_XMyj3EE7';
-var USUARIOS={
-  '12345':{nombre:'Administrador',rol:'admin',carteras:[]},
-  '1111':{nombre:'Equipo Roca',rol:'cobrador',carteras:['ROCA_COMERCIAL','MOTORS','LIBERTAD','BARRIO']},
-  '2222':{nombre:'Equipo Su Mueble',rol:'cobrador',carteras:['MUEBLE','MOTO','DANLI']}
-};
+var USUARIOS={}; // cargado desde Supabase al arrancar
 
 // ══ STATE ══
 var HOY=new Date(); HOY.setHours(0,0,0,0);
@@ -417,6 +413,17 @@ async function loadLibs(){
 // ══ INIT ══
 window.addEventListener('load',async function(){
   await loadLibs();
+  // Cargar usuarios desde Supabase antes de mostrar el login
+  if(supa){
+    try{
+      var cbRes=await supa.from('cobranza_usuarios').select('*');
+      if(cbRes.data&&cbRes.data.length){
+        cbRes.data.forEach(function(u){
+          USUARIOS[u.pin]={nombre:u.nombre,rol:u.rol,carteras:u.carteras||[]};
+        });
+      }
+    }catch(e){console.error('Error cargando usuarios:',e);}
+  }
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('main-header').style.display='none';
   document.getElementById('home-zone').style.display='none';
