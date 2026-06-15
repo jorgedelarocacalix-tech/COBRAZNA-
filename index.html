@@ -4727,8 +4727,7 @@ function _buildCarteraPayload(cartId){
   var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
   var hoyStr=HOY.toISOString().split('T')[0];
   var hoyD=HOY.getDate();
-  var vencidos=[],mora60=[],mora90=[],mora120=[],mora150=[],inactivos=[],pagaron=[],sinGestion=[];
-  var promIncumplidas=[];
+  var vencidos=[],mora60=[],mora90=[],mora120=[],mora150=[],inactivos=[],pagaron=[];
   cl.forEach(function(x){
     var p=PROMESAS[cartId+'::'+x.nombre];
     var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
@@ -4740,37 +4739,45 @@ function _buildCarteraPayload(cartId){
     else if(x.tramo==='120')mora120.push(x);
     else if(x.tramo==='150')mora150.push(x);
     else if(x.tramo==='INACTIVO')inactivos.push(x);
-    if(p&&p.estado==='promesa'&&p.fecha&&p.fecha<hoyStr)promIncumplidas.push(x);
-    if(!p||!p.estado)sinGestion.push(x);
   });
+
+  function _gestion(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    if(!p||!p.estado) return{txt:'Sin gestión',tipo:'sin'};
+    if(p.estado==='promesa'){
+      var vencida=p.fecha&&p.fecha<hoyStr;
+      return{txt:'Prometió pagar el '+(p.fecha||'—')+(vencida?' — NO PAGÓ':''),tipo:vencida?'promesa_vencida':'promesa_ok',fecha:p.fecha||''};
+    }
+    if(p.estado==='no-contesta'||p.estado==='no_contesta') return{txt:'No contesta',tipo:'nc'};
+    if(p.estado==='visita'||p.estado==='visita_agenda') return{txt:'Visita agendada '+(p.fecha||''),tipo:'visita'};
+    if(p.estado==='negociacion') return{txt:'En negociación'+(p.nota?' — '+p.nota:''),tipo:'neg'};
+    if(p.estado==='nota') return{txt:'Nota: '+(p.nota||''),tipo:'nota'};
+    return{txt:p.estado,tipo:'otro'};
+  }
+
+  // ALERTA EXTREMA: 120d/150d + promesa vencida (prometieron y no cumplieron)
+  var alertasExtremas=[...mora120,...mora150].map(function(x){
+    var g=_gestion(x);return Object.assign({},x,{gestion:g});
+  }).filter(function(x){return x.gestion.tipo==='promesa_vencida';})
+    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,6);
+
+  // URGENTES: 120d/150d SIN ninguna gestión
+  var urgentes120=[...mora120,...mora150].map(function(x){
+    var g=_gestion(x);return Object.assign({},x,{gestion:g});
+  }).filter(function(x){return x.gestion.tipo==='sin';})
+    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,6);
+
+  // COBRAR HOY: vencidos sin promesa activa vigente
+  var cobrarHoy=vencidos.map(function(x){
+    var g=_gestion(x);return Object.assign({},x,{gestion:g});
+  }).filter(function(x){return x.gestion.tipo!=='promesa_ok';})
+    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,5);
+
   var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
   var nMora=mora60.length+mora90.length+mora120.length+mora150.length;
   var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos.length/activos.length*35))):100;
-  var saldoActivo=activos.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];var pagado=pagoEsteMes(x.ultimo_pago)&&!(p&&p.mora_pendiente);return !pagado;}).reduce(function(s,x){return s+(x.saldo||0);},0);
   var nPromActivas=cl.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];return p&&p.estado==='promesa'&&!(pagoEsteMes(x.ultimo_pago)&&!p.mora_pendiente);}).length;
-  // Top 5 por saldo — SIN filtrar por promesa, todos aparecen con su estado real
-  var topPrioridad=[...vencidos,...mora60,...mora90,...mora120,...mora150]
-    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);})
-    .slice(0,6)
-    .map(function(x){
-      var p=PROMESAS[cartId+'::'+x.nombre];
-      var gestion='Sin gestión';
-      if(p&&p.estado==='promesa') gestion='Promesa para '+( p.fecha||'—')+(p.fecha&&p.fecha<hoyStr?' ⚠️ INCUMPLIDA':'');
-      else if(p&&p.estado==='no-contesta'||p&&p.estado==='no_contesta') gestion='No contesta';
-      else if(p&&p.estado==='visita'||p&&p.estado==='visita_agenda') gestion='Visita agendada '+(p.fecha||'');
-      else if(p&&p.estado==='negociacion') gestion='En negociación';
-      else if(p&&p.estado==='nota') gestion='Nota: '+(p.nota||'');
-      return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,gestion:gestion};
-    });
-  // Clientes críticos 120d+ con promesa vencida o sin gestión (los que más necesitan atención)
-  var criticos=[...mora120,...mora150]
-    .map(function(x){
-      var p=PROMESAS[cartId+'::'+x.nombre];
-      var gestion=!p||!p.estado?'Sin gestión':p.estado==='promesa'?'Promesa '+(p.fecha&&p.fecha<hoyStr?'VENCIDA '+p.fecha:'para '+p.fecha):p.estado;
-      return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,gestion:gestion};
-    })
-    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);})
-    .slice(0,5);
+
   return{
     empresa:c.empresa,fecha:HOY.toLocaleDateString('es-HN'),
     gestor:USER&&USER.nombre?USER.nombre:'Equipo',
@@ -4778,82 +4785,105 @@ function _buildCarteraPayload(cartId){
     pctPagaron:cl.length?Math.round(pagaron.length/cl.length*100):0,
     vencidos:vencidos.length,mora60:mora60.length,mora90:mora90.length,
     mora120:mora120.length,mora150:mora150.length,inactivos:inactivos.length,
-    saldoActivo:saldoActivo,promesas:nPromActivas,
-    promIncumplidas:promIncumplidas.length,sinGestion:sinGestion.length,
-    score:score,topPrioridad:topPrioridad,criticos:criticos
+    promesas:nPromActivas,score:score,
+    alertasExtremas:alertasExtremas,urgentes120:urgentes120,cobrarHoy:cobrarHoy
   };
 }
 
-// Renderiza el bloque de score (inmediato, sin esperar a Claude)
-function _aiScoreHTML(payload){
-  var score=payload.score;
-  var scoreColor=score>=75?'var(--green)':score>=50?'var(--amber)':'var(--red)';
-  var scoreLbl=score>=75?'Cartera saludable':score>=50?'Atención requerida':'Estado crítico';
+// Encabezado con mini stats (inmediato)
+function _aiHeaderHTML(payload){
   var pct=payload.pctPagaron;
-  var html='<div class="ai-score">';
-  html+='<div class="ai-score-v" style="color:'+scoreColor+'">'+score+'<span style="font-size:15px;font-weight:400">/100</span></div>';
-  html+='<div class="ai-score-l" style="color:'+scoreColor+'">'+scoreLbl+'</div>';
-  html+='</div>';
-  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">';
-  html+='<div style="background:var(--orangebg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--orange)">'+payload.vencidos+'</div><div style="font-size:9px;color:var(--text3)">Vencidos</div></div>';
-  html+='<div style="background:var(--greenbg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--green)">'+pct+'%</div><div style="font-size:9px;color:var(--text3)">Pagaron</div></div>';
-  html+='<div style="background:var(--purplebg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--purple)">'+payload.promesas+'</div><div style="font-size:9px;color:var(--text3)">Promesas</div></div>';
+  var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">';
+  html+='<div style="background:var(--redbg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:17px;font-weight:700;color:var(--red)">'+(payload.mora120+payload.mora150)+'</div><div style="font-size:9px;color:var(--red);font-weight:600">120d-150d</div></div>';
+  html+='<div style="background:var(--orangebg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:17px;font-weight:700;color:var(--orange)">'+payload.vencidos+'</div><div style="font-size:9px;color:var(--text3)">Vencidos</div></div>';
+  html+='<div style="background:var(--greenbg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:17px;font-weight:700;color:var(--green)">'+pct+'%</div><div style="font-size:9px;color:var(--text3)">Pagaron</div></div>';
   html+='</div>';
   return html;
 }
 
-// Skeleton animado mientras espera a Claude
-function _aiSkeletonHTML(){
-  var s='<div style="margin-bottom:6px;border-radius:6px;overflow:hidden">';
-  var line=function(w){return '<div class="ai-skel" style="width:'+w+'%;height:11px;border-radius:4px;margin-bottom:5px"></div>';};
-  return '<div class="ai-section"><div class="ai-sec-title" style="display:flex;align-items:center;gap:6px"><span class="ai-skel-dot"></span> Analizando con Claude IA...</div>'+s+line(90)+line(75)+line(85)+'</div>'+s+line(95)+line(70)+line(80)+'</div>'+s+line(88)+'</div></div>';
+// Renderiza tarjetas de alerta por nivel (inmediato, sin esperar a Claude)
+function _aiAlertCardsHTML(payload){
+  var html='';
+
+  function card(tipo, x, accionId){
+    var esExtrema=tipo==='extrema';
+    var esUrgente=tipo==='urgente';
+    var border=esExtrema?'#b01020':esUrgente?'var(--orange)':'var(--amber)';
+    var bg=esExtrema?'#fff0f2':esUrgente?'var(--orangebg)':'var(--amberbg)';
+    var ico=esExtrema?'🚨':esUrgente?'🔴':'⚡';
+    var etiqueta=esExtrema?'ALERTA EXTREMA':esUrgente?'URGENTE':'COBRAR HOY';
+    var etiquetaColor=esExtrema?'#b01020':esUrgente?'var(--orange)':'var(--amber)';
+    var situacion=x.gestion?x.gestion.txt:'';
+    return '<div style="border:1px solid '+border+';border-left:4px solid '+border+';background:'+bg+';border-radius:8px;padding:10px 12px;margin-bottom:7px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      +'<span style="font-size:9px;font-weight:800;letter-spacing:.6px;color:'+etiquetaColor+'">'+ico+' '+etiqueta+'</span>'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+x.tramo+' · L '+fmt(x.saldo||0)+'</span>'
+      +'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">'+esc2(x.nombre)+'</div>'
+      +'<div style="font-size:11px;color:'+etiquetaColor+';margin-bottom:6px">'+esc2(situacion)+'</div>'
+      +'<div id="ai-accion-'+accionId+'" style="font-size:11px;color:var(--text2);font-style:italic;min-height:14px"><span class="ai-skel" style="width:80%;height:10px;border-radius:3px;display:inline-block"></span></div>'
+      +'</div>';
+  }
+
+  if(payload.alertasExtremas&&payload.alertasExtremas.length){
+    html+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;color:#b01020;margin-bottom:5px;text-transform:uppercase">🚨 Alerta extrema — prometieron y NO pagaron</div>';
+    payload.alertasExtremas.forEach(function(x,i){html+=card('extrema',x,'ext_'+i);});
+  }
+  if(payload.urgentes120&&payload.urgentes120.length){
+    html+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--orange);margin:10px 0 5px;text-transform:uppercase">🔴 Urgente — 120d+ sin ningún contacto</div>';
+    payload.urgentes120.forEach(function(x,i){html+=card('urgente',x,'urg_'+i);});
+  }
+  if(payload.cobrarHoy&&payload.cobrarHoy.length){
+    html+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--amber);margin:10px 0 5px;text-transform:uppercase">⚡ Cobrar hoy — vencidos este mes</div>';
+    payload.cobrarHoy.forEach(function(x,i){html+=card('hoy',x,'hoy_'+i);});
+  }
+  if(!html) html='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">✅ Sin alertas críticas en este momento.</div>';
+  return html;
 }
 
-// Formatea la respuesta de texto de Claude en HTML visual
-function _formatClaudeResponse(text){
-  var sections=[
-    {key:'📊 ESTADO DE LA CARTERA',cls:'azul',ico:'📊'},
-    {key:'🎯 ACCIONES PARA HOY',cls:'naranja',ico:'🎯'},
-    {key:'💡 ESTRATEGIA DE LA SEMANA',cls:'morado',ico:'💡'},
-  ];
-  // Partir el texto por encabezados
-  var parts={};
-  var remaining=text;
-  sections.forEach(function(sec,i){
-    var idx=remaining.indexOf(sec.key);
-    if(idx===-1)return;
-    var nextIdx=remaining.length;
-    for(var j=i+1;j<sections.length;j++){
-      var ni=remaining.indexOf(sections[j].key,idx+1);
-      if(ni>-1&&ni<nextIdx)nextIdx=ni;
-    }
-    parts[sec.key]=remaining.substring(idx+sec.key.length,nextIdx).trim();
+// Inyecta respuesta de Claude en las tarjetas ya renderizadas
+function _injectClaudeAcciones(text, payload){
+  // Claude responde: NOMBRE CLIENTE: acción\nCONSEJO: ...
+  var lines=text.split('\n');
+  var consejo='';
+  var acciones={};
+  lines.forEach(function(line){
+    line=line.trim();if(!line)return;
+    var colonIdx=line.indexOf(':');if(colonIdx<1)return;
+    var key=line.substring(0,colonIdx).trim().toUpperCase();
+    var val=line.substring(colonIdx+1).trim();
+    if(key==='CONSEJO')consejo=val;
+    else acciones[key]=val;
   });
-  var html='';
-  sections.forEach(function(sec){
-    var content=parts[sec.key];
-    if(!content)return;
-    // Convertir lista numerada (1. 2. 3.) a items visuales
-    var lines=content.split('\n').filter(function(l){return l.trim();});
-    var itemsHtml='';
-    lines.forEach(function(line){
-      line=line.trim();
-      if(!line)return;
-      var isNum=/^\d+\./.test(line);
-      if(isNum){
-        var txt=line.replace(/^\d+\.\s*/,'');
-        itemsHtml+='<div style="display:flex;gap:6px;margin-bottom:5px;align-items:flex-start"><span style="font-family:var(--mono);font-size:10px;color:var(--text3);min-width:14px;margin-top:1px">→</span><span style="font-size:12px;line-height:1.45;color:var(--text)">'+esc2(txt)+'</span></div>';
-      } else {
-        itemsHtml+='<p style="font-size:12px;line-height:1.5;color:var(--text);margin-bottom:4px">'+esc2(line)+'</p>';
+
+  // Inyectar en cada tarjeta por nombre de cliente
+  function inject(list, prefix){
+    (list||[]).forEach(function(x,i){
+      var el=document.getElementById('ai-accion-'+prefix+i);
+      if(!el)return;
+      var key=x.nombre.toUpperCase();
+      // Buscar coincidencia parcial (primer apellido)
+      var match=acciones[key];
+      if(!match){
+        Object.keys(acciones).forEach(function(k){
+          if(k&&x.nombre.toUpperCase().indexOf(k.split(' ')[0])>-1)match=match||acciones[k];
+        });
       }
+      el.style.fontStyle='normal';
+      el.innerHTML=match
+        ?'<span style="color:var(--blue)">→ </span>'+esc2(match)
+        :'<span style="color:var(--text3)">Sin acción específica</span>';
     });
-    var borderColors={azul:'var(--blue)',naranja:'var(--orange)',morado:'var(--purple)'};
-    var bgColors={azul:'var(--bluebg)',naranja:'var(--orangebg)',morado:'var(--purplebg)'};
-    html+='<div style="border-left:3px solid '+borderColors[sec.cls]+';background:'+bgColors[sec.cls]+';border-radius:0 7px 7px 0;padding:9px 11px;margin-bottom:8px">';
-    html+='<div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px">'+sec.ico+' '+sec.key.replace(/^[^ ]+ /,'')+'</div>';
-    html+=itemsHtml+'</div>';
-  });
-  return html||'<p style="font-size:12px;color:var(--text2)">'+esc2(text)+'</p>';
+  }
+  inject(payload.alertasExtremas,'ext_');
+  inject(payload.urgentes120,'urg_');
+  inject(payload.cobrarHoy,'hoy_');
+
+  // Mostrar consejo estratégico al final
+  if(consejo){
+    var consejoEl=document.getElementById('ai-consejo-semana');
+    if(consejoEl) consejoEl.innerHTML='<b style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--purple)">💡 Consejo de la semana</b><div style="margin-top:4px;font-size:12px;color:var(--text2)">'+esc2(consejo)+'</div>';
+  }
 }
 
 var AI_FN_URL='https://ixskgawbpwwxdjnkiixt.supabase.co/functions/v1/ai-recomendaciones';
@@ -4864,8 +4894,11 @@ async function buildAIRecomendaciones(cartId){
   var payload=_buildCarteraPayload(cartId);
   if(!payload){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px">Sin cartera activa.</div>';return;}
 
-  // Mostrar score inmediato + skeleton mientras carga Claude
-  body.innerHTML=_aiScoreHTML(payload)+_aiSkeletonHTML();
+  // Mostrar tarjetas de alerta inmediatamente (datos locales, sin esperar a Claude)
+  var cardsHTML=_aiAlertCardsHTML(payload);
+  var consejoZone='<div id="ai-consejo-semana" style="background:var(--purplebg);border:1px solid rgba(96,48,176,.15);border-radius:8px;padding:10px 12px;margin-top:8px"><span class="ai-skel" style="width:90%;height:10px;border-radius:3px;display:inline-block"></span></div>';
+  var refreshBtn='<button class="ai-recargar" style="margin-top:8px" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Nuevo análisis</button>';
+  body.innerHTML=_aiHeaderHTML(payload)+cardsHTML+consejoZone+refreshBtn;
 
   try{
     var res=await fetch(AI_FN_URL,{
@@ -4875,17 +4908,11 @@ async function buildAIRecomendaciones(cartId){
     });
     var data=await res.json();
     if(data.error)throw new Error(data.error);
-    var claudeHTML=_formatClaudeResponse(data.analysis||'');
-    var refreshBtn='<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Pedir nuevo análisis a Claude</button>';
-    body.innerHTML=_aiScoreHTML(payload)+claudeHTML+refreshBtn;
+    _injectClaudeAcciones(data.analysis||'',payload);
   }catch(e){
     var errMsg=String(e.message||e);
-    var isNoKey=errMsg.toLowerCase().includes('api key');
-    body.innerHTML=_aiScoreHTML(payload)
-      +'<div style="background:var(--redbg);border-left:3px solid var(--red);border-radius:0 7px 7px 0;padding:10px 12px;margin-bottom:8px;font-size:12px;color:var(--red)">'
-      +(isNoKey?'⚠️ Falta configurar la API Key de Claude en Supabase. Contacta al administrador.':'⚠️ '+esc2(errMsg))
-      +'</div>'
-      +'<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Reintentar</button>';
+    var consejoEl=document.getElementById('ai-consejo-semana');
+    if(consejoEl) consejoEl.innerHTML='<span style="color:var(--red);font-size:11px">⚠️ '+esc2(errMsg)+'</span>';
   }
 }
 // ══ fin bienvenida IA + burbuja ══
