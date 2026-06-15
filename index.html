@@ -257,6 +257,59 @@ tr:hover td{background:#f5f8ff}
 .rep-row-prioridad-3 td:first-child{border-left:3px solid var(--amber)}
 .rep-row-prioridad-4 td:first-child{border-left:3px solid var(--green)}
 .rep-export-row{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap}
+/* ══ BIENVENIDA IA ══ */
+#bv-overlay{position:fixed;inset:0;background:rgba(10,15,25,.55);backdrop-filter:blur(4px);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px;animation:bvFadeIn .3s ease}
+@keyframes bvFadeIn{from{opacity:0}to{opacity:1}}
+.bv-card{background:#fff;border-radius:16px;padding:28px 28px 22px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.18);animation:bvSlide .35s ease;position:relative}
+@keyframes bvSlide{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+.bv-top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.bv-avatar{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--green),#0d5a2e);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.bv-nombre{font-size:15px;font-weight:700;color:var(--text)}
+.bv-cartera{font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.bv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.bv-stat{background:var(--bg3);border-radius:8px;padding:10px 8px;text-align:center}
+.bv-stat-v{font-family:var(--mono);font-size:17px;font-weight:700}
+.bv-stat-l{font-size:10px;color:var(--text3);margin-top:2px}
+.bv-msg{background:linear-gradient(135deg,#e8f4ec,#d6efdf);border:1px solid rgba(26,122,60,.15);border-radius:10px;padding:13px 15px;margin-bottom:16px}
+.bv-msg-ico{font-size:18px;margin-bottom:5px}
+.bv-msg-txt{font-size:13px;color:var(--green);font-weight:500;line-height:1.55}
+.bv-btn{width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:background .2s}
+.bv-btn:hover{background:#0d5a2e}
+.bv-close{position:absolute;top:12px;right:14px;background:none;border:none;cursor:pointer;font-size:18px;color:var(--text3);padding:4px;line-height:1}
+/* ══ BURBUJA IA ══ */
+#ai-bubble{position:fixed;bottom:78px;right:18px;z-index:1500;display:none}
+#ai-fab{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1a55a0,#6030b0);border:none;cursor:pointer;box-shadow:0 4px 18px rgba(26,85,160,.38);display:flex;align-items:center;justify-content:center;font-size:22px;transition:transform .2s,box-shadow .2s;position:relative}
+#ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(26,85,160,.48)}
+#ai-fab-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;border-radius:10px;font-size:9px;font-family:var(--mono);font-weight:700;padding:1px 5px;min-width:16px;text-align:center;line-height:14px}
+#ai-panel{position:fixed;bottom:142px;right:18px;width:315px;background:#fff;border:1px solid var(--border2);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.14);z-index:1499;display:none;max-height:70vh;overflow:hidden;flex-direction:column;animation:aiSlide .22s ease}
+#ai-panel.open{display:flex}
+@keyframes aiSlide{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+.ai-panel-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;flex-shrink:0;background:linear-gradient(135deg,var(--bluebg),var(--purplebg))}
+.ai-panel-hdr-ico{font-size:20px}
+.ai-panel-hdr-txt{flex:1;font-size:13px;font-weight:700;color:var(--text)}
+.ai-panel-hdr-sub{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.ai-panel-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:17px;padding:3px}
+.ai-panel-body{overflow-y:auto;flex:1;padding:10px 11px 12px}
+.ai-section{margin-bottom:11px}
+.ai-sec-title{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.ai-item{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;padding:8px 10px;border-radius:7px;border-left:3px solid transparent}
+.ai-item.rojo{border-left-color:var(--red);background:var(--redbg)}
+.ai-item.naranja{border-left-color:var(--orange);background:var(--orangebg)}
+.ai-item.verde{border-left-color:var(--green);background:var(--greenbg)}
+.ai-item.azul{border-left-color:var(--blue);background:var(--bluebg)}
+.ai-item.morado{border-left-color:var(--purple);background:var(--purplebg)}
+.ai-item.gris{border-left-color:var(--text3);background:var(--bg3)}
+.ai-item-ico{font-size:14px;flex-shrink:0;margin-top:1px}
+.ai-item-txt{font-size:12px;color:var(--text);line-height:1.45}
+.ai-item-txt b{display:block;font-weight:600;margin-bottom:1px;font-size:12px}
+.ai-item-txt small{color:var(--text3);font-family:var(--mono);font-size:10px}
+.ai-tip{background:linear-gradient(135deg,var(--bluebg),var(--purplebg));border:1px solid rgba(96,48,176,.15);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.52;margin-bottom:9px}
+.ai-tip b{color:var(--purple);display:block;margin-bottom:3px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+.ai-score{text-align:center;padding:8px 0 10px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.ai-score-v{font-size:30px;font-weight:700;font-family:var(--mono)}
+.ai-score-l{font-size:10px;color:var(--text3);margin-top:2px}
+.ai-recargar{width:100%;margin-top:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:11px;cursor:pointer;color:var(--text2);font-family:var(--sans);transition:background .15s}
+.ai-recargar:hover{background:var(--bg4)}
 </style>
 <script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script><script src="./La Roca — Cobranza_files/pdf(1).min.js"></script></head>
 <body>
@@ -388,6 +441,31 @@ Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con po
   </div>
 </div>
 <div class="alert-container" id="alert-container"></div>
+
+<!-- ══ BIENVENIDA IA ══ -->
+<div id="bv-overlay"></div>
+
+<!-- ══ BURBUJA IA ══ -->
+<div id="ai-bubble">
+  <div id="ai-panel">
+    <div class="ai-panel-hdr">
+      <span class="ai-panel-hdr-ico">🤖</span>
+      <div style="flex:1">
+        <div class="ai-panel-hdr-txt">Asistente IA</div>
+        <div class="ai-panel-hdr-sub">Recomendaciones en tiempo real</div>
+      </div>
+      <button class="ai-panel-close" onclick="toggleAIPanel()">✕</button>
+    </div>
+    <div class="ai-panel-body" id="ai-panel-body">
+      <div style="text-align:center;padding:24px 16px;color:var(--text3);font-size:12px">Abre una cartera para ver recomendaciones</div>
+    </div>
+  </div>
+  <button id="ai-fab" onclick="toggleAIPanel()" title="Recomendaciones IA">
+    🤖
+    <span id="ai-fab-badge" style="display:none">0</span>
+  </button>
+</div>
+
 <script>
 // ══ CONFIG ══
 var SUPA_URL='https://ixskgawbpwwxdjnkiixt.supabase.co';
@@ -807,8 +885,9 @@ function openCartera(id){
   document.getElementById('dash-zone').style.display='block';
   document.getElementById('back-btn').style.display='';
   renderDash(id);
+  showBienvenida(id);
 }
-function goHome(){CURRENT=null;document.getElementById('proy-zone').style.display='none';renderHome();}
+function goHome(){CURRENT=null;document.getElementById('proy-zone').style.display='none';document.getElementById('ai-bubble').style.display='none';var p=document.getElementById('ai-panel');if(p)p.classList.remove('open');_AI_OPEN=false;renderHome();}
 async function delCart(id){
   if(!confirm('Eliminar esta cartera y todas sus promesas?'))return;
   delete CARTERAS[id];Object.keys(PROMESAS).forEach(function(k){if(k.startsWith(id+'::'))delete PROMESAS[k];});
@@ -4537,6 +4616,227 @@ async function verNotasProy(idx,btn){
 }
 // -- fin proyeccion semanal --
 
+// ══════════════════════════════════════════════════════════
+// ══ BIENVENIDA IA + BURBUJA DE RECOMENDACIONES ══
+// ══════════════════════════════════════════════════════════
+var _BV_SEEN=new Set();
+var _AI_OPEN=false;
+
+var _BV_FRASES=[
+  '¡El esfuerzo de hoy es el resultado de mañana! Cada llamada cuenta.',
+  '¡Tú eres la clave del éxito de La Roca! Hoy es un gran día para cobrar.',
+  'Los mejores cobradores construyen relaciones. ¡A por ello!',
+  'Cada "no" te acerca a un "sí". ¡No te rindas, el equipo cuenta contigo!',
+  '¡El equipo que más llama, más cobra! Tu perseverancia es tu mayor herramienta.',
+  'Una llamada a tiempo salva una cuenta. ¡Tú puedes lograrlo!',
+  '¡Cada lempira cobrado hoy es una victoria para todo el equipo!',
+  'La constancia vence la resistencia. ¡Ánimo, hoy será un gran día!',
+  'Tu trabajo hace posible que La Roca siga creciendo. ¡Gracias por tu esfuerzo!',
+  'El cliente que hoy no contesta, mañana paga. ¡Sigue intentando!',
+];
+
+function showBienvenida(cartId){
+  if(_BV_SEEN.has(cartId))return;
+  _BV_SEEN.add(cartId);
+  var c=CARTERAS[cartId];if(!c)return;
+  var cl=c.clientes||[];
+  var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var nVencido=0,nPagaron=0,nPromesa=0,saldoActivo=0;
+  cl.forEach(function(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+    var pagado=(pagoEsteMes(x.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
+    if(pagado){nPagaron++;return;}
+    if(x.tramo==='VENCIDO')nVencido++;
+    if(p&&p.estado==='promesa')nPromesa++;
+    if(x.tramo!=='INACTIVO')saldoActivo+=x.saldo||0;
+  });
+  var frase=_BV_FRASES[Math.floor(Math.random()*_BV_FRASES.length)];
+  var hora=new Date().getHours();
+  var saludo=hora<12?'¡Buenos días':hora<19?'¡Buenas tardes':'¡Buenas noches';
+  var nombre=USER&&USER.nombre?USER.nombre.split(' ')[0]:'Equipo';
+  var html='<div class="bv-card">';
+  html+='<button class="bv-close" onclick="closeBienvenida()">×</button>';
+  html+='<div class="bv-top">';
+  html+='<div class="bv-avatar">💼</div>';
+  html+='<div><div class="bv-nombre">'+saludo+', '+nombre+'!</div>';
+  html+='<div class="bv-cartera">'+esc2(c.empresa)+'</div></div></div>';
+  html+='<div class="bv-stats">';
+  html+='<div class="bv-stat"><div class="bv-stat-v" style="color:var(--orange)">'+nVencido+'</div><div class="bv-stat-l">Cobrar hoy</div></div>';
+  html+='<div class="bv-stat"><div class="bv-stat-v" style="color:var(--green)">'+nPagaron+'</div><div class="bv-stat-l">Ya pagaron</div></div>';
+  html+='<div class="bv-stat"><div class="bv-stat-v" style="color:var(--purple)">'+nPromesa+'</div><div class="bv-stat-l">Promesas</div></div>';
+  html+='</div>';
+  html+='<div class="bv-msg"><div class="bv-msg-ico">💪</div><div class="bv-msg-txt">'+esc2(frase)+'</div></div>';
+  html+='<button class="bv-btn" onclick="closeBienvenida()">¡Vamos a cobrar! →</button>';
+  html+='</div>';
+  var ov=document.getElementById('bv-overlay');
+  ov.innerHTML=html;
+  ov.style.display='flex';
+  ov.onclick=function(e){if(e.target===ov)closeBienvenida();};
+}
+
+function closeBienvenida(){
+  var ov=document.getElementById('bv-overlay');
+  ov.style.display='none';
+  document.getElementById('ai-bubble').style.display='block';
+  if(CURRENT){
+    setTimeout(function(){
+      buildAIRecomendaciones(CURRENT);
+      actualizarBadgeIA();
+    },200);
+  }
+}
+
+function toggleAIPanel(){
+  _AI_OPEN=!_AI_OPEN;
+  var panel=document.getElementById('ai-panel');
+  panel.classList.toggle('open',_AI_OPEN);
+  if(_AI_OPEN&&CURRENT){
+    buildAIRecomendaciones(CURRENT);
+    actualizarBadgeIA();
+  }
+}
+
+function actualizarBadgeIA(){
+  if(!CURRENT||!CARTERAS[CURRENT])return;
+  var n=_contarAlertasIA(CURRENT);
+  var badge=document.getElementById('ai-fab-badge');
+  if(n>0){badge.textContent=n;badge.style.display='';}
+  else badge.style.display='none';
+}
+
+function _contarAlertasIA(cartId){
+  var c=CARTERAS[cartId];if(!c)return 0;
+  var n=0;
+  var hoyStr=HOY.toISOString().split('T')[0];
+  (c.clientes||[]).forEach(function(x){
+    if(x.tramo==='120'||x.tramo==='150')n++;
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    if(p&&p.estado==='promesa'&&p.fecha&&p.fecha<hoyStr)n++;
+  });
+  return n;
+}
+
+function buildAIRecomendaciones(cartId){
+  var body=document.getElementById('ai-panel-body');
+  if(!body)return;
+  var c=CARTERAS[cartId];
+  if(!c){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px">Sin cartera activa.</div>';return;}
+  var cl=c.clientes||[];
+  var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var hoyD=HOY.getDate();
+
+  var vencidos=[],mora60=[],mora90=[],mora120=[],mora150=[],pagaron=[],sinGestion=[];
+  var promIncumplidas=[];
+  cl.forEach(function(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+    var pagado=(pagoEsteMes(x.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
+    if(pagado){pagaron.push(x);return;}
+    if(x.tramo==='VENCIDO')vencidos.push(x);
+    else if(x.tramo==='60')mora60.push(x);
+    else if(x.tramo==='90')mora90.push(x);
+    else if(x.tramo==='120')mora120.push(x);
+    else if(x.tramo==='150')mora150.push(x);
+    if(p&&p.estado==='promesa'&&p.fecha&&p.fecha<hoyStr)promIncumplidas.push(x);
+    if(!p||!p.estado)sinGestion.push(x);
+  });
+
+  var proxSemana=cl.filter(function(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    var pagado=pagoEsteMes(x.ultimo_pago)&&!(p&&p.mora_pendiente);
+    return !pagado&&x.tramo!=='INACTIVO'&&x.dia_pago>=hoyD&&x.dia_pago<=(hoyD+7);
+  });
+  var totalProxSemana=proxSemana.reduce(function(s,x){return s+(x.cuota||0);},0);
+
+  var enRiesgo=cl.filter(function(x){
+    if(!x.dias_mora)return false;
+    var d=x.dias_mora;
+    return(d>=25&&d<=30)||(d>=55&&d<=60)||(d>=85&&d<=90)||(d>=115&&d<=120)||(d>=145&&d<=150)||(d>=175&&d<=180);
+  });
+
+  var urgentes=[...vencidos,...mora60,...mora90].filter(function(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    return !p||p.estado!=='promesa';
+  }).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,3);
+
+  var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
+  var nMora=(mora60.length+mora90.length+mora120.length+mora150.length);
+  var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos.length/activos.length*35))):100;
+  var scoreColor=score>=75?'var(--green)':score>=50?'var(--amber)':'var(--red)';
+  var scoreLbl=score>=75?'Cartera saludable':score>=50?'Atención requerida':'Estado crítico';
+
+  var html='';
+
+  // Score de salud
+  html+='<div class="ai-score">';
+  html+='<div class="ai-score-v" style="color:'+scoreColor+'">'+score+'<span style="font-size:15px;font-weight:400">/100</span></div>';
+  html+='<div class="ai-score-l" style="color:'+scoreColor+'">'+scoreLbl+'</div>';
+  html+='</div>';
+
+  // PRIORIDAD HOY
+  var hayPrioridad=vencidos.length||promIncumplidas.length||urgentes.length;
+  if(hayPrioridad){
+    html+='<div class="ai-section"><div class="ai-sec-title">🔥 Acción inmediata</div>';
+    if(vencidos.length){
+      html+='<div class="ai-item rojo"><span class="ai-item-ico">📞</span><div class="ai-item-txt"><b>'+vencidos.length+' clientes vencieron este mes</b><small>Llama HOY — cada día que pasa es más difícil recuperar</small></div></div>';
+    }
+    if(promIncumplidas.length){
+      html+='<div class="ai-item naranja"><span class="ai-item-ico">🚨</span><div class="ai-item-txt"><b>'+promIncumplidas.length+' promesas incumplidas</b><small>La fecha pasó y no pagaron — seguimiento urgente</small></div></div>';
+    }
+    urgentes.forEach(function(x){
+      html+='<div class="ai-item naranja"><span class="ai-item-ico">💰</span><div class="ai-item-txt"><b>'+esc2(x.nombre)+'</b><small>L '+fmt(x.saldo||0)+' saldo · Tramo '+x.tramo+'</small></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // RIESGO DE ESCALAR
+  if(mora120.length||mora150.length||enRiesgo.length){
+    html+='<div class="ai-section"><div class="ai-sec-title">⚠️ En riesgo de empeorar</div>';
+    if(mora150.length){
+      html+='<div class="ai-item rojo"><span class="ai-item-ico">⛔</span><div class="ai-item-txt"><b>'+mora150.length+' clientes a punto de ser incobrables</b><small>Más de 150d — negocia ya antes de que pasen a +180d</small></div></div>';
+    }
+    if(mora120.length){
+      html+='<div class="ai-item naranja"><span class="ai-item-ico">🚗</span><div class="ai-item-txt"><b>'+mora120.length+' necesitan visita personal (120d)</b><small>La llamada ya no basta — ir en persona aumenta 3x las chances</small></div></div>';
+    }
+    if(enRiesgo.length){
+      html+='<div class="ai-item gris"><span class="ai-item-ico">📈</span><div class="ai-item-txt"><b>'+enRiesgo.length+' clientes cerca del corte de tramo</b><small>Actúa antes de que pasen a la siguiente categoría de mora</small></div></div>';
+    }
+    html+='</div>';
+  }
+
+  // AVANCE Y OPORTUNIDADES
+  html+='<div class="ai-section"><div class="ai-sec-title">✅ Avance del mes</div>';
+  if(pagaron.length){
+    var pct=Math.round(pagaron.length/cl.length*100);
+    html+='<div class="ai-item verde"><span class="ai-item-ico">🎉</span><div class="ai-item-txt"><b>'+pagaron.length+' clientes ya pagaron ('+pct+'% del total)</b><small>¡Sigan así! El equipo va a un buen ritmo.</small></div></div>';
+  }
+  if(proxSemana.length){
+    html+='<div class="ai-item azul"><span class="ai-item-ico">📅</span><div class="ai-item-txt"><b>'+proxSemana.length+' cobros vencen esta semana</b><small>Potencial: L '+fmt(totalProxSemana)+' en cuotas próximos 7 días</small></div></div>';
+  }
+  if(sinGestion.length&&activos.length>0){
+    html+='<div class="ai-item morado"><span class="ai-item-ico">📋</span><div class="ai-item-txt"><b>'+sinGestion.length+' clientes sin ninguna gestión</b><small>Registra una acción hoy — cada nota aumenta la recuperación</small></div></div>';
+  }
+  html+='</div>';
+
+  // CONSEJO IA DEL DÍA (rota por día de la semana)
+  var consejos=[
+    {ico:'📞',txt:'Las llamadas entre <b>9am y 11am</b> tienen mayor tasa de respuesta. Usa la mañana para clientes prioritarios.'},
+    {ico:'🚗',txt:'Para cuentas de <b>más de 90 días</b>, una visita tiene 3× más efectividad que una llamada.'},
+    {ico:'💬',txt:'Enviar un <b>WhatsApp antes de llamar</b> aumenta la tasa de contacto — el cliente ya sabe que llamarás.'},
+    {ico:'📅',txt:'Los clientes con <b>promesa esta semana</b> merecen un recordatorio el día anterior para reducir incumplimientos.'},
+    {ico:'🤝',txt:'Ofrecer un <b>plan de pago</b> a clientes en mora 90-120d es más efectivo que exigir el total de una vez.'},
+    {ico:'🎯',txt:'Prioriza siempre los <b>saldos más altos</b> en mora — menos llamadas, mayor impacto en la cartera.'},
+    {ico:'📊',txt:'Un cliente que pagó <b>2 meses seguidos</b> tiene 80% de probabilidad de seguir pagando. ¡Nutrelos con buen servicio!'},
+  ];
+  var consejo=consejos[new Date().getDay()%consejos.length];
+  html+='<div class="ai-tip"><b>💡 Consejo IA del día</b>'+consejo.ico+' '+consejo.txt+'</div>';
+
+  html+='<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Actualizar recomendaciones</button>';
+  body.innerHTML=html;
+}
+// ══ fin bienvenida IA + burbuja ══
 
 </script>
 
