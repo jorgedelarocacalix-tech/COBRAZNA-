@@ -4748,7 +4748,29 @@ function _buildCarteraPayload(cartId){
   var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos.length/activos.length*35))):100;
   var saldoActivo=activos.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];var pagado=pagoEsteMes(x.ultimo_pago)&&!(p&&p.mora_pendiente);return !pagado;}).reduce(function(s,x){return s+(x.saldo||0);},0);
   var nPromActivas=cl.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];return p&&p.estado==='promesa'&&!(pagoEsteMes(x.ultimo_pago)&&!p.mora_pendiente);}).length;
-  var topPrioridad=[...vencidos,...mora60,...mora90,...mora120,...mora150].filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];return !p||p.estado!=='promesa';}).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,5).map(function(x){return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo};});
+  // Top 5 por saldo — SIN filtrar por promesa, todos aparecen con su estado real
+  var topPrioridad=[...vencidos,...mora60,...mora90,...mora120,...mora150]
+    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);})
+    .slice(0,6)
+    .map(function(x){
+      var p=PROMESAS[cartId+'::'+x.nombre];
+      var gestion='Sin gestión';
+      if(p&&p.estado==='promesa') gestion='Promesa para '+( p.fecha||'—')+(p.fecha&&p.fecha<hoyStr?' ⚠️ INCUMPLIDA':'');
+      else if(p&&p.estado==='no-contesta'||p&&p.estado==='no_contesta') gestion='No contesta';
+      else if(p&&p.estado==='visita'||p&&p.estado==='visita_agenda') gestion='Visita agendada '+(p.fecha||'');
+      else if(p&&p.estado==='negociacion') gestion='En negociación';
+      else if(p&&p.estado==='nota') gestion='Nota: '+(p.nota||'');
+      return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,gestion:gestion};
+    });
+  // Clientes críticos 120d+ con promesa vencida o sin gestión (los que más necesitan atención)
+  var criticos=[...mora120,...mora150]
+    .map(function(x){
+      var p=PROMESAS[cartId+'::'+x.nombre];
+      var gestion=!p||!p.estado?'Sin gestión':p.estado==='promesa'?'Promesa '+(p.fecha&&p.fecha<hoyStr?'VENCIDA '+p.fecha:'para '+p.fecha):p.estado;
+      return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,gestion:gestion};
+    })
+    .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);})
+    .slice(0,5);
   return{
     empresa:c.empresa,fecha:HOY.toLocaleDateString('es-HN'),
     gestor:USER&&USER.nombre?USER.nombre:'Equipo',
@@ -4758,7 +4780,7 @@ function _buildCarteraPayload(cartId){
     mora120:mora120.length,mora150:mora150.length,inactivos:inactivos.length,
     saldoActivo:saldoActivo,promesas:nPromActivas,
     promIncumplidas:promIncumplidas.length,sinGestion:sinGestion.length,
-    score:score,topPrioridad:topPrioridad
+    score:score,topPrioridad:topPrioridad,criticos:criticos
   };
 }
 
