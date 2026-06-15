@@ -310,6 +310,9 @@ tr:hover td{background:#f5f8ff}
 .ai-score-l{font-size:10px;color:var(--text3);margin-top:2px}
 .ai-recargar{width:100%;margin-top:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:11px;cursor:pointer;color:var(--text2);font-family:var(--sans);transition:background .15s}
 .ai-recargar:hover{background:var(--bg4)}
+@keyframes aiPulse{0%,100%{opacity:.4}50%{opacity:.9}}
+.ai-skel{background:var(--bg4);animation:aiPulse 1.4s ease-in-out infinite}
+.ai-skel-dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:inline-block;animation:aiPulse .9s ease-in-out infinite}
 </style>
 <script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script><script src="./La Roca — Cobranza_files/pdf(1).min.js"></script></head>
 <body>
@@ -4717,17 +4720,14 @@ function _contarAlertasIA(cartId){
   return n;
 }
 
-function buildAIRecomendaciones(cartId){
-  var body=document.getElementById('ai-panel-body');
-  if(!body)return;
-  var c=CARTERAS[cartId];
-  if(!c){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px">Sin cartera activa.</div>';return;}
+// Calcula el payload de datos de la cartera para enviar a Claude
+function _buildCarteraPayload(cartId){
+  var c=CARTERAS[cartId];if(!c)return null;
   var cl=c.clientes||[];
   var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
   var hoyStr=HOY.toISOString().split('T')[0];
   var hoyD=HOY.getDate();
-
-  var vencidos=[],mora60=[],mora90=[],mora120=[],mora150=[],pagaron=[],sinGestion=[];
+  var vencidos=[],mora60=[],mora90=[],mora120=[],mora150=[],inactivos=[],pagaron=[],sinGestion=[];
   var promIncumplidas=[];
   cl.forEach(function(x){
     var p=PROMESAS[cartId+'::'+x.nombre];
@@ -4739,102 +4739,132 @@ function buildAIRecomendaciones(cartId){
     else if(x.tramo==='90')mora90.push(x);
     else if(x.tramo==='120')mora120.push(x);
     else if(x.tramo==='150')mora150.push(x);
+    else if(x.tramo==='INACTIVO')inactivos.push(x);
     if(p&&p.estado==='promesa'&&p.fecha&&p.fecha<hoyStr)promIncumplidas.push(x);
     if(!p||!p.estado)sinGestion.push(x);
   });
-
-  var proxSemana=cl.filter(function(x){
-    var p=PROMESAS[cartId+'::'+x.nombre];
-    var pagado=pagoEsteMes(x.ultimo_pago)&&!(p&&p.mora_pendiente);
-    return !pagado&&x.tramo!=='INACTIVO'&&x.dia_pago>=hoyD&&x.dia_pago<=(hoyD+7);
-  });
-  var totalProxSemana=proxSemana.reduce(function(s,x){return s+(x.cuota||0);},0);
-
-  var enRiesgo=cl.filter(function(x){
-    if(!x.dias_mora)return false;
-    var d=x.dias_mora;
-    return(d>=25&&d<=30)||(d>=55&&d<=60)||(d>=85&&d<=90)||(d>=115&&d<=120)||(d>=145&&d<=150)||(d>=175&&d<=180);
-  });
-
-  var urgentes=[...vencidos,...mora60,...mora90].filter(function(x){
-    var p=PROMESAS[cartId+'::'+x.nombre];
-    return !p||p.estado!=='promesa';
-  }).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,3);
-
   var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
-  var nMora=(mora60.length+mora90.length+mora120.length+mora150.length);
+  var nMora=mora60.length+mora90.length+mora120.length+mora150.length;
   var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos.length/activos.length*35))):100;
+  var saldoActivo=activos.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];var pagado=pagoEsteMes(x.ultimo_pago)&&!(p&&p.mora_pendiente);return !pagado;}).reduce(function(s,x){return s+(x.saldo||0);},0);
+  var nPromActivas=cl.filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];return p&&p.estado==='promesa'&&!(pagoEsteMes(x.ultimo_pago)&&!p.mora_pendiente);}).length;
+  var topPrioridad=[...vencidos,...mora60,...mora90,...mora120,...mora150].filter(function(x){var p=PROMESAS[cartId+'::'+x.nombre];return !p||p.estado!=='promesa';}).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,5).map(function(x){return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo};});
+  return{
+    empresa:c.empresa,fecha:HOY.toLocaleDateString('es-HN'),
+    gestor:USER&&USER.nombre?USER.nombre:'Equipo',
+    totalClientes:cl.length,pagaron:pagaron.length,
+    pctPagaron:cl.length?Math.round(pagaron.length/cl.length*100):0,
+    vencidos:vencidos.length,mora60:mora60.length,mora90:mora90.length,
+    mora120:mora120.length,mora150:mora150.length,inactivos:inactivos.length,
+    saldoActivo:saldoActivo,promesas:nPromActivas,
+    promIncumplidas:promIncumplidas.length,sinGestion:sinGestion.length,
+    score:score,topPrioridad:topPrioridad
+  };
+}
+
+// Renderiza el bloque de score (inmediato, sin esperar a Claude)
+function _aiScoreHTML(payload){
+  var score=payload.score;
   var scoreColor=score>=75?'var(--green)':score>=50?'var(--amber)':'var(--red)';
   var scoreLbl=score>=75?'Cartera saludable':score>=50?'Atención requerida':'Estado crítico';
-
-  var html='';
-
-  // Score de salud
-  html+='<div class="ai-score">';
+  var pct=payload.pctPagaron;
+  var html='<div class="ai-score">';
   html+='<div class="ai-score-v" style="color:'+scoreColor+'">'+score+'<span style="font-size:15px;font-weight:400">/100</span></div>';
   html+='<div class="ai-score-l" style="color:'+scoreColor+'">'+scoreLbl+'</div>';
   html+='</div>';
-
-  // PRIORIDAD HOY
-  var hayPrioridad=vencidos.length||promIncumplidas.length||urgentes.length;
-  if(hayPrioridad){
-    html+='<div class="ai-section"><div class="ai-sec-title">🔥 Acción inmediata</div>';
-    if(vencidos.length){
-      html+='<div class="ai-item rojo"><span class="ai-item-ico">📞</span><div class="ai-item-txt"><b>'+vencidos.length+' clientes vencieron este mes</b><small>Llama HOY — cada día que pasa es más difícil recuperar</small></div></div>';
-    }
-    if(promIncumplidas.length){
-      html+='<div class="ai-item naranja"><span class="ai-item-ico">🚨</span><div class="ai-item-txt"><b>'+promIncumplidas.length+' promesas incumplidas</b><small>La fecha pasó y no pagaron — seguimiento urgente</small></div></div>';
-    }
-    urgentes.forEach(function(x){
-      html+='<div class="ai-item naranja"><span class="ai-item-ico">💰</span><div class="ai-item-txt"><b>'+esc2(x.nombre)+'</b><small>L '+fmt(x.saldo||0)+' saldo · Tramo '+x.tramo+'</small></div></div>';
-    });
-    html+='</div>';
-  }
-
-  // RIESGO DE ESCALAR
-  if(mora120.length||mora150.length||enRiesgo.length){
-    html+='<div class="ai-section"><div class="ai-sec-title">⚠️ En riesgo de empeorar</div>';
-    if(mora150.length){
-      html+='<div class="ai-item rojo"><span class="ai-item-ico">⛔</span><div class="ai-item-txt"><b>'+mora150.length+' clientes a punto de ser incobrables</b><small>Más de 150d — negocia ya antes de que pasen a +180d</small></div></div>';
-    }
-    if(mora120.length){
-      html+='<div class="ai-item naranja"><span class="ai-item-ico">🚗</span><div class="ai-item-txt"><b>'+mora120.length+' necesitan visita personal (120d)</b><small>La llamada ya no basta — ir en persona aumenta 3x las chances</small></div></div>';
-    }
-    if(enRiesgo.length){
-      html+='<div class="ai-item gris"><span class="ai-item-ico">📈</span><div class="ai-item-txt"><b>'+enRiesgo.length+' clientes cerca del corte de tramo</b><small>Actúa antes de que pasen a la siguiente categoría de mora</small></div></div>';
-    }
-    html+='</div>';
-  }
-
-  // AVANCE Y OPORTUNIDADES
-  html+='<div class="ai-section"><div class="ai-sec-title">✅ Avance del mes</div>';
-  if(pagaron.length){
-    var pct=Math.round(pagaron.length/cl.length*100);
-    html+='<div class="ai-item verde"><span class="ai-item-ico">🎉</span><div class="ai-item-txt"><b>'+pagaron.length+' clientes ya pagaron ('+pct+'% del total)</b><small>¡Sigan así! El equipo va a un buen ritmo.</small></div></div>';
-  }
-  if(proxSemana.length){
-    html+='<div class="ai-item azul"><span class="ai-item-ico">📅</span><div class="ai-item-txt"><b>'+proxSemana.length+' cobros vencen esta semana</b><small>Potencial: L '+fmt(totalProxSemana)+' en cuotas próximos 7 días</small></div></div>';
-  }
-  if(sinGestion.length&&activos.length>0){
-    html+='<div class="ai-item morado"><span class="ai-item-ico">📋</span><div class="ai-item-txt"><b>'+sinGestion.length+' clientes sin ninguna gestión</b><small>Registra una acción hoy — cada nota aumenta la recuperación</small></div></div>';
-  }
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">';
+  html+='<div style="background:var(--orangebg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--orange)">'+payload.vencidos+'</div><div style="font-size:9px;color:var(--text3)">Vencidos</div></div>';
+  html+='<div style="background:var(--greenbg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--green)">'+pct+'%</div><div style="font-size:9px;color:var(--text3)">Pagaron</div></div>';
+  html+='<div style="background:var(--purplebg);border-radius:7px;padding:7px 6px;text-align:center"><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--purple)">'+payload.promesas+'</div><div style="font-size:9px;color:var(--text3)">Promesas</div></div>';
   html+='</div>';
+  return html;
+}
 
-  // CONSEJO IA DEL DÍA (rota por día de la semana)
-  var consejos=[
-    {ico:'📞',txt:'Las llamadas entre <b>9am y 11am</b> tienen mayor tasa de respuesta. Usa la mañana para clientes prioritarios.'},
-    {ico:'🚗',txt:'Para cuentas de <b>más de 90 días</b>, una visita tiene 3× más efectividad que una llamada.'},
-    {ico:'💬',txt:'Enviar un <b>WhatsApp antes de llamar</b> aumenta la tasa de contacto — el cliente ya sabe que llamarás.'},
-    {ico:'📅',txt:'Los clientes con <b>promesa esta semana</b> merecen un recordatorio el día anterior para reducir incumplimientos.'},
-    {ico:'🤝',txt:'Ofrecer un <b>plan de pago</b> a clientes en mora 90-120d es más efectivo que exigir el total de una vez.'},
-    {ico:'🎯',txt:'Prioriza siempre los <b>saldos más altos</b> en mora — menos llamadas, mayor impacto en la cartera.'},
-    {ico:'📊',txt:'Un cliente que pagó <b>2 meses seguidos</b> tiene 80% de probabilidad de seguir pagando. ¡Nutrelos con buen servicio!'},
+// Skeleton animado mientras espera a Claude
+function _aiSkeletonHTML(){
+  var s='<div style="margin-bottom:6px;border-radius:6px;overflow:hidden">';
+  var line=function(w){return '<div class="ai-skel" style="width:'+w+'%;height:11px;border-radius:4px;margin-bottom:5px"></div>';};
+  return '<div class="ai-section"><div class="ai-sec-title" style="display:flex;align-items:center;gap:6px"><span class="ai-skel-dot"></span> Analizando con Claude IA...</div>'+s+line(90)+line(75)+line(85)+'</div>'+s+line(95)+line(70)+line(80)+'</div>'+s+line(88)+'</div></div>';
+}
+
+// Formatea la respuesta de texto de Claude en HTML visual
+function _formatClaudeResponse(text){
+  var sections=[
+    {key:'📊 ESTADO DE LA CARTERA',cls:'azul',ico:'📊'},
+    {key:'🎯 ACCIONES PARA HOY',cls:'naranja',ico:'🎯'},
+    {key:'💡 ESTRATEGIA DE LA SEMANA',cls:'morado',ico:'💡'},
   ];
-  var consejo=consejos[new Date().getDay()%consejos.length];
-  html+='<div class="ai-tip"><b>💡 Consejo IA del día</b>'+consejo.ico+' '+consejo.txt+'</div>';
+  // Partir el texto por encabezados
+  var parts={};
+  var remaining=text;
+  sections.forEach(function(sec,i){
+    var idx=remaining.indexOf(sec.key);
+    if(idx===-1)return;
+    var nextIdx=remaining.length;
+    for(var j=i+1;j<sections.length;j++){
+      var ni=remaining.indexOf(sections[j].key,idx+1);
+      if(ni>-1&&ni<nextIdx)nextIdx=ni;
+    }
+    parts[sec.key]=remaining.substring(idx+sec.key.length,nextIdx).trim();
+  });
+  var html='';
+  sections.forEach(function(sec){
+    var content=parts[sec.key];
+    if(!content)return;
+    // Convertir lista numerada (1. 2. 3.) a items visuales
+    var lines=content.split('\n').filter(function(l){return l.trim();});
+    var itemsHtml='';
+    lines.forEach(function(line){
+      line=line.trim();
+      if(!line)return;
+      var isNum=/^\d+\./.test(line);
+      if(isNum){
+        var txt=line.replace(/^\d+\.\s*/,'');
+        itemsHtml+='<div style="display:flex;gap:6px;margin-bottom:5px;align-items:flex-start"><span style="font-family:var(--mono);font-size:10px;color:var(--text3);min-width:14px;margin-top:1px">→</span><span style="font-size:12px;line-height:1.45;color:var(--text)">'+esc2(txt)+'</span></div>';
+      } else {
+        itemsHtml+='<p style="font-size:12px;line-height:1.5;color:var(--text);margin-bottom:4px">'+esc2(line)+'</p>';
+      }
+    });
+    var borderColors={azul:'var(--blue)',naranja:'var(--orange)',morado:'var(--purple)'};
+    var bgColors={azul:'var(--bluebg)',naranja:'var(--orangebg)',morado:'var(--purplebg)'};
+    html+='<div style="border-left:3px solid '+borderColors[sec.cls]+';background:'+bgColors[sec.cls]+';border-radius:0 7px 7px 0;padding:9px 11px;margin-bottom:8px">';
+    html+='<div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px">'+sec.ico+' '+sec.key.replace(/^[^ ]+ /,'')+'</div>';
+    html+=itemsHtml+'</div>';
+  });
+  return html||'<p style="font-size:12px;color:var(--text2)">'+esc2(text)+'</p>';
+}
 
-  html+='<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Actualizar recomendaciones</button>';
-  body.innerHTML=html;
+var AI_FN_URL='https://ixskgawbpwwxdjnkiixt.supabase.co/functions/v1/ai-recomendaciones';
+
+async function buildAIRecomendaciones(cartId){
+  var body=document.getElementById('ai-panel-body');
+  if(!body)return;
+  var payload=_buildCarteraPayload(cartId);
+  if(!payload){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px">Sin cartera activa.</div>';return;}
+
+  // Mostrar score inmediato + skeleton mientras carga Claude
+  body.innerHTML=_aiScoreHTML(payload)+_aiSkeletonHTML();
+
+  try{
+    var res=await fetch(AI_FN_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cartera:payload})
+    });
+    var data=await res.json();
+    if(data.error)throw new Error(data.error);
+    var claudeHTML=_formatClaudeResponse(data.analysis||'');
+    var refreshBtn='<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Pedir nuevo análisis a Claude</button>';
+    body.innerHTML=_aiScoreHTML(payload)+claudeHTML+refreshBtn;
+  }catch(e){
+    var errMsg=String(e.message||e);
+    var isNoKey=errMsg.toLowerCase().includes('api key');
+    body.innerHTML=_aiScoreHTML(payload)
+      +'<div style="background:var(--redbg);border-left:3px solid var(--red);border-radius:0 7px 7px 0;padding:10px 12px;margin-bottom:8px;font-size:12px;color:var(--red)">'
+      +(isNoKey?'⚠️ Falta configurar la API Key de Claude en Supabase. Contacta al administrador.':'⚠️ '+esc2(errMsg))
+      +'</div>'
+      +'<button class="ai-recargar" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Reintentar</button>';
+  }
 }
 // ══ fin bienvenida IA + burbuja ══
 
