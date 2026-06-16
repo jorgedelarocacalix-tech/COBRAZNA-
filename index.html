@@ -4969,14 +4969,45 @@ function switchAITab(tab){
   else{panelBody.style.display='none';chatBody.style.display='flex';}
 }
 
-// Extrae el bloque [ACCION:{...}] del final del texto del bot
-function _parseAction(text){
-  var match=text.match(/\[ACCION:(\{[^}]*\})\]/);
-  if(!match)return{text:text.trim(),action:null};
-  var action=null;
-  try{action=JSON.parse(match[1]);}catch(e){}
-  var cleanText=text.replace(/\[ACCION:[^\]]*\]/g,'').trim();
-  return{text:cleanText,action:action};
+// Extrae bloques [ACCION:{...}] y [HISTORIAL:{...}] del final del texto del bot
+function _parseReply(text){
+  var result={text:text.trim(),action:null,historial:null};
+  var am=text.match(/\[ACCION:(\{[^}]*\})\]/);
+  if(am){try{result.action=JSON.parse(am[1]);}catch(e){}result.text=result.text.replace(/\[ACCION:[^\]]*\]/g,'').trim();}
+  var hm=text.match(/\[HISTORIAL:(\{[^}]*\})\]/);
+  if(hm){try{result.historial=JSON.parse(hm[1]);}catch(e){}result.text=result.text.replace(/\[HISTORIAL:[^\]]*\]/g,'').trim();}
+  return result;
+}
+
+async function _fetchClienteHistorial(cartId,nombre){
+  if(!supa)return[];
+  try{
+    var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).eq('cliente_nombre',nombre).order('created_at',{ascending:false}).limit(40);
+    return r.data||[];
+  }catch(e){return[];}
+}
+
+function _buildHistorialContext(cliente,hist,prom){
+  var fmtL=function(n){return Number(n||0).toLocaleString('es-HN');};
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var header='[HISTORIAL DE '+cliente.nombre+']\n'
+    +'Saldo: L '+fmtL(cliente.saldo)+' | Tramo: '+(cliente.tramo||'?')+' | Cuota mensual: L '+fmtL(cliente.cuota);
+  if(prom&&prom.estado){
+    var vencida=prom.estado==='promesa'&&prom.fecha&&prom.fecha<hoyStr;
+    header+='\nGestión actual: '+prom.estado+(prom.fecha?' — '+prom.fecha:'')+(prom.nota?' — '+prom.nota:'')+(vencida?' ⚠️ VENCIDA, NO PAGÓ':'');
+  }else{header+='\nGestión actual: Sin gestión registrada';}
+  if(!hist.length)return header+'\nSin historial previo de gestiones.\n\nAnaliza el perfil de este cliente con los datos disponibles y da una recomendación de acción.';
+  var cnt={promesa:0,pago:0,abono:0,nota:0,visita_agenda:0,visita_realizada:0};
+  var lines=hist.slice(0,25).map(function(h){
+    var tipo=h.tipo||'nota';cnt[tipo]=(cnt[tipo]||0)+1;
+    var fecha=(h.fecha_accion||h.created_at||'').substring(0,10);
+    var desc=h.descripcion||h.nota||'';
+    return '- '+fecha+' | '+tipo+(desc?': '+desc:'');
+  });
+  header+='\n\nÚltimas gestiones ('+hist.length+' total):\n'+lines.join('\n');
+  header+='\n\nResumen: promesas='+cnt.promesa+' pagos='+cnt.pago+' abonos='+cnt.abono+' visitas_agendadas='+cnt.visita_agenda+' visitas_realizadas='+cnt.visita_realizada;
+  header+='\n\nAnaliza el patrón de comportamiento de este cliente y entrega: (1) veredicto del perfil, (2) acción concreta recomendada. Máximo 4 oraciones.';
+  return header;
 }
 
 // Busca cliente por nombre. Guarda múltiples coincidencias en _LAST_MULTIMATCH.
@@ -5030,14 +5061,42 @@ async function sendChatMsg(){
   tdiv.className='ai-chat-msg bot typing';tdiv.id=typingId;tdiv.textContent='···';
   msgsEl.appendChild(tdiv);msgsEl.scrollTop=msgsEl.scrollHeight;
   try{
-    var res=await fetch(CHAT_FN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:_CHAT_MSGS.slice(-10),cartera:payload})});
+    var res=await fetch(CHAT_FN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:_CHAT_MSGS.slice(-12),cartera:payload})});
     var data=await res.json();
     var rawReply=data.reply||data.error||'Sin respuesta';
-    var parsed=_parseAction(rawReply);
+    var parsed=_parseReply(rawReply);
     var tel=document.getElementById(typingId);if(tel)tel.remove();
-    _appendBotWithAction(parsed.text,parsed.action);
-    // Guardamos versión limpia en el historial (sin el bloque ACCION)
-    _CHAT_MSGS.push({role:'assistant',content:parsed.text});
+
+    if(parsed.historial&&parsed.historial.cliente){
+      // ── Flujo historial: mostrar respuesta inicial → buscar historial → segunda llamada ──
+      _appendBotWithAction(parsed.text,null);
+      _CHAT_MSGS.push({role:'assistant',content:parsed.text});
+      var histCliente=_findCliente(parsed.historial.cliente);
+      if(histCliente){
+        // Indicador mientras se busca el historial
+        var loadId='hl'+Date.now();
+        var msgsEl2=document.getElementById('ai-chat-msgs');
+        var ldiv=document.createElement('div');ldiv.className='ai-chat-msg bot typing';ldiv.id=loadId;ldiv.textContent='···';
+        msgsEl2.appendChild(ldiv);msgsEl2.scrollTop=msgsEl2.scrollHeight;
+        var hist=await _fetchClienteHistorial(CURRENT,histCliente.nombre);
+        var lel=document.getElementById(loadId);if(lel)lel.remove();
+        // Incluir historial como contexto oculto y pedir análisis
+        var histCtx=_buildHistorialContext(histCliente,hist,PROMESAS[CURRENT+'::'+histCliente.nombre]);
+        _CHAT_MSGS.push({role:'user',content:histCtx});
+        var res2=await fetch(CHAT_FN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:_CHAT_MSGS.slice(-14),cartera:payload})});
+        var data2=await res2.json();
+        var reply2=data2.reply||'Sin análisis disponible.';
+        var parsed2=_parseReply(reply2);
+        _appendBotWithAction(parsed2.text,parsed2.action);
+        _CHAT_MSGS.push({role:'assistant',content:parsed2.text});
+      }else{
+        _appendChatMsg('bot','⚠️ No encontré ese cliente para revisar su historial.');
+      }
+    }else{
+      // ── Flujo normal ──
+      _appendBotWithAction(parsed.text,parsed.action);
+      _CHAT_MSGS.push({role:'assistant',content:parsed.text});
+    }
   }catch(e){
     var tel2=document.getElementById(typingId);if(tel2)tel2.remove();
     _appendChatMsg('bot','⚠️ Error de conexión. Intenta de nuevo.');
@@ -5091,6 +5150,10 @@ function _buildConfirmHTML(action,actionId){
       +'<br><span style="font-size:11px;color:var(--text2)">Monto prometido: <b>'+esc(montoStr)+'</b></span>';
   } else if(action.tipo==='pago'){
     desc='✅ Marcar como pagado: <b>'+esc(action.cliente)+'</b>';
+  } else if(action.tipo==='visita'){
+    var vPartes=action.fecha?(action.fecha+'').split('-'):[];
+    var vFechaLeg=vPartes.length===3?vPartes[2]+'/'+vPartes[1]+'/'+vPartes[0]:esc(action.fecha||'-');
+    desc='🏠 Agendar visita a <b>'+esc(action.cliente)+'</b><br><span style="font-size:11px;color:var(--text2)">Fecha: <b>'+vFechaLeg+'</b></span>';
   } else if(action.tipo==='nota'){
     desc='📝 Nota para <b>'+esc(action.cliente)+'</b>:<br><span style="font-size:11px;color:var(--text2)">'+esc(action.nota)+'</span>';
   }
@@ -5128,6 +5191,12 @@ async function executeChatAction(actionId){
     PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'pago',fecha:HOY.toISOString().split('T')[0],ts:new Date().toISOString()});
     await dbSaveProm(CURRENT,cliente.nombre);
     _appendChatMsg('bot','✅ '+cliente.nombre+' marcado como pagado.');
+  }else if(action.tipo==='visita'){
+    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'visita_agenda',fecha:action.fecha||'',ts:new Date().toISOString()});
+    await dbSaveProm(CURRENT,cliente.nombre);
+    var vPartes2=(action.fecha||'').split('-');
+    var vFmt=vPartes2.length===3?vPartes2[2]+'/'+vPartes2[1]+'/'+vPartes2[0]:(action.fecha||'—');
+    _appendChatMsg('bot','✅ Visita agendada para '+cliente.nombre+' el '+vFmt+'.');
   }else if(action.tipo==='nota'){
     PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'nota',nota:action.nota||'',ts:new Date().toISOString()});
     await dbSaveProm(CURRENT,cliente.nombre);
