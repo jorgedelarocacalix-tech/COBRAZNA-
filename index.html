@@ -548,7 +548,7 @@ Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con po
       <div style="text-align:center;padding:24px 16px;color:var(--text3);font-size:12px">Abre una cartera para ver recomendaciones</div>
     </div>
     <div class="ai-chat-body" id="ai-chat-body" style="display:none">
-      <div class="ai-chat-mode-bar">
+      <div class="ai-chat-mode-bar" id="ai-chat-mode-bar" style="display:none">
         <button class="ai-mode-btn on" id="ai-mode-cartera" onclick="switchChatMode('cartera')">📋 Esta cartera</button>
         <button class="ai-mode-btn" id="ai-mode-general" onclick="switchChatMode('general')">🌐 Todas las carteras</button>
       </div>
@@ -999,6 +999,13 @@ function openCartera(id){
   document.getElementById('proy-zone').style.display='none';
   document.getElementById('dash-zone').style.display='block';
   document.getElementById('back-btn').style.display='';
+  // Burbuja IA siempre visible al entrar a una cartera
+  document.getElementById('ai-bubble').style.display='';
+  // Barra de modo: solo gerente ve "Todas las carteras"
+  var modeBar=document.getElementById('ai-chat-mode-bar');
+  if(modeBar) modeBar.style.display=(USER&&USER.rol==='gerente')?'flex':'none';
+  // Resetear modo chat a "esta cartera" para cobradores
+  if(USER&&USER.rol!=='gerente') switchChatMode('cartera');
   renderDash(id);
   showBienvenida(id);
 }
