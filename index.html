@@ -2780,8 +2780,8 @@ function quickComentario(cartId,nombre){
     +'<input type="date" class="form-inp" id="qcom-fecha" value="'+hoyStr+'">'
     +'</div>'
     +'<div class="form-row">'
-    +'<label class="form-lbl">Comentario</label>'
-    +'<textarea class="form-inp" id="qcom-texto" rows="4" style="resize:vertical;font-family:var(--mono);font-size:12px" placeholder="Escribe el comentario aquí..."></textarea>'
+    +'<label class="form-lbl">Comentario <span style="color:var(--text3);font-size:10px">(Enter para guardar)</span></label>'
+    +'<textarea class="form-inp" id="qcom-texto" rows="3" style="resize:vertical;font-family:var(--mono);font-size:12px" placeholder="Ej: no contesta · prometió llamar mañana · visita pendiente..."></textarea>'
     +'</div>'
     +'<div class="form-actions">'
     +'<button class="btn btn-ghost" onclick="document.getElementById(\'qcom-overlay\').remove()">Cancelar</button>'
@@ -2789,29 +2789,37 @@ function quickComentario(cartId,nombre){
     +'</div>'
     +'</div>';
   document.body.appendChild(div);
-  setTimeout(function(){var t=document.getElementById('qcom-texto');if(t)t.focus();},60);
+  setTimeout(function(){
+    var t=document.getElementById('qcom-texto');
+    if(t){
+      t.focus();
+      t.onkeydown=function(e){
+        if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();quickComentarioGuardar(cartId,nombre);}
+      };
+    }
+  },60);
 }
 
 async function quickComentarioGuardar(cartId,nombre){
   var texto=(document.getElementById('qcom-texto')||{}).value||'';
   var fecha=(document.getElementById('qcom-fecha')||{}).value||new Date().toISOString().split('T')[0];
-  document.getElementById('qcom-overlay').remove();
-  if(!texto.trim()){return;}
+  var ov=document.getElementById('qcom-overlay');if(ov)ov.remove();
+  if(!texto.trim())return;
   if(!supa){setConn(false,'Sin conexión — comentario no guardado');return;}
-  var entry={
+  // Guardar en historial
+  await dbSaveHist({
     cartera_id:cartId, cliente_nombre:nombre, tipo:'nota',
     nota:'💬 '+texto.trim(),
     monto:null, fecha_accion:fecha, fecha_visita:null,
     gestor:(USER&&USER.nombre)||'—', created_at:new Date().toISOString()
-  };
-  await dbSaveHist(entry);
+  });
+  // Actualizar estado en PROMESAS para que aparezca en el dashboard
+  var key=cartId+'::'+nombre;
+  PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'nota',nota:texto.trim(),ts:new Date().toISOString()});
+  await dbSaveProm(cartId,nombre);
   setConn(true,'💬 Comentario guardado ✓');
   setTimeout(function(){setConn(true,'Conectado');},2500);
-  // Recargar historial del cliente directamente para que el comentario aparezca de inmediato
-  var clData=((CARTERAS[cartId]||{}).clientes||[]).find(function(c){return c.nombre===nombre;});
-  var cuota=clData?clData.cuota:0;
-  var saldo=clData?clData.saldo:0;
-  irAHistorialCliente(cartId,nombre,cuota,saldo);
+  if(CURRENT&&CARTERAS[CURRENT])refreshSoft(CURRENT);
 }
 
 // ══ ECG ══
