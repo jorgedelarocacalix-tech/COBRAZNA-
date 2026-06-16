@@ -4949,6 +4949,14 @@ function _buildCarteraPayload(cartId){
   }).filter(function(x){return x.gestion.tipo==='sin';})
     .sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,6);
 
+  // SIN PROMESA 60-90d: tienen gestión (nota, no contesta, etc.) pero aún sin promesa activa
+  var sinGestion60_90Nombres=new Set(sinGestion60_90.map(function(x){return x.nombre;}));
+  var sinPromesa60_90=[...mora60,...mora90].map(function(x){
+    var g=_gestion(x);return Object.assign({},x,{gestion:g});
+  }).filter(function(x){
+    return !sinGestion60_90Nombres.has(x.nombre)&&x.gestion.tipo!=='promesa_ok'&&x.gestion.tipo!=='sin';
+  }).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);}).slice(0,6);
+
   var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
   var nMora=mora60.length+mora90.length+mora120.length+mora150.length;
   var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos.length/activos.length*35))):100;
@@ -4963,7 +4971,7 @@ function _buildCarteraPayload(cartId){
     mora120:mora120.length,mora150:mora150.length,inactivos:inactivos.length,
     promesas:nPromActivas,score:score,
     alertasExtremas:alertasExtremas,urgentes120:urgentes120,cobrarHoy:cobrarHoy,
-    mora120otros:mora120otros,riesgoMora:riesgoMora,sinGestion60_90:sinGestion60_90
+    mora120otros:mora120otros,riesgoMora:riesgoMora,sinGestion60_90:sinGestion60_90,sinPromesa60_90:sinPromesa60_90
   };
 }
 
@@ -5057,6 +5065,20 @@ function _aiAlertCardsHTML(payload){
         +'</div>';
     });
   }
+  if(payload.sinPromesa60_90&&payload.sinPromesa60_90.length){
+    html+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;color:#0077aa;margin:10px 0 5px;text-transform:uppercase">💬 Contactados pero sin promesa — mora 60-90d</div>';
+    payload.sinPromesa60_90.forEach(function(x,i){
+      html+='<div style="border:1px solid #0099cc;border-left:4px solid #0099cc;background:#f0f9ff;border-radius:8px;padding:10px 12px;margin-bottom:7px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        +'<span style="font-size:9px;font-weight:800;letter-spacing:.6px;color:#0077aa">💬 MORA '+x.tramo+'d — SIN PROMESA</span>'
+        +'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">L '+fmt(x.saldo||0)+'</span>'
+        +'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">'+esc2(x.nombre)+'</div>'
+        +'<div style="font-size:11px;color:#0077aa;margin-bottom:6px">'+esc2(x.gestion?x.gestion.txt:'')+'</div>'
+        +'<div id="ai-accion-sp_'+i+'" style="font-size:11px;color:var(--text2);font-style:italic;min-height:14px"><span class="ai-skel" style="width:80%;height:10px;border-radius:3px;display:inline-block"></span></div>'
+        +'</div>';
+    });
+  }
   if(!html) html='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">✅ Sin alertas críticas en este momento.</div>';
   return html;
 }
@@ -5101,6 +5123,7 @@ function _injectClaudeAcciones(text, payload){
   inject(payload.mora120otros,'ot_');
   inject(payload.riesgoMora,'rm_');
   inject(payload.sinGestion60_90,'sg_');
+  inject(payload.sinPromesa60_90,'sp_');
 
   // Mostrar consejo estratégico al final
   if(consejo){
@@ -5110,6 +5133,89 @@ function _injectClaudeAcciones(text, payload){
 }
 
 var AI_FN_URL='https://ixskgawbpwwxdjnkiixt.supabase.co/functions/v1/ai-recomendaciones';
+
+function _aiProjectionHTML(cartId){
+  var c=CARTERAS[cartId];if(!c)return '';
+  var cl=c.clientes||[];
+  var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var lastDay=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
+
+  // Promesas activas este mes con fecha
+  var promMes=[];
+  Object.keys(PROMESAS).forEach(function(key){
+    if(!key.startsWith(cartId+'::'))return;
+    var p=PROMESAS[key];
+    if(p.estado!=='promesa'||!p.fecha||p.fecha.substring(0,7)!==mesActualStr)return;
+    var nombre=key.substring(cartId.length+2);
+    promMes.push({nombre:nombre,fecha:p.fecha,monto:p.monto||0,vencida:p.fecha<hoyStr});
+  });
+  promMes.sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+
+  // Total prometido (solo promesas futuras/hoy)
+  var totalProy=promMes.filter(function(p){return !p.vencida;}).reduce(function(s,p){return s+(p.monto||0);},0);
+  var totalVenc=promMes.filter(function(p){return p.vencida;}).reduce(function(s,p){return s+(p.monto||0);},0);
+
+  // Meta estimada = suma de cuotas de clientes activos sin pago
+  var metaMes=cl.filter(function(x){return x.tramo!=='INACTIVO';}).reduce(function(s,x){return s+(x.cuota||0);},0);
+  var pagaronCuotas=cl.filter(function(x){
+    var p=PROMESAS[cartId+'::'+x.nombre];
+    return pagoEsteMes(x.ultimo_pago)||(p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr);
+  }).reduce(function(s,x){return s+(x.cuota||0);},0);
+  var pctProyTotal=metaMes>0?Math.round((totalProy+pagaronCuotas)/metaMes*100):0;
+
+  // Agrupar por semana del mes
+  function semDia(d){return d<=7?1:d<=14?2:d<=21?3:d<=28?4:5;}
+  var semanas={};
+  promMes.forEach(function(p){
+    var d=parseInt(p.fecha.split('-')[2]);
+    var s=semDia(d);
+    if(!semanas[s])semanas[s]=[];
+    semanas[s].push(p);
+  });
+  var todaySem=semDia(HOY.getDate());
+  var semLabels={1:'Sem 1 (1-7)',2:'Sem 2 (8-14)',3:'Sem 3 (15-21)',4:'Sem 4 (22-28)',5:'Sem 5 (29-'+lastDay+')'};
+
+  var html='<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;background:var(--bg2)">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px">📅 PROYECCIÓN HASTA FIN DE MES</div>';
+
+  if(!promMes.length){
+    html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);padding:4px 0">Sin promesas registradas para este mes.</div></div>';
+    return html;
+  }
+
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:9px">'
+    +'<div style="background:var(--greenbg);border-radius:6px;padding:6px 5px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)">L '+fmt(totalProy)+'</div><div style="font-size:9px;color:var(--text3)">Prometido</div></div>'
+    +(totalVenc?'<div style="background:var(--redbg);border-radius:6px;padding:6px 5px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red)">L '+fmt(totalVenc)+'</div><div style="font-size:9px;color:var(--red)">Vencidas</div></div>':'<div style="background:var(--bg3);border-radius:6px;padding:6px 5px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text3)">0</div><div style="font-size:9px;color:var(--text3)">Vencidas</div></div>')
+    +'<div style="background:var(--bluebg);border-radius:6px;padding:6px 5px;text-align:center"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--blue)">'+pctProyTotal+'%</div><div style="font-size:9px;color:var(--text3)">De meta</div></div>'
+    +'</div>';
+
+  var semKeys=Object.keys(semanas).map(Number).sort();
+  semKeys.forEach(function(s){
+    var list=semanas[s];
+    var semTotal=list.reduce(function(a,p){return a+p.monto;},0);
+    var isPast=s<todaySem;
+    var isCurrent=s===todaySem;
+    var col=isPast?'var(--text3)':isCurrent?'var(--green)':'var(--blue)';
+    var bg=isPast?'var(--bg3)':isCurrent?'var(--greenbg)':'var(--bluebg)';
+    html+='<div style="border-left:3px solid '+col+';background:'+bg+';border-radius:4px;padding:6px 8px;margin-bottom:5px">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+      +'<span style="font-size:10px;font-weight:700;color:'+col+'">'+semLabels[s]+(isCurrent?' ← esta semana':'')+'</span>'
+      +'<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+col+'">L '+fmt(semTotal)+'</span>'
+      +'</div>';
+    list.forEach(function(p){
+      var parts=p.fecha.split('-');
+      var dayFmt=parts[2]+'/'+parts[1];
+      html+='<div style="font-size:10px;color:var(--text2);display:flex;justify-content:space-between;padding:1px 0">'
+        +'<span'+(p.vencida?' style="color:var(--red)"':'')+'>'+esc2(p.nombre)+(p.vencida?' ⚠️':'')+'</span>'
+        +'<span style="font-family:var(--mono);color:var(--text3)">'+dayFmt+' · L '+fmt(p.monto)+'</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
 
 async function buildAIRecomendaciones(cartId){
   var body=document.getElementById('ai-panel-body');
@@ -5121,7 +5227,7 @@ async function buildAIRecomendaciones(cartId){
   var cardsHTML=_aiAlertCardsHTML(payload);
   var consejoZone='<div id="ai-consejo-semana" style="background:var(--purplebg);border:1px solid rgba(96,48,176,.15);border-radius:8px;padding:10px 12px;margin-top:8px"><span class="ai-skel" style="width:90%;height:10px;border-radius:3px;display:inline-block"></span></div>';
   var refreshBtn='<button class="ai-recargar" style="margin-top:8px" onclick="buildAIRecomendaciones(\''+cartId+'\')">↺ Nuevo análisis</button>';
-  body.innerHTML=_aiHeaderHTML(payload)+cardsHTML+consejoZone+refreshBtn;
+  body.innerHTML=_aiHeaderHTML(payload)+_aiProjectionHTML(cartId)+cardsHTML+consejoZone+refreshBtn;
 
   try{
     var res=await fetch(AI_FN_URL,{
