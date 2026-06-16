@@ -4958,6 +4958,7 @@ var _CHAT_MSGS=[];
 var _CHAT_TYPING=false;
 var _CHAT_CART='';
 var _PENDING_ACTIONS={};
+var _LAST_MULTIMATCH=[];
 
 function switchAITab(tab){
   document.getElementById('ai-tab-analisis').classList.toggle('on',tab==='analisis');
@@ -4978,8 +4979,9 @@ function _parseAction(text){
   return{text:cleanText,action:action};
 }
 
-// Busca cliente por nombre con tolerancia a diferencias menores
+// Busca cliente por nombre. Guarda múltiples coincidencias en _LAST_MULTIMATCH.
 function _findCliente(nombreBuscado){
+  _LAST_MULTIMATCH=[];
   var c=CARTERAS[CURRENT];if(!c||!c.clientes)return null;
   var n=(nombreBuscado||'').trim().toUpperCase();
   // Coincidencia exacta
@@ -4987,16 +4989,17 @@ function _findCliente(nombreBuscado){
   if(exact)return exact;
   // Todas las palabras del buscado aparecen en el nombre
   var words=n.split(/\s+/).filter(Boolean);
+  if(!words.length)return null;
   var allWords=c.clientes.filter(function(x){
     var xU=x.nombre.toUpperCase();
     return words.every(function(w){return xU.indexOf(w)>-1;});
   });
   if(allWords.length===1)return allWords[0];
-  // Primera palabra
-  if(words.length>0){
-    var first=c.clientes.filter(function(x){return x.nombre.toUpperCase().indexOf(words[0])>-1;});
-    if(first.length===1)return first[0];
-  }
+  if(allWords.length>1){_LAST_MULTIMATCH=allWords;return null;}
+  // Solo primera palabra
+  var first=c.clientes.filter(function(x){return x.nombre.toUpperCase().indexOf(words[0])>-1;});
+  if(first.length===1)return first[0];
+  if(first.length>1){_LAST_MULTIMATCH=first;return null;}
   return null;
 }
 
@@ -5078,12 +5081,19 @@ function _appendBotWithAction(text,action){
 function _buildConfirmHTML(action,actionId){
   var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var desc='';
-  if(action.tipo==='promesa')
-    desc='📅 <b>'+esc(action.cliente)+'</b> prometió pagar el <b>'+esc(action.fecha)+'</b>';
-  else if(action.tipo==='pago')
+  if(action.tipo==='promesa'){
+    // Fecha legible DD/MM/YYYY
+    var partes=action.fecha?(action.fecha+'').split('-'):[];
+    var fechaLeg=partes.length===3?partes[2]+'/'+partes[1]+'/'+partes[0]:esc(action.fecha||'-');
+    var montoStr=action.monto?'L '+Number(action.monto).toLocaleString('es-HN'):'sin monto registrado';
+    desc='📅 <b>'+esc(action.cliente)+'</b>'
+      +'<br><span style="font-size:11px;color:var(--text2)">Fecha: <b>'+fechaLeg+'</b></span>'
+      +'<br><span style="font-size:11px;color:var(--text2)">Monto prometido: <b>'+esc(montoStr)+'</b></span>';
+  } else if(action.tipo==='pago'){
     desc='✅ Marcar como pagado: <b>'+esc(action.cliente)+'</b>';
-  else if(action.tipo==='nota')
-    desc='📝 Nota para <b>'+esc(action.cliente)+'</b>: '+esc(action.nota);
+  } else if(action.tipo==='nota'){
+    desc='📝 Nota para <b>'+esc(action.cliente)+'</b>:<br><span style="font-size:11px;color:var(--text2)">'+esc(action.nota)+'</span>';
+  }
   return '<div class="ai-chat-confirm-desc">'+desc+'</div>'
     +'<div class="ai-chat-confirm-btns">'
     +'<button class="ai-confirm-si" onclick="executeChatAction(\''+actionId+'\')">✓ Sí, confirmar</button>'
@@ -5097,14 +5107,23 @@ async function executeChatAction(actionId){
   var card=document.getElementById(actionId);if(card)card.remove();
   var cliente=_findCliente(action.cliente||'');
   if(!cliente){
-    _appendChatMsg('bot','⚠️ No encontré el cliente "'+String(action.cliente||'')+'" en la cartera. Verifica el nombre e intenta de nuevo.');
+    if(_LAST_MULTIMATCH.length>1){
+      var lista=_LAST_MULTIMATCH.map(function(x,i){
+        return (i+1)+'. '+x.nombre+' | L '+Number(x.saldo||0).toLocaleString('es-HN')+' | '+x.tramo;
+      }).join('\n');
+      _appendChatMsg('bot','Encontré varios clientes con ese nombre. ¿A cuál te refieres?\n'+lista);
+    }else{
+      _appendChatMsg('bot','⚠️ No encontré el cliente "'+String(action.cliente||'')+'" en la cartera. Verifica el nombre e intenta de nuevo.');
+    }
     return;
   }
   var key=CURRENT+'::'+cliente.nombre;
+  var monto=action.monto?Number(action.monto):null;
+  var montoFmt=monto?(' — L '+monto.toLocaleString('es-HN')):'';
   if(action.tipo==='promesa'){
-    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'promesa',fecha:action.fecha||'',ts:new Date().toISOString()});
+    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'promesa',fecha:action.fecha||'',monto:monto,ts:new Date().toISOString()});
     await dbSaveProm(CURRENT,cliente.nombre);
-    _appendChatMsg('bot','✅ Promesa registrada: '+cliente.nombre+' pagará el '+(action.fecha||'—')+'.');
+    _appendChatMsg('bot','✅ Promesa registrada: '+cliente.nombre+' pagará el '+(action.fecha||'—')+montoFmt+'.');
   }else if(action.tipo==='pago'){
     PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'pago',fecha:HOY.toISOString().split('T')[0],ts:new Date().toISOString()});
     await dbSaveProm(CURRENT,cliente.nombre);
