@@ -330,6 +330,9 @@ tr:hover td{background:#f5f8ff}
 .ai-chat-send:hover{background:#1a3a80}
 .ai-chat-send:disabled{background:var(--bg4);cursor:not-allowed}
 .ai-chat-empty{text-align:center;padding:28px 14px;color:var(--text3);font-size:11px;font-family:var(--mono);line-height:2}
+.ai-chat-mode-bar{display:flex;gap:4px;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+.ai-mode-btn{flex:1;padding:5px 6px;font-size:10px;font-family:var(--mono);border:1px solid var(--border2);background:var(--bg2);border-radius:4px;cursor:pointer;color:var(--text3);transition:all .15s;white-space:nowrap}
+.ai-mode-btn.on{background:var(--text);color:#fff;border-color:var(--text)}
 .ai-chat-confirm{background:var(--bluebg);border:1px solid rgba(26,85,160,.22);border-radius:10px;padding:11px 13px;margin-top:2px}
 .ai-chat-confirm-desc{font-size:12px;color:var(--text);margin-bottom:9px;line-height:1.55}
 .ai-chat-confirm-btns{display:flex;gap:8px}
@@ -491,8 +494,12 @@ Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con po
       <div style="text-align:center;padding:24px 16px;color:var(--text3);font-size:12px">Abre una cartera para ver recomendaciones</div>
     </div>
     <div class="ai-chat-body" id="ai-chat-body" style="display:none">
+      <div class="ai-chat-mode-bar">
+        <button class="ai-mode-btn on" id="ai-mode-cartera" onclick="switchChatMode('cartera')">📋 Esta cartera</button>
+        <button class="ai-mode-btn" id="ai-mode-general" onclick="switchChatMode('general')">🌐 Todas las carteras</button>
+      </div>
       <div class="ai-chat-msgs" id="ai-chat-msgs">
-        <div class="ai-chat-empty">💬 Pregunta algo sobre tu cartera<br>Ejemplos:<br>"¿Quién me debe más?"<br>"¿Quién prometió y no pagó?"<br>"¿Qué hago con clientes en mora 90?"</div>
+        <div class="ai-chat-empty">💬 Pregunta algo sobre tu cartera<br>Ej: "¿Quién me debe más?" · "¿Quién prometió y no pagó?"</div>
       </div>
       <div class="ai-chat-input-row">
         <input class="ai-chat-inp" id="ai-chat-inp" placeholder="Escribe tu pregunta..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}">
@@ -5061,23 +5068,110 @@ function _findCliente(nombreBuscado){
   return null;
 }
 
+var _CHAT_MODE='cartera';
+
+function switchChatMode(mode){
+  _CHAT_MODE=mode;
+  document.getElementById('ai-mode-cartera').classList.toggle('on',mode==='cartera');
+  document.getElementById('ai-mode-general').classList.toggle('on',mode==='general');
+  _CHAT_MSGS=[];_CHAT_CART='';
+  var msgsEl=document.getElementById('ai-chat-msgs');
+  if(!msgsEl)return;
+  var hint=mode==='general'
+    ?'🌐 Modo global — todas las carteras<br>Ej: "¿Cuál cartera está peor?" · "¿Qué clientes entraron a mora?" · "Dame un resumen ejecutivo" · "¿Qué harías esta semana?"'
+    :'💬 Esta cartera<br>Ej: "¿Quién me debe más?" · "¿Quién prometió y no pagó?" · Registra gestiones y promesas';
+  msgsEl.innerHTML='<div class="ai-chat-empty">'+hint+'</div>';
+}
+
+function _buildGeneralPayload(){
+  var ids=typeof getCarteras==='function'?getCarteras():Object.keys(CARTERAS);
+  if(!ids.length)return null;
+  var mesStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var tot={clientes:0,pagaron:0,mora60:0,mora90:0,mora120mas:0,vencidos:0};
+
+  var carteras=ids.filter(function(id){return !!CARTERAS[id];}).map(function(id){
+    var c=CARTERAS[id];var cl=c.clientes||[];
+    var pg=[],ve=[],m60=[],m90=[],m120=[],m150=[];
+    cl.forEach(function(x){
+      var p=PROMESAS[id+'::'+x.nombre];
+      var pagoM=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesStr;
+      var pagado=(pagoEsteMes(x.ultimo_pago)||pagoM)&&!(p&&p.mora_pendiente);
+      if(pagado){pg.push(x);return;}
+      if(x.tramo==='VENCIDO')ve.push(x);
+      else if(x.tramo==='60')m60.push(x);
+      else if(x.tramo==='90')m90.push(x);
+      else if(x.tramo==='120')m120.push(x);
+      else if(x.tramo==='150')m150.push(x);
+    });
+    function g(x){
+      var p=PROMESAS[id+'::'+x.nombre];
+      if(!p||!p.estado)return{txt:'Sin gestión',tipo:'sin'};
+      if(p.estado==='promesa'){var v=p.fecha&&p.fecha<hoyStr;return{txt:'Prometió '+(p.fecha||'')+(v?' — NO PAGÓ':''),tipo:v?'promesa_vencida':'promesa_ok'};}
+      if(p.estado==='no-contesta'||p.estado==='no_contesta')return{txt:'No contesta',tipo:'nc'};
+      if(p.estado==='visita'||p.estado==='visita_agenda')return{txt:'Visita agendada',tipo:'visita'};
+      if(p.estado==='negociacion')return{txt:'En negociación',tipo:'neg'};
+      return{txt:p.nota||p.estado||'',tipo:'otro'};
+    }
+    var m120all=[...m120,...m150].map(function(x){return Object.assign({},x,{gestion:g(x)});});
+    var extremas=m120all.filter(function(x){return x.gestion.tipo==='promesa_vencida';}).sort(function(a,b){return(b.saldo||0)-(a.saldo||0);}).slice(0,3);
+    var urgentes=m120all.filter(function(x){return x.gestion.tipo==='sin';}).sort(function(a,b){return(b.saldo||0)-(a.saldo||0);}).slice(0,3);
+    var en=new Set(extremas.map(function(x){return x.nombre;}));
+    var un=new Set(urgentes.map(function(x){return x.nombre;}));
+    var otros120=m120all.filter(function(x){return !en.has(x.nombre)&&!un.has(x.nombre);}).sort(function(a,b){return(b.saldo||0)-(a.saldo||0);}).slice(0,3);
+    var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
+    var nMora=m60.length+m90.length+m120.length+m150.length;
+    var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(ve.length/activos.length*35))):100;
+    tot.clientes+=cl.length;tot.pagaron+=pg.length;tot.mora60+=m60.length;tot.mora90+=m90.length;tot.mora120mas+=m120.length+m150.length;tot.vencidos+=ve.length;
+    return{
+      nombre:c.empresa,score:score,clientes:cl.length,pagaron:pg.length,
+      pctPagaron:cl.length?Math.round(pg.length/cl.length*100):0,
+      vencidos:ve.length,mora60:m60.length,mora90:m90.length,mora120:m120.length,mora150:m150.length,
+      alertasExtremas:extremas,urgentes120:urgentes,mora120otros:otros120,
+      nuevosMora60:m60.map(function(x){return{nombre:x.nombre,saldo:x.saldo||0};})
+    };
+  });
+
+  return{
+    tipo:'general',
+    fecha:HOY.toLocaleDateString('es-HN'),
+    hoy:HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+    hoyISO:hoyStr,
+    gestor:USER&&USER.nombre?USER.nombre:'Equipo',
+    resumen:{
+      totalCarteras:carteras.length,
+      totalClientes:tot.clientes,totalPagaron:tot.pagaron,
+      pctPagoGlobal:tot.clientes?Math.round(tot.pagaron/tot.clientes*100):0,
+      totalMora60:tot.mora60,totalMora90:tot.mora90,totalMora120mas:tot.mora120mas,
+      totalVencidos:tot.vencidos,
+      scorePromedio:carteras.length?Math.round(carteras.reduce(function(s,c){return s+c.score;},0)/carteras.length):0
+    },
+    carteras:carteras
+  };
+}
+
 async function sendChatMsg(){
   if(_CHAT_TYPING)return;
   var inp=document.getElementById('ai-chat-inp');
   var sendBtn=document.getElementById('ai-chat-send-btn');
   var text=(inp.value||'').trim();
   if(!text)return;
-  var payload=_buildCarteraPayload(CURRENT);
-  if(!payload){_appendChatMsg('bot','Primero abre una cartera para poder consultar datos.');return;}
-  // Contexto enriquecido para el chat
-  var c=CARTERAS[CURRENT];
-  if(c&&c.clientes){
-    payload.clientesTodos=c.clientes.map(function(x){return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,cuota:x.cuota||0};});
+  var payload;
+  if(_CHAT_MODE==='general'){
+    payload=_buildGeneralPayload();
+    if(!payload){_appendChatMsg('bot','No hay carteras cargadas. Carga al menos una cartera primero.');
+      _CHAT_TYPING=false;if(sendBtn)sendBtn.disabled=false;inp.focus();return;}
+  }else{
+    payload=_buildCarteraPayload(CURRENT);
+    if(!payload){_appendChatMsg('bot','Primero abre una cartera para poder consultar datos.');return;}
+    var c=CARTERAS[CURRENT];
+    if(c&&c.clientes){payload.clientesTodos=c.clientes.map(function(x){return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,cuota:x.cuota||0};});}
+    payload.hoyISO=HOY.toISOString().split('T')[0];
+    payload.hoy=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   }
-  payload.hoyISO=HOY.toISOString().split('T')[0];
-  payload.hoy=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   inp.value='';
-  if(_CHAT_CART!==CURRENT){_CHAT_MSGS=[];_CHAT_CART=CURRENT;}
+  var chatKey=_CHAT_MODE==='general'?'__general__':CURRENT;
+  if(_CHAT_CART!==chatKey){_CHAT_MSGS=[];_CHAT_CART=chatKey;}
   _appendChatMsg('user',text);
   _CHAT_MSGS.push({role:'user',content:text});
   _CHAT_TYPING=true;
