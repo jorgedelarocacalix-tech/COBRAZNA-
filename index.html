@@ -329,7 +329,11 @@ tr:hover td{background:#f5f8ff}
 .ai-chat-send{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
 .ai-chat-send:hover{background:#1a3a80}
 .ai-chat-send:disabled{background:var(--bg4);cursor:not-allowed}
-.ai-chat-empty{text-align:center;padding:28px 14px;color:var(--text3);font-size:11px;font-family:var(--mono);line-height:2}
+.ai-chat-empty{text-align:center;padding:12px 10px;color:var(--text3);font-size:11px;font-family:var(--mono);line-height:2}
+.ai-chat-chips{display:flex;flex-direction:column;gap:5px;padding:6px 10px 4px}
+.ai-chip-group{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin:4px 0 2px;font-family:var(--mono)}
+.ai-chip{display:inline-block;padding:5px 10px;border-radius:14px;border:1px solid var(--border2);background:var(--bg2);font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;margin:2px 2px;font-family:var(--sans);text-align:left;white-space:normal;line-height:1.3}
+.ai-chip:hover{background:var(--bluebg);border-color:rgba(26,85,160,.3);color:var(--blue)}
 .ai-chat-mode-bar{display:flex;gap:4px;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
 .ai-mode-btn{flex:1;padding:5px 6px;font-size:10px;font-family:var(--mono);border:1px solid var(--border2);background:var(--bg2);border-radius:4px;cursor:pointer;color:var(--text3);transition:all .15s;white-space:nowrap}
 .ai-mode-btn.on{background:var(--text);color:#fff;border-color:var(--text)}
@@ -553,7 +557,30 @@ Ej: Cliente en casa, dice que paga el viernes. Esposo trabaja fuera. Casa con po
         <button class="ai-mode-btn" id="ai-mode-general" onclick="switchChatMode('general')">🌐 Todas las carteras</button>
       </div>
       <div class="ai-chat-msgs" id="ai-chat-msgs">
-        <div class="ai-chat-empty">💬 Pregunta algo sobre tu cartera<br>Ej: "¿Quién me debe más?" · "¿Quién prometió y no pagó?"</div>
+        <div class="ai-chat-empty">💬 ¿En qué te ayudo hoy?</div>
+        <div class="ai-chat-chips" id="ai-chat-chips">
+          <div class="ai-chip-group">📋 Registrar gestión</div>
+          <div style="display:flex;flex-wrap:wrap">
+            <button class="ai-chip" onclick="_chipClick(this)">📅 [NOMBRE] prometió pagar el [FECHA] L [MONTO]</button>
+            <button class="ai-chip" onclick="_chipClick(this)">✅ [NOMBRE] pagó hoy</button>
+            <button class="ai-chip" onclick="_chipClick(this)">🏠 Agendar visita a [NOMBRE] el [FECHA]</button>
+            <button class="ai-chip" onclick="_chipClick(this)">📝 Nota: [NOMBRE] no contestó</button>
+          </div>
+          <div class="ai-chip-group">🔍 Consultar cartera</div>
+          <div style="display:flex;flex-wrap:wrap">
+            <button class="ai-chip" onclick="_chipClick(this)">¿Quién prometió y no pagó?</button>
+            <button class="ai-chip" onclick="_chipClick(this)">¿Quién no ha sido contactado?</button>
+            <button class="ai-chip" onclick="_chipClick(this)">¿Quién me debe más?</button>
+            <button class="ai-chip" onclick="_chipClick(this)">¿Quién está a punto de entrar en mora?</button>
+          </div>
+          <div class="ai-chip-group">👤 Info de cliente</div>
+          <div style="display:flex;flex-wrap:wrap">
+            <button class="ai-chip" onclick="_chipClick(this)">Dime más sobre [NOMBRE]</button>
+            <button class="ai-chip" onclick="_chipClick(this)">¿Cuánto debe [NOMBRE]?</button>
+            <button class="ai-chip" onclick="_chipClick(this)">¿Cuál es la cuota de [NOMBRE]?</button>
+            <button class="ai-chip" onclick="_chipClick(this)">Historial de [NOMBRE]</button>
+          </div>
+        </div>
       </div>
       <div class="ai-chat-input-row">
         <input class="ai-chat-inp" id="ai-chat-inp" placeholder="Escribe tu pregunta..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}">
@@ -5197,10 +5224,39 @@ function switchChatMode(mode){
   _CHAT_MSGS=[];_CHAT_CART='';
   var msgsEl=document.getElementById('ai-chat-msgs');
   if(!msgsEl)return;
-  var hint=mode==='general'
-    ?'🌐 Modo global — todas las carteras<br>Ej: "¿Cuál cartera está peor?" · "¿Qué clientes entraron a mora?" · "Dame un resumen ejecutivo" · "¿Qué harías esta semana?"'
-    :'💬 Esta cartera<br>Ej: "¿Quién me debe más?" · "¿Quién prometió y no pagó?" · Registra gestiones y promesas';
-  msgsEl.innerHTML='<div class="ai-chat-empty">'+hint+'</div>';
+  if(mode==='general'){
+    msgsEl.innerHTML='<div class="ai-chat-empty">🌐 Vista global — todas las carteras</div>'
+      +'<div class="ai-chat-chips" id="ai-chat-chips"><div style="display:flex;flex-wrap:wrap">'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Cuál cartera está peor?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Qué clientes entraron a mora este mes?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">Dame un resumen ejecutivo</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Qué harías esta semana?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Cuál cartera tiene más mora alta?</button>'
+      +'</div></div>';
+  }else{
+    msgsEl.innerHTML='<div class="ai-chat-empty">💬 ¿En qué te ayudo hoy?</div>'
+      +'<div class="ai-chat-chips" id="ai-chat-chips">'
+      +'<div class="ai-chip-group">📋 Registrar gestión</div>'
+      +'<div style="display:flex;flex-wrap:wrap">'
+      +'<button class="ai-chip" onclick="_chipClick(this)">📅 [NOMBRE] prometió pagar el [FECHA] L [MONTO]</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">✅ [NOMBRE] pagó hoy</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">🏠 Agendar visita a [NOMBRE] el [FECHA]</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">📝 Nota: [NOMBRE] no contestó</button>'
+      +'</div>'
+      +'<div class="ai-chip-group">🔍 Consultar cartera</div>'
+      +'<div style="display:flex;flex-wrap:wrap">'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Quién prometió y no pagó?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Quién no ha sido contactado?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Quién me debe más?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Quién está a punto de entrar en mora?</button>'
+      +'</div>'
+      +'<div class="ai-chip-group">👤 Info de cliente</div>'
+      +'<div style="display:flex;flex-wrap:wrap">'
+      +'<button class="ai-chip" onclick="_chipClick(this)">Dime más sobre [NOMBRE]</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">¿Cuánto debe [NOMBRE]?</button>'
+      +'<button class="ai-chip" onclick="_chipClick(this)">Historial de [NOMBRE]</button>'
+      +'</div></div>';
+  }
 }
 
 function _buildGeneralPayload(){
@@ -5347,9 +5403,21 @@ async function sendChatMsg(){
   inp.focus();
 }
 
+function _hideChips(){var ch=document.getElementById('ai-chat-chips');if(ch)ch.style.display='none';}
+
+function _chipClick(btn){
+  var txt=btn.textContent.trim();
+  var inp=document.getElementById('ai-chat-inp');
+  if(!inp)return;
+  // Si tiene placeholder entre [], poner el texto en el input para que lo editen
+  if(txt.indexOf('[')>-1){inp.value=txt;inp.focus();}
+  else{inp.value=txt;sendChatMsg();}
+}
+
 function _appendChatMsg(role,text){
   var msgsEl=document.getElementById('ai-chat-msgs');
   var empty=msgsEl.querySelector('.ai-chat-empty');if(empty)empty.remove();
+  _hideChips();
   var div=document.createElement('div');
   div.className='ai-chat-msg '+role;
   div.textContent=text;
@@ -5360,6 +5428,7 @@ function _appendChatMsg(role,text){
 function _appendBotWithAction(text,action){
   var msgsEl=document.getElementById('ai-chat-msgs');
   var empty=msgsEl.querySelector('.ai-chat-empty');if(empty)empty.remove();
+  _hideChips();
   // Mensaje del bot
   var div=document.createElement('div');
   div.className='ai-chat-msg bot';
