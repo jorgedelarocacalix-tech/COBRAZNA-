@@ -519,6 +519,7 @@ var SUPA_URL='https://ixskgawbpwwxdjnkiixt.supabase.co';
 var SUPA_KEY='sb_publishable_-JUaSYPPkq8n4wJIKPtXGw_XMyj3EE7';
 var USUARIOS={
   '12345':{nombre:'Administrador',rol:'admin',carteras:[]},
+  '7777':{nombre:'Jorge',rol:'gerente',carteras:[]},
   '1111':{nombre:'Equipo Roca',rol:'cobrador',carteras:['ROCA_COMERCIAL','MOTORS','LIBERTAD','BARRIO']},
   '2222':{nombre:'Equipo Su Mueble',rol:'cobrador',carteras:['MUEBLE','MOTO','DANLI']}
 };
@@ -596,7 +597,19 @@ function pinEnter(){
   document.getElementById('main-header').style.display='flex';
   document.getElementById('user-lbl').textContent='👤 '+u.nombre;
   if(USER.rol==='admin')document.getElementById('btn-alerta').style.display='';
-  loadData().then(function(){renderHome();startSync();});
+  loadData().then(function(){
+    renderHome();startSync();
+    if(USER.rol==='gerente'){
+      // Abrir burbuja IA en modo global al entrar
+      var bubble=document.getElementById('ai-bubble');
+      if(bubble)bubble.style.display='';
+      setTimeout(function(){
+        switchAITab('chat');
+        switchChatMode('general');
+        if(!_AI_OPEN)toggleAIPanel();
+      },700);
+    }
+  });
 }
 function logout(){
   if(!confirm('¿Cerrar sesión?'))return;
@@ -899,6 +912,7 @@ function renderHome(){
   CURRENT=null;
   var rn=document.getElementById('role-note');
   if(USER&&USER.rol==='admin'){rn.style.cssText='background:var(--greenbg);color:var(--green);border:1px solid rgba(26,122,60,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent='Administrador - acceso completo. Sube PDFs y gestiona carteras.';}
+  else if(USER&&USER.rol==='gerente'){rn.style.cssText='background:var(--purplebg,#f3e8ff);color:var(--purple,#7c3aed);border:1px solid rgba(124,58,237,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent='Gerente — Vista global y análisis IA';}
   else{rn.style.cssText='background:var(--bluebg);color:var(--blue);border:1px solid rgba(26,85,160,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent=(USER?USER.nombre:'') + ' - Registra promesas y visitas en tu cartera';}
   var dz=document.getElementById('drop-zone');
   dz.className='drop-zone'+(canUpload()?'':' disabled');
@@ -915,7 +929,7 @@ function renderHome(){
   }).join('');
 }
 function getVisibles(){
-  if(!USER)return [];if(USER.rol==='admin')return Object.keys(CARTERAS);
+  if(!USER)return [];if(USER.rol==='admin'||USER.rol==='gerente')return Object.keys(CARTERAS);
   return Object.keys(CARTERAS).filter(function(id){
     var emp=((CARTERAS[id]||{}).empresa||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
     var idc=id.toUpperCase().replace(/[^A-Z0-9]/g,'');
