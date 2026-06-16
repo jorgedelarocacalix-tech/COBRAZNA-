@@ -330,6 +330,13 @@ tr:hover td{background:#f5f8ff}
 .ai-chat-send:hover{background:#1a3a80}
 .ai-chat-send:disabled{background:var(--bg4);cursor:not-allowed}
 .ai-chat-empty{text-align:center;padding:28px 14px;color:var(--text3);font-size:11px;font-family:var(--mono);line-height:2}
+.ai-chat-confirm{background:var(--bluebg);border:1px solid rgba(26,85,160,.22);border-radius:10px;padding:11px 13px;margin-top:2px}
+.ai-chat-confirm-desc{font-size:12px;color:var(--text);margin-bottom:9px;line-height:1.55}
+.ai-chat-confirm-btns{display:flex;gap:8px}
+.ai-confirm-si{flex:1;padding:7px 10px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:background .15s}
+.ai-confirm-si:hover{background:#0d5a2e}
+.ai-confirm-no{flex:1;padding:7px 10px;background:var(--bg3);color:var(--text2);border:1px solid var(--border2);border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--sans);transition:background .15s}
+.ai-confirm-no:hover{background:var(--bg4)}
 </style>
 <script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script><script src="./La Roca — Cobranza_files/pdf(1).min.js"></script></head>
 <body>
@@ -4950,6 +4957,7 @@ var CHAT_FN_URL='https://ixskgawbpwwxdjnkiixt.supabase.co/functions/v1/ai-chat';
 var _CHAT_MSGS=[];
 var _CHAT_TYPING=false;
 var _CHAT_CART='';
+var _PENDING_ACTIONS={};
 
 function switchAITab(tab){
   document.getElementById('ai-tab-analisis').classList.toggle('on',tab==='analisis');
@@ -4960,6 +4968,38 @@ function switchAITab(tab){
   else{panelBody.style.display='none';chatBody.style.display='flex';}
 }
 
+// Extrae el bloque [ACCION:{...}] del final del texto del bot
+function _parseAction(text){
+  var match=text.match(/\[ACCION:(\{[^}]*\})\]/);
+  if(!match)return{text:text.trim(),action:null};
+  var action=null;
+  try{action=JSON.parse(match[1]);}catch(e){}
+  var cleanText=text.replace(/\[ACCION:[^\]]*\]/g,'').trim();
+  return{text:cleanText,action:action};
+}
+
+// Busca cliente por nombre con tolerancia a diferencias menores
+function _findCliente(nombreBuscado){
+  var c=CARTERAS[CURRENT];if(!c||!c.clientes)return null;
+  var n=(nombreBuscado||'').trim().toUpperCase();
+  // Coincidencia exacta
+  var exact=c.clientes.find(function(x){return x.nombre.toUpperCase()===n;});
+  if(exact)return exact;
+  // Todas las palabras del buscado aparecen en el nombre
+  var words=n.split(/\s+/).filter(Boolean);
+  var allWords=c.clientes.filter(function(x){
+    var xU=x.nombre.toUpperCase();
+    return words.every(function(w){return xU.indexOf(w)>-1;});
+  });
+  if(allWords.length===1)return allWords[0];
+  // Primera palabra
+  if(words.length>0){
+    var first=c.clientes.filter(function(x){return x.nombre.toUpperCase().indexOf(words[0])>-1;});
+    if(first.length===1)return first[0];
+  }
+  return null;
+}
+
 async function sendChatMsg(){
   if(_CHAT_TYPING)return;
   var inp=document.getElementById('ai-chat-inp');
@@ -4968,17 +5008,17 @@ async function sendChatMsg(){
   if(!text)return;
   var payload=_buildCarteraPayload(CURRENT);
   if(!payload){_appendChatMsg('bot','Primero abre una cartera para poder consultar datos.');return;}
-  // Incluir lista completa de clientes para el contexto del chat
+  // Contexto enriquecido para el chat
   var c=CARTERAS[CURRENT];
   if(c&&c.clientes){
     payload.clientesTodos=c.clientes.map(function(x){return{nombre:x.nombre,saldo:x.saldo||0,tramo:x.tramo,cuota:x.cuota||0};});
   }
+  payload.hoyISO=HOY.toISOString().split('T')[0];
+  payload.hoy=HOY.toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   inp.value='';
-  // Reset historial si cambió la cartera
   if(_CHAT_CART!==CURRENT){_CHAT_MSGS=[];_CHAT_CART=CURRENT;}
   _appendChatMsg('user',text);
   _CHAT_MSGS.push({role:'user',content:text});
-  // Indicador de escritura
   _CHAT_TYPING=true;
   if(sendBtn)sendBtn.disabled=true;
   var typingId='ct'+Date.now();
@@ -4989,10 +5029,12 @@ async function sendChatMsg(){
   try{
     var res=await fetch(CHAT_FN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:_CHAT_MSGS.slice(-10),cartera:payload})});
     var data=await res.json();
-    var reply=data.reply||data.error||'Sin respuesta';
+    var rawReply=data.reply||data.error||'Sin respuesta';
+    var parsed=_parseAction(rawReply);
     var tel=document.getElementById(typingId);if(tel)tel.remove();
-    _appendChatMsg('bot',reply);
-    _CHAT_MSGS.push({role:'assistant',content:reply});
+    _appendBotWithAction(parsed.text,parsed.action);
+    // Guardamos versión limpia en el historial (sin el bloque ACCION)
+    _CHAT_MSGS.push({role:'assistant',content:parsed.text});
   }catch(e){
     var tel2=document.getElementById(typingId);if(tel2)tel2.remove();
     _appendChatMsg('bot','⚠️ Error de conexión. Intenta de nuevo.');
@@ -5010,6 +5052,77 @@ function _appendChatMsg(role,text){
   div.textContent=text;
   msgsEl.appendChild(div);
   msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+function _appendBotWithAction(text,action){
+  var msgsEl=document.getElementById('ai-chat-msgs');
+  var empty=msgsEl.querySelector('.ai-chat-empty');if(empty)empty.remove();
+  // Mensaje del bot
+  var div=document.createElement('div');
+  div.className='ai-chat-msg bot';
+  div.textContent=text;
+  msgsEl.appendChild(div);
+  // Tarjeta de confirmación si hay acción
+  if(action&&action.tipo){
+    var actionId='ca-'+Date.now();
+    _PENDING_ACTIONS[actionId]=action;
+    var card=document.createElement('div');
+    card.className='ai-chat-confirm';
+    card.id=actionId;
+    card.innerHTML=_buildConfirmHTML(action,actionId);
+    msgsEl.appendChild(card);
+  }
+  msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+function _buildConfirmHTML(action,actionId){
+  var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var desc='';
+  if(action.tipo==='promesa')
+    desc='📅 <b>'+esc(action.cliente)+'</b> prometió pagar el <b>'+esc(action.fecha)+'</b>';
+  else if(action.tipo==='pago')
+    desc='✅ Marcar como pagado: <b>'+esc(action.cliente)+'</b>';
+  else if(action.tipo==='nota')
+    desc='📝 Nota para <b>'+esc(action.cliente)+'</b>: '+esc(action.nota);
+  return '<div class="ai-chat-confirm-desc">'+desc+'</div>'
+    +'<div class="ai-chat-confirm-btns">'
+    +'<button class="ai-confirm-si" onclick="executeChatAction(\''+actionId+'\')">✓ Sí, confirmar</button>'
+    +'<button class="ai-confirm-no" onclick="cancelChatAction(\''+actionId+'\')">✕ No</button>'
+    +'</div>';
+}
+
+async function executeChatAction(actionId){
+  var action=_PENDING_ACTIONS[actionId];if(!action)return;
+  delete _PENDING_ACTIONS[actionId];
+  var card=document.getElementById(actionId);if(card)card.remove();
+  var cliente=_findCliente(action.cliente||'');
+  if(!cliente){
+    _appendChatMsg('bot','⚠️ No encontré el cliente "'+String(action.cliente||'')+'" en la cartera. Verifica el nombre e intenta de nuevo.');
+    return;
+  }
+  var key=CURRENT+'::'+cliente.nombre;
+  if(action.tipo==='promesa'){
+    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'promesa',fecha:action.fecha||'',ts:new Date().toISOString()});
+    await dbSaveProm(CURRENT,cliente.nombre);
+    _appendChatMsg('bot','✅ Promesa registrada: '+cliente.nombre+' pagará el '+(action.fecha||'—')+'.');
+  }else if(action.tipo==='pago'){
+    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'pago',fecha:HOY.toISOString().split('T')[0],ts:new Date().toISOString()});
+    await dbSaveProm(CURRENT,cliente.nombre);
+    _appendChatMsg('bot','✅ '+cliente.nombre+' marcado como pagado.');
+  }else if(action.tipo==='nota'){
+    PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'nota',nota:action.nota||'',ts:new Date().toISOString()});
+    await dbSaveProm(CURRENT,cliente.nombre);
+    _appendChatMsg('bot','✅ Nota guardada para '+cliente.nombre+'.');
+  }
+  _CHAT_MSGS.push({role:'assistant',content:'Acción completada.'});
+  if(CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);
+}
+
+function cancelChatAction(actionId){
+  delete _PENDING_ACTIONS[actionId];
+  var card=document.getElementById(actionId);if(card)card.remove();
+  _appendChatMsg('bot','Entendido, no se registró nada. ¿En qué más te puedo ayudar?');
+  _CHAT_MSGS.push({role:'assistant',content:'No se registró ninguna acción.'});
 }
 // ══ fin bienvenida IA + burbuja ══
 
