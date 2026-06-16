@@ -5141,23 +5141,26 @@ async function _fetchClienteHistorial(cartId,nombre){
 function _buildHistorialContext(cliente,hist,prom){
   var fmtL=function(n){return Number(n||0).toLocaleString('es-HN');};
   var hoyStr=HOY.toISOString().split('T')[0];
+  var tramoDias={'MES':'al día','VENCIDO':'vencido este mes','60':'mora 60 días','90':'mora 90 días','120':'mora 120 días','150':'mora 150+ días','INACTIVO':'inactivo'};
+  var tramoDesc=tramoDias[cliente.tramo||'MES']||cliente.tramo||'?';
   var header='[HISTORIAL DE '+cliente.nombre+']\n'
-    +'Saldo: L '+fmtL(cliente.saldo)+' | Tramo: '+(cliente.tramo||'?')+' | Cuota mensual: L '+fmtL(cliente.cuota);
+    +'Saldo total: L '+fmtL(cliente.saldo)+' | Estado: '+tramoDesc+' | Cuota mensual: L '+fmtL(cliente.cuota)+' | Día de pago: '+(cliente.dia_pago||'?');
   if(prom&&prom.estado){
     var vencida=prom.estado==='promesa'&&prom.fecha&&prom.fecha<hoyStr;
-    header+='\nGestión actual: '+prom.estado+(prom.fecha?' — '+prom.fecha:'')+(prom.nota?' — '+prom.nota:'')+(vencida?' ⚠️ VENCIDA, NO PAGÓ':'');
-  }else{header+='\nGestión actual: Sin gestión registrada';}
-  if(!hist.length)return header+'\nSin historial previo de gestiones.\n\nAnaliza el perfil de este cliente con los datos disponibles y da una recomendación de acción.';
-  var cnt={promesa:0,pago:0,abono:0,nota:0,visita_agenda:0,visita_realizada:0};
+    header+='\nGestión actual: '+prom.estado+(prom.fecha?' — '+prom.fecha:'')+(prom.monto?' por L '+fmtL(prom.monto):'')+(prom.nota?' — '+prom.nota:'')+(vencida?' ⚠️ VENCIDA, NO PAGÓ':'');
+  }else{header+='\nGestión actual: Sin ninguna gestión registrada';}
+  if(!hist.length)return header+'\nSin historial previo de gestiones.\n\nCon estos datos informa: cuota (L '+fmtL(cliente.cuota)+'/mes), saldo (L '+fmtL(cliente.saldo)+'), estado ('+tramoDesc+'). Luego da una recomendación de acción concreta.';
+  var cnt={promesa:0,pago:0,abono:0,promesa_cumplida:0,promesa_incumplida:0,nota:0,visita_agenda:0,visita_realizada:0};
   var lines=hist.slice(0,25).map(function(h){
     var tipo=h.tipo||'nota';cnt[tipo]=(cnt[tipo]||0)+1;
     var fecha=(h.fecha_accion||h.created_at||'').substring(0,10);
     var desc=h.descripcion||h.nota||'';
-    return '- '+fecha+' | '+tipo+(desc?': '+desc:'');
+    var montoH=h.monto?(' L '+fmtL(h.monto)):'';
+    return '- '+fecha+' | '+tipo+montoH+(desc?' — '+desc:'');
   });
   header+='\n\nÚltimas gestiones ('+hist.length+' total):\n'+lines.join('\n');
-  header+='\n\nResumen: promesas='+cnt.promesa+' pagos='+cnt.pago+' abonos='+cnt.abono+' visitas_agendadas='+cnt.visita_agenda+' visitas_realizadas='+cnt.visita_realizada;
-  header+='\n\nAnaliza el patrón de comportamiento de este cliente y entrega: (1) veredicto del perfil, (2) acción concreta recomendada. Máximo 4 oraciones.';
+  header+='\n\nResumen: promesas_hechas='+cnt.promesa+' promesas_cumplidas='+cnt.promesa_cumplida+' promesas_incumplidas='+cnt.promesa_incumplida+' pagos='+cnt.pago+' abonos='+cnt.abono+' visitas_agendadas='+cnt.visita_agenda+' visitas_realizadas='+cnt.visita_realizada;
+  header+='\n\nCon estos datos responde: (1) cuota mensual y saldo total, (2) veredicto del perfil de pago ("cumple promesas", "promete y no paga", "no contesta", etc.), (3) acción concreta recomendada hoy. Máximo 4 oraciones.';
   return header;
 }
 
