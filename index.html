@@ -436,6 +436,7 @@ tr:hover td{background:#f5f8ff}
   <h1 style="font-size:24px;font-weight:300;margin-bottom:4px">Cartera <strong style="font-weight:600;color:var(--green)">La Roca</strong></h1>
   <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Subi el PDF del dia para actualizar la cartera. Las promesas se conservan siempre.</p>
   <div id="role-note" class="role-note" style="background: var(--greenbg); color: var(--green); border: 1px solid rgba(26, 122, 60, 0.2); border-radius: 5px; padding: 9px 13px; font-family: var(--mono); font-size: 11px; margin-bottom: 16px;">Administrador - acceso completo. Sube PDFs y gestiona carteras.</div>
+  <div id="gerente-panel" style="display:none;margin-bottom:20px"></div>
   <div class="drop-zone" id="drop-zone" onclick="dropClick()">
     <span style="font-size:28px;margin-bottom:8px;display:block">📄</span>
     <p style="font-size:14px;font-weight:500;margin-bottom:3px" id="drop-lbl">Arrastra el PDF aqui o haz clic</p>
@@ -985,6 +986,142 @@ function getCanonicalId(empresa){
   return empresa.replace(/[\s\/()#]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').toUpperCase();
 }
 
+// ══ GERENTE HOME PANEL ══
+function _renderGerentePanel(){
+  var panel=document.getElementById('gerente-panel');
+  if(!panel)return;
+  var ids=Object.keys(CARTERAS);
+  if(!ids.length){panel.style.display='none';return;}
+  panel.style.display='';
+  HOY=new Date();HOY.setHours(0,0,0,0);
+  var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
+  var hoyStr=HOY.toISOString().split('T')[0];
+  var lastDay=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
+
+  // ── Agregados globales ──
+  var totClientes=0,totPagaron=0,totMora60=0,totMora120=0,totVencidos=0;
+  var metaGlobal=0,cobradoGlobal=0;
+  var cartStats=[];
+
+  ids.forEach(function(id){
+    var c=CARTERAS[id];if(!c||!c.clientes)return;
+    var cl=c.clientes;
+    var activos=cl.filter(function(x){return x.tramo!=='INACTIVO';});
+    var pagaron=0,vencidos=0,mora60=0,mora90=0,mora120=0,mora150=0,nProm=0;
+    activos.forEach(function(x){
+      var p=PROMESAS[id+'::'+x.nombre];
+      var pagoM=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+      var pago=(pagoEsteMes(x.ultimo_pago)||pagoM)&&!(p&&p.mora_pendiente);
+      if(pago){pagaron++;cobradoGlobal+=(x.cuota||0);return;}
+      metaGlobal+=(x.cuota||0);
+      if(x.tramo==='VENCIDO')vencidos++;
+      else if(x.tramo==='60')mora60++;
+      else if(x.tramo==='90')mora90++;
+      else if(x.tramo==='120')mora120++;
+      else if(x.tramo==='150')mora150++;
+      if(p&&p.estado==='promesa')nProm++;
+    });
+    totClientes+=activos.length;totPagaron+=pagaron;
+    totVencidos+=vencidos;totMora60+=mora60+mora90;totMora120+=mora120+mora150;
+    var nMora=mora60+mora90+mora120+mora150;
+    var score=activos.length>0?Math.max(0,Math.round(100-(nMora/activos.length*55)-(vencidos/activos.length*35))):100;
+    cartStats.push({id:id,nombre:c.empresa,activos:activos.length,pagaron:pagaron,score:score,mora120:mora120+mora150,vencidos:vencidos,nProm:nProm});
+  });
+  var metaTotal=metaGlobal+cobradoGlobal;
+  var pctMeta=metaTotal>0?Math.round(cobradoGlobal/metaTotal*100):0;
+
+  // ── Proyección global hasta fin de mes ──
+  function semDia(d){return d<=7?1:d<=14?2:d<=21?3:d<=28?4:5;}
+  var semanas={};
+  ids.forEach(function(id){
+    var c=CARTERAS[id];if(!c)return;
+    Object.keys(PROMESAS).forEach(function(key){
+      if(!key.startsWith(id+'::'))return;
+      var p=PROMESAS[key];
+      if(p.estado!=='promesa'||!p.fecha||p.fecha.substring(0,7)!==mesActualStr)return;
+      var nombre=key.substring(id.length+2);
+      var d=parseInt(p.fecha.split('-')[2]);
+      var s=semDia(d);
+      if(!semanas[s])semanas[s]=[];
+      semanas[s].push({nombre:nombre,cartera:(c.empresa||id),fecha:p.fecha,monto:p.monto||0,vencida:p.fecha<hoyStr});
+    });
+  });
+  var totalProy=0,totalVencProm=0;
+  Object.keys(semanas).forEach(function(s){
+    semanas[s].forEach(function(p){
+      if(p.vencida)totalVencProm+=p.monto;else totalProy+=p.monto;
+    });
+  });
+  var semLabels={1:'Sem 1 · 1-7',2:'Sem 2 · 8-14',3:'Sem 3 · 15-21',4:'Sem 4 · 22-28',5:'Sem 5 · 29-'+lastDay};
+  var todaySem=semDia(HOY.getDate());
+
+  // ── HTML ──
+  var h='';
+
+  // KPIs globales
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px">'
+    +'<div style="background:var(--greenbg);border:1px solid rgba(26,122,60,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green)">'+totPagaron+'</div><div style="font-size:10px;color:var(--text3)">Pagaron este mes</div></div>'
+    +'<div style="background:var(--bluebg);border:1px solid rgba(26,85,160,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--blue)">'+pctMeta+'%</div><div style="font-size:10px;color:var(--text3)">Meta global</div></div>'
+    +'<div style="background:var(--orangebg);border:1px solid rgba(200,100,0,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--orange)">'+totVencidos+'</div><div style="font-size:10px;color:var(--text3)">Vencidos hoy</div></div>'
+    +'<div style="background:var(--redbg);border:1px solid rgba(176,16,32,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--red)">'+totMora120+'</div><div style="font-size:10px;color:var(--text3)">Mora 120d+</div></div>'
+    +'<div style="background:var(--purplebg);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--purple)">L '+fmt(totalProy)+'</div><div style="font-size:10px;color:var(--text3)">Prometido</div></div>'
+    +'</div>';
+
+  // Proyección semana por semana
+  h+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2)">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px">📅 PENDIENTE POR COBRAR — HOY AL '+lastDay+' DE '+HOY.toLocaleString('es-HN',{month:'long'}).toUpperCase()+' (todas las carteras)</div>';
+
+  var semKeys=Object.keys(semanas).map(Number).sort();
+  if(!semKeys.length){
+    h+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono)">Sin promesas activas registradas.</div>';
+  }else{
+    semKeys.forEach(function(s){
+      var list=semanas[s].sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+      var semTotal=list.reduce(function(a,p){return a+p.monto;},0);
+      var isPast=s<todaySem,isCurrent=s===todaySem;
+      var col=isPast?'var(--text3)':isCurrent?'var(--green)':'var(--blue)';
+      var bg=isPast?'var(--bg3)':isCurrent?'var(--greenbg)':'var(--bluebg)';
+      h+='<div style="border-left:3px solid '+col+';background:'+bg+';border-radius:5px;padding:7px 10px;margin-bottom:6px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        +'<span style="font-size:11px;font-weight:700;color:'+col+'">'+semLabels[s]+(isCurrent?' ← esta semana':'')+'</span>'
+        +'<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:'+col+'">L '+fmt(semTotal)+'</span>'
+        +'</div>';
+      list.forEach(function(p){
+        var parts=p.fecha.split('-');var dayFmt=parts[2]+'/'+parts[1];
+        h+='<div style="font-size:11px;color:var(--text2);display:flex;justify-content:space-between;padding:1px 0;border-bottom:1px solid rgba(0,0,0,.04)">'
+          +'<span'+(p.vencida?' style="color:var(--red)"':'')+'>'+esc2(p.nombre)+' <span style="color:var(--text3);font-size:10px">· '+esc2(p.cartera)+'</span>'+(p.vencida?' ⚠️ vencida':'')+'</span>'
+          +'<span style="font-family:var(--mono);color:var(--text3);font-size:10px;white-space:nowrap">'+dayFmt+' · L '+fmt(p.monto)+'</span>'
+          +'</div>';
+      });
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+
+  // Estado por cartera (tarjetas compactas)
+  h+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:8px">🗂️ ESTADO POR CARTERA</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:8px">';
+  cartStats.sort(function(a,b){return a.score-b.score;}).forEach(function(c){
+    var pct=c.activos>0?Math.round(c.pagaron/c.activos*100):0;
+    var scoreCol=c.score>=70?'var(--green)':c.score>=45?'var(--orange)':'var(--red)';
+    h+='<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg2);cursor:pointer" onclick="openCartera(\''+c.id+'\')">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'
+      +'<span style="font-size:12px;font-weight:600;color:var(--text)">'+esc2(c.nombre)+'</span>'
+      +'<span style="font-family:var(--mono);font-size:13px;font-weight:700;color:'+scoreCol+'">'+c.score+'</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:10px;font-family:var(--mono);font-size:10px;color:var(--text3)">'
+      +'<span style="color:var(--green)">✓ '+c.pagaron+' ('+pct+'%)</span>'
+      +'<span style="color:var(--orange)">⚡ '+c.vencidos+' venc</span>'
+      +'<span style="color:var(--red)">🔴 '+c.mora120+' 120d+</span>'
+      +'<span style="color:var(--purple)">📋 '+c.nProm+'</span>'
+      +'</div>'
+      +'</div>';
+  });
+  h+='</div>';
+
+  panel.innerHTML=h;
+}
+
 // ══ HOME ══
 function renderHome(){
   document.getElementById('dash-zone').style.display='none';
@@ -995,6 +1132,8 @@ function renderHome(){
   if(USER&&USER.rol==='admin'){rn.style.cssText='background:var(--greenbg);color:var(--green);border:1px solid rgba(26,122,60,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent='Administrador - acceso completo. Sube PDFs y gestiona carteras.';}
   else if(USER&&USER.rol==='gerente'){rn.style.cssText='background:var(--purplebg,#f3e8ff);color:var(--purple,#7c3aed);border:1px solid rgba(124,58,237,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent='Gerente — Vista global y análisis IA';}
   else{rn.style.cssText='background:var(--bluebg);color:var(--blue);border:1px solid rgba(26,85,160,.2);border-radius:5px;padding:9px 13px;font-family:var(--mono);font-size:11px;margin-bottom:16px';rn.textContent=(USER?USER.nombre:'') + ' - Registra promesas y visitas en tu cartera';}
+  if(USER&&USER.rol==='gerente') _renderGerentePanel();
+  else {var gp=document.getElementById('gerente-panel');if(gp)gp.style.display='none';}
   var dz=document.getElementById('drop-zone');
   dz.className='drop-zone'+(canUpload()?'':' disabled');
   document.getElementById('drop-lbl').textContent=canUpload()?'Arrastra el PDF aqui o haz clic':'Solo el admin puede subir PDFs';
