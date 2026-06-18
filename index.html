@@ -987,7 +987,7 @@ function getCanonicalId(empresa){
 }
 
 // ══ GERENTE HOME PANEL ══
-function _renderGerentePanel(){
+async function _renderGerentePanel(){
   var panel=document.getElementById('gerente-panel');
   if(!panel)return;
   var ids=Object.keys(CARTERAS);
@@ -997,6 +997,12 @@ function _renderGerentePanel(){
   var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
   var hoyStr=HOY.toISOString().split('T')[0];
   var lastDay=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
+
+  // Cargar proyecciones de todos los asesores
+  if(supa){
+    var rp=await supa.from('proyecciones').select('*');
+    if(!rp.error)(rp.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
+  }
 
   // ── Agregados globales ──
   var totClientes=0,totPagaron=0,totMora60=0,totMora120=0,totVencidos=0;
@@ -1029,6 +1035,29 @@ function _renderGerentePanel(){
   });
   var metaTotal=metaGlobal+cobradoGlobal;
   var pctMeta=metaTotal>0?Math.round(cobradoGlobal/metaTotal*100):0;
+
+  // ── Proyección sistema vs gestores por cartera ──
+  var proyGlobal=[];var totSisGlobal=0,totGesGlobal=0;
+  ids.forEach(function(id){
+    var c=CARTERAS[id];if(!c||!c.clientes)return;
+    var totalSis=0,totalGes=0,nEditados=0,nPendientes=0;
+    c.clientes.forEach(function(x){
+      if(x.tramo==='INACTIVO')return;
+      var p=PROMESAS[id+'::'+x.nombre];
+      var pagoM=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+      var pagado=(pagoEsteMes(x.ultimo_pago)||pagoM)&&!(p&&p.mora_pendiente);
+      if(pagado)return;
+      nPendientes++;
+      var best=null;
+      Object.keys(PROYECCIONES).forEach(function(k){if(k.startsWith(id+'::'+x.nombre+'::')){ var cand=PROYECCIONES[k];if(!best||(cand.updated_at||'')>(best.updated_at||''))best=cand;}});
+      var montoExp=best&&best.monto_proyectado?best.monto_proyectado:(p&&p.monto?p.monto:null);
+      if(montoExp)nEditados++;
+      totalSis+=x.cuota||0;
+      totalGes+=montoExp||x.cuota||0;
+    });
+    totSisGlobal+=totalSis;totGesGlobal+=totalGes;
+    proyGlobal.push({id:id,nombre:c.empresa,totalSis:totalSis,totalGes:totalGes,nEditados:nEditados,nPendientes:nPendientes});
+  });
 
   // ── Proyección global hasta fin de mes ──
   function semDia(d){return d<=7?1:d<=14?2:d<=21?3:d<=28?4:5;}
@@ -1066,6 +1095,60 @@ function _renderGerentePanel(){
     +'<div style="background:var(--redbg);border:1px solid rgba(176,16,32,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--red)">'+totMora120+'</div><div style="font-size:10px;color:var(--text3)">Mora 120d+</div></div>'
     +'<div style="background:var(--purplebg);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px 12px;text-align:center"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--purple)">L '+fmt(totalProy)+'</div><div style="font-size:10px;color:var(--text3)">Prometido</div></div>'
     +'</div>';
+
+  // Bloque sistema vs gestores
+  var diffGlobal=totGesGlobal-totSisGlobal;
+  h+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2)">';
+  h+='<div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px">📊 PROYECCION PENDIENTE — SISTEMA vs ASESORES</div>';
+  // Totales globales
+  h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  h+='<div style="flex:1;min-width:130px;border-left:3px solid var(--blue);background:var(--bluebg);border-radius:6px;padding:8px 12px">';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase">Total sistema</div>';
+  h+='<div style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--blue)">L '+fmt(totSisGlobal)+'</div>';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3)">suma de cuotas pendientes</div>';
+  h+='</div>';
+  h+='<div style="flex:1;min-width:130px;border-left:3px solid var(--green);background:var(--greenbg);border-radius:6px;padding:8px 12px">';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase">Segun asesores</div>';
+  h+='<div style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--green)">L '+fmt(totGesGlobal)+'</div>';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3)">'+(diffGlobal>=0?'▲ L '+fmt(Math.abs(diffGlobal))+' sobre sistema':'▼ L '+fmt(Math.abs(diffGlobal))+' bajo sistema')+'</div>';
+  h+='</div>';
+  h+='</div>';
+  // Tabla por cartera
+  h+='<table style="width:100%;border-collapse:collapse;font-size:11px">';
+  h+='<thead><tr style="border-bottom:1px solid var(--border)">';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:left;padding:4px 6px;text-transform:uppercase">Cartera</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Pendientes</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Sistema</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Asesores</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Diferencia</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:center;padding:4px 6px;text-transform:uppercase">Editados</th>';
+  h+='</tr></thead><tbody>';
+  proyGlobal.sort(function(a,b){return b.totalSis-a.totalSis;}).forEach(function(r){
+    var diff=r.totalGes-r.totalSis;
+    var diffCol=diff>0?'var(--green)':diff<0?'var(--red)':'var(--text3)';
+    var diffStr=(diff>0?'▲ ':'diff<0?▼ ':'')+'L '+fmt(Math.abs(diff));
+    // fix the ternary properly
+    var diffLabel=diff>0?'▲ L '+fmt(diff):diff<0?'▼ L '+fmt(Math.abs(diff)):'=';
+    var pctEdit=r.nPendientes>0?Math.round(r.nEditados/r.nPendientes*100):0;
+    h+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openCartera(\''+esc(r.id)+'\')">';
+    h+='<td style="padding:5px 6px;font-weight:600;color:var(--text)">'+esc2(r.nombre)+'</td>';
+    h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text3)">'+r.nPendientes+'</td>';
+    h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--blue);font-weight:600">L '+fmt(r.totalSis)+'</td>';
+    h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--green);font-weight:600">L '+fmt(r.totalGes)+'</td>';
+    h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:'+diffCol+';font-weight:600">'+diffLabel+'</td>';
+    h+='<td style="padding:5px 6px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3)">'+r.nEditados+'/'+r.nPendientes+' ('+pctEdit+'%)</td>';
+    h+='</tr>';
+  });
+  // Fila total
+  var diffT=totGesGlobal-totSisGlobal;
+  h+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border)">';
+  h+='<td colspan="2" style="padding:6px 6px;font-family:var(--mono);font-size:11px;color:var(--text3)">TOTAL GLOBAL</td>';
+  h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--blue)">L '+fmt(totSisGlobal)+'</td>';
+  h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--green)">L '+fmt(totGesGlobal)+'</td>';
+  h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:'+(diffT>=0?'var(--green)':'var(--red)')+'">'+( diffT>0?'▲ L '+fmt(diffT):diffT<0?'▼ L '+fmt(Math.abs(diffT)):'=')+'</td>';
+  h+='<td></td></tr>';
+  h+='</tbody></table>';
+  h+='</div>';
 
   // Proyección semana por semana
   h+='<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--bg2)">'
