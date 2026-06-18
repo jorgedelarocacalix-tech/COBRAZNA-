@@ -1128,8 +1128,6 @@ async function _renderGerentePanel(){
   proyGlobal.sort(function(a,b){return b.totalSis-a.totalSis;}).forEach(function(r){
     var diff=r.totalGes-r.totalSis;
     var diffCol=diff>0?'var(--green)':diff<0?'var(--red)':'var(--text3)';
-    var diffStr=(diff>0?'▲ ':'diff<0?▼ ':'')+'L '+fmt(Math.abs(diff));
-    // fix the ternary properly
     var diffLabel=diff>0?'▲ L '+fmt(diff):diff<0?'▼ L '+fmt(Math.abs(diff)):'=';
     var pctEdit=r.nPendientes>0?Math.round(r.nEditados/r.nPendientes*100):0;
     h+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="openCartera(\''+esc(r.id)+'\')">';
