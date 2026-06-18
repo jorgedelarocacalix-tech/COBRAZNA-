@@ -4567,6 +4567,7 @@ document.getElementById('modal-alerta').addEventListener('click',function(e){if(
 // ══════════════════════════════════════════════════════
 var PROYECCIONES={};      // key: cartId+'::'+nombre+'::'+semanaInicio
 var _PROY_ITEMS=[];       // lista plana del render actual (para ver notas por index)
+var _PROY_VIEW='semana';  // 'semana' | 'mes' | 'mora'
 
 function _getLunes(offset){
   var d=new Date(HOY);var dow=d.getDay();var diff=dow===0?-6:1-dow;
@@ -4616,6 +4617,11 @@ function _navProy(cartId,delta){
   pane._proySemOffset=(pane._proySemOffset||0)+delta;
   _renderProyTab(cartId,pane,pane._proySemOffset);
 }
+function _setProyView(cartId,view){
+  _PROY_VIEW=view;
+  var pane=document.getElementById('tp-PROYECCION');if(!pane)return;
+  _renderProyTab(cartId,pane,pane._proySemOffset||0);
+}
 function _renderProyTab(cartId,container,weekOff){
   container._proySemOffset=weekOff;
   HOY=new Date();HOY.setHours(0,0,0,0);
@@ -4626,6 +4632,12 @@ function _renderProyTab(cartId,container,weekOff){
   var cl=data.clientes;
   var mesActualStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
   _PROY_ITEMS=[];
+  var _escCart=esc(cartId);
+  var _subNav='<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:2px solid var(--border);padding-bottom:12px">';
+  [['semana','📅 Semanal'],['mes','📆 Cobros del Mes'],['mora','🔴 Mora / Riesgo']].forEach(function(vl){var act=_PROY_VIEW===vl[0];_subNav+='<button onclick="_setProyView(\''+_escCart+'\',\''+vl[0]+'\')" style="padding:5px 16px;border-radius:20px;border:1px solid '+(act?'var(--blue)':'var(--border)')+';background:'+(act?'var(--blue)':'transparent')+';color:'+(act?'#fff':'var(--text)')+';font-size:11px;font-family:var(--mono);font-weight:700;cursor:pointer;transition:all .15s">'+vl[1]+'</button>';});
+  _subNav+='</div>';
+  if(_PROY_VIEW==='mes'){container.innerHTML=_subNav+_buildMesView(cartId,cl,mesActualStr);return;}
+  if(_PROY_VIEW==='mora'){container.innerHTML=_subNav+_buildMoraView(cartId,cl,mesActualStr);return;}
   var enSemana=[],fuera=[],pagaron=[];
 
   cl.forEach(function(c){
@@ -4682,6 +4694,8 @@ function _renderProyTab(cartId,container,weekOff){
   var totalVencidos=fueraVencidos.reduce(function(s,it){return s+(it.montoProy||it.c.cuota||0);},0);
   var totalPagado=pagaron.reduce(function(s,it){return s+(it.p&&it.p.monto?it.p.monto:it.c.cuota||0);},0);
   var totalProy=totalPromesa+totalOtros;
+  // Solo montos que el gestor ingresó explícitamente en el cuadro
+  var totalGestor=semConProm.concat(semOtros).concat(semIncump).reduce(function(s,it){return s+(it.proy&&it.proy.monto_proyectado?it.proy.monto_proyectado:0);},0);
   // Para grafica: todos los que tienen fecha esta semana
   var enSemanaGraf=semConProm.concat(semOtros).concat(semIncump);
 
@@ -4736,6 +4750,7 @@ function _renderProyTab(cartId,container,weekOff){
   if(semIncump.length)html+='<div class="kpi-card" style="border-left:2px solid var(--red)"><div class="kpi-l">Incumplidas</div><div class="kpi-v" style="color:var(--red)">'+semIncump.length+'</div><div class="kpi-s">L '+fmt(totalIncump)+'</div></div>';
   html+='<div class="kpi-card"><div class="kpi-l">Vencidos s/p</div><div class="kpi-v" style="color:var(--orange)">'+fueraVencidos.length+'</div><div class="kpi-s">sin promesa</div></div>';
   html+='<div class="kpi-card"><div class="kpi-l">Pagaron</div><div class="kpi-v" style="color:var(--green)">'+pagaron.length+'</div><div class="kpi-s">L '+fmt(totalPagado)+'</div></div>';
+  if(totalGestor>0)html+='<div class="kpi-card" style="border-left:2px solid var(--green);background:var(--greenbg,rgba(26,122,60,.06))"><div class="kpi-l" style="color:var(--green)">Segun gestor</div><div class="kpi-v" style="color:var(--green);font-size:18px">L '+fmt(totalGestor)+'</div><div class="kpi-s" style="color:var(--green)">montos ingresados</div></div>';
   html+='</div>';
 
   // ── Tabla ──
@@ -4799,7 +4814,7 @@ function _renderProyTab(cartId,container,weekOff){
         if(c.ultimo_pago)pagoR+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3)">'+c.ultimo_pago+'</div>';
         h+='<td style="text-align:right;font-family:var(--mono);font-size:11px">'+prom+'</td>';
         h+='<td style="text-align:right">'+pagoR+'</td>';
-        h+='<td><input type="text" class="proy-inp" style="width:140px" value="'+esc2(it.comentario)+'" placeholder="comentario..." onblur="onProySave(\''+escCart+'\',\''+cN+'\',\''+esc(curSem)+'\',\'comentario\',this.value)"></td>';
+        h+='<td><input type="text" class="proy-inp" style="width:140px" value="'+esc2(it.comentario)+'" placeholder="comentario..." onblur="onProySave(\''+escCart+'\',\''+cN+'\',\''+esc(curSem)+'\',\'comentario\',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();onProyComentarioEnter(\''+escCart+'\',\''+cN+'\','+idx+',this.value,this);}"></td>';
         h+='<td><button class="add-p" style="font-size:10px" onclick="openAccion(\''+escCart+'\',\''+cN+'\','+c.cuota+','+c.saldo+')">+ accion</button></td>';
       } else {
         total+=(it.montoProy||c.cuota||0);
@@ -4814,7 +4829,7 @@ function _renderProyTab(cartId,container,weekOff){
         // Monto
         h+='<td style="text-align:right"><input type="number" class="proy-inp" style="width:85px;text-align:right" value="'+esc2(String(it.montoProy||''))+'" placeholder="'+fmt(c.cuota)+'" onblur="onProyMontoSave(\''+escCart+'\',\''+cN+'\','+idx+',this.value)"></td>';
         // Comentario
-        h+='<td><input type="text" class="proy-inp" style="width:160px" value="'+esc2(it.comentario)+'" placeholder="comentario..." onblur="onProySave(\''+escCart+'\',\''+cN+'\',\''+esc(curSem)+'\',\'comentario\',this.value)"></td>';
+        h+='<td><input type="text" class="proy-inp" style="width:160px" value="'+esc2(it.comentario)+'" placeholder="comentario..." onblur="onProySave(\''+escCart+'\',\''+cN+'\',\''+esc(curSem)+'\',\'comentario\',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();onProyComentarioEnter(\''+escCart+'\',\''+cN+'\','+idx+',this.value,this);}"></td>';
         // Notas
         h+='<td><button class="add-p" style="font-size:10px;white-space:nowrap" onclick="verNotasProy('+idx+',this)">Ver notas</button></td>';
       }
@@ -4867,7 +4882,126 @@ function _renderProyTab(cartId,container,weekOff){
   if(pagaron.length){
     html+='<div class="sec-card" style="margin-bottom:12px;border-left:3px solid var(--green)"><div class="sec-title" style="color:var(--green)">Pagaron este mes ('+pagaron.length+') &middot; L '+fmt(totalPagado)+'</div>'+buildRows(pagaron,true)+'</div>';
   }
-  container.innerHTML=html;
+  container.innerHTML=_subNav+html;
+}
+
+function _getBestProy(cartId,nombre){
+  var best=null;
+  Object.keys(PROYECCIONES).forEach(function(k){if(k.startsWith(cartId+'::'+nombre+'::')){ var c=PROYECCIONES[k];if(!best||(c.updated_at||'')>(best.updated_at||''))best=c;}});
+  return best;
+}
+function _buildMesView(cartId,cl,mesActualStr){
+  var hoyStr=_d2s(HOY);
+  var y=HOY.getFullYear(),m=HOY.getMonth();
+  var finMesStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(new Date(y,m+1,0).getDate()).padStart(2,'0');
+  var items=[],totalSistema=0,totalGestor=0;
+  cl.forEach(function(c){
+    if(c.tramo==='INACTIVO')return;
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+    var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
+    if(pagado)return;
+    var bp=_getBestProy(cartId,c.nombre);
+    var fechaGestor=bp&&bp.fecha_proyectada?bp.fecha_proyectada:null;
+    var fechaPromesa=p&&p.estado==='promesa'&&p.fecha?p.fecha:null;
+    var fechaSistema=c.dia_pago?_diaToFecha(c.dia_pago):null;
+    var fechaEfectiva=fechaGestor||fechaPromesa||fechaSistema;
+    if(!fechaEfectiva||fechaEfectiva<hoyStr||fechaEfectiva>finMesStr)return;
+    var montoProy=bp&&bp.monto_proyectado?bp.monto_proyectado:(p&&p.monto?p.monto:null);
+    items.push({c:c,p:p,proy:bp,fechaEfectiva:fechaEfectiva,fechaSistema:fechaSistema,fechaGestor:fechaGestor,fechaPromesa:fechaPromesa,montoProy:montoProy});
+    totalSistema+=c.cuota||0;
+    if(montoProy)totalGestor+=montoProy;
+  });
+  items.sort(function(a,b){return a.fechaEfectiva.localeCompare(b.fechaEfectiva);});
+  var h='';
+  h+='<div class="kpi-row" style="margin-bottom:14px">';
+  h+='<div class="kpi-card"><div class="kpi-l">Por cobrar</div><div class="kpi-v" style="color:var(--blue)">'+items.length+'</div><div class="kpi-s">de hoy a fin de mes</div></div>';
+  h+='<div class="kpi-card"><div class="kpi-l">Total sistema</div><div class="kpi-v" style="color:var(--purple);font-size:18px">L '+fmt(totalSistema)+'</div><div class="kpi-s">suma de cuotas</div></div>';
+  if(totalGestor>0)h+='<div class="kpi-card" style="border-left:2px solid var(--green);background:var(--greenbg,rgba(26,122,60,.06))"><div class="kpi-l" style="color:var(--green)">Total gestor</div><div class="kpi-v" style="color:var(--green);font-size:18px">L '+fmt(totalGestor)+'</div><div class="kpi-s" style="color:var(--green)">montos ingresados</div></div>';
+  h+='</div>';
+  if(!items.length){h+='<div style="font-family:var(--mono);font-size:12px;color:var(--text3);padding:20px 0;text-align:center">No hay clientes con fecha de cobro de hoy a fin de mes.</div>';return h;}
+  h+='<div style="overflow-x:auto"><table class="proy-tbl"><thead><tr>';
+  h+='<th style="min-width:170px">Cliente</th>';
+  h+='<th style="text-align:center">Dia sistema</th>';
+  h+='<th style="text-align:center">Fecha gestor</th>';
+  h+='<th style="text-align:right">Cuota (sistema)</th>';
+  h+='<th style="text-align:right">Monto gestor</th>';
+  h+='<th>Estado</th>';
+  h+='</tr></thead><tbody>';
+  items.forEach(function(it){
+    var c=it.c,p=it.p;
+    var esPromesa=p&&p.estado==='promesa';
+    var estadoBadge=esPromesa?'<span style="font-family:var(--mono);font-size:9px;background:var(--bluebg);color:var(--blue);border:1px solid rgba(26,85,160,.25);padding:1px 5px;border-radius:3px">📅 Promesa '+p.fecha+'</span>':'<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">Sin acuerdo</span>';
+    var fechaGestorCell=it.fechaGestor?'<span style="font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600">'+it.fechaGestor.substring(8)+' '+_diaN(_s2d(it.fechaGestor))+'</span>':'<span style="color:var(--text3)">--</span>';
+    var montoGestorCell=it.montoProy?'<span style="font-family:var(--mono);font-size:12px;color:var(--green);font-weight:700">L '+fmt(it.montoProy)+'</span>':'<span style="color:var(--text3)">--</span>';
+    var rowBg=esPromesa?'background:var(--bluebg)':'';
+    h+='<tr style="'+rowBg+'">';
+    h+='<td><div style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</div></td>';
+    h+='<td style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--text2)">'+( it.fechaSistema?it.fechaSistema.substring(8)+'&nbsp;'+_diaN(_s2d(it.fechaSistema)):'--')+'</td>';
+    h+='<td style="text-align:center">'+fechaGestorCell+'</td>';
+    h+='<td style="text-align:right;font-family:var(--mono);font-size:11px">L '+fmt(c.cuota)+'</td>';
+    h+='<td style="text-align:right">'+montoGestorCell+'</td>';
+    h+='<td>'+estadoBadge+'</td>';
+    h+='</tr>';
+  });
+  h+='<tr style="background:var(--bg3);font-weight:700">';
+  h+='<td colspan="3" style="font-family:var(--mono);font-size:11px;padding:7px 8px;color:var(--text3)">TOTAL</td>';
+  h+='<td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--purple);padding:7px 8px">L '+fmt(totalSistema)+'</td>';
+  h+='<td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--green);padding:7px 8px">'+(totalGestor>0?'L '+fmt(totalGestor):'--')+'</td>';
+  h+='<td></td></tr>';
+  h+='</tbody></table></div>';
+  return h;
+}
+function _buildMoraView(cartId,cl,mesActualStr){
+  var sinAcuerdo=[],pagaronConMora=[];
+  cl.forEach(function(c){
+    if(c.tramo==='INACTIVO')return;
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+    var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
+    var mora=calcMora(c.ultimo_pago,c.dia_pago,c.sin_pago,c.fecha_factura);
+    var enMora=mora&&mora.tramo&&mora.tramo!=='MES';
+    if(!enMora)return;
+    if(pagado){pagaronConMora.push({c:c,p:p,mora:mora});return;}
+    var tieneAcuerdo=p&&(p.estado==='promesa'||p.estado==='pago'||p.estado==='negociacion');
+    var bp=_getBestProy(cartId,c.nombre);
+    var tieneMonto=bp&&bp.monto_proyectado;
+    if(!tieneAcuerdo&&!tieneMonto)sinAcuerdo.push({c:c,p:p,mora:mora,proy:bp});
+  });
+  sinAcuerdo.sort(function(a,b){return (b.mora.dias||0)-(a.mora.dias||0);});
+  pagaronConMora.sort(function(a,b){return (b.mora.dias||0)-(a.mora.dias||0);});
+  var totalSA=sinAcuerdo.reduce(function(s,it){return s+(it.c.cuota||0);},0);
+  var totalPM=pagaronConMora.reduce(function(s,it){return s+(it.c.saldo||0);},0);
+  var h='';
+  h+='<div class="kpi-row" style="margin-bottom:14px">';
+  h+='<div class="kpi-card" style="border-left:2px solid var(--orange)"><div class="kpi-l" style="color:var(--orange)">Sin acuerdo</div><div class="kpi-v" style="color:var(--orange)">'+sinAcuerdo.length+'</div><div class="kpi-s">L '+fmt(totalSA)+' en riesgo</div></div>';
+  h+='<div class="kpi-card" style="border-left:2px solid var(--purple)"><div class="kpi-l" style="color:var(--purple)">Pagaron con mora</div><div class="kpi-v" style="color:var(--purple)">'+pagaronConMora.length+'</div><div class="kpi-s">L '+fmt(totalPM)+' saldo pendiente</div></div>';
+  h+='</div>';
+  function buildMoraTable(items,title,color,nota){
+    if(!items.length)return '<div style="font-family:var(--mono);font-size:11px;color:var(--text3);padding:6px 0;margin-bottom:12px">'+nota+' — ninguno en esta categoria.</div>';
+    var h2='<div class="sec-card" style="margin-bottom:14px;border-left:3px solid '+color+'">';
+    h2+='<div class="sec-title" style="color:'+color+'">'+title+' ('+items.length+')</div>';
+    h2+='<div style="overflow-x:auto"><table class="proy-tbl"><thead><tr>';
+    h2+='<th style="min-width:170px">Cliente</th><th style="text-align:right">Mora (dias)</th><th>Tramo</th><th style="text-align:right">Cuota</th><th style="text-align:right">Saldo total</th><th>Ultimo estado</th>';
+    h2+='</tr></thead><tbody>';
+    items.forEach(function(it){
+      var c=it.c,mora=it.mora,p=it.p;
+      var estadoStr=p&&p.estado?promBadge(p):'<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">Sin gestion</span>';
+      h2+='<tr>';
+      h2+='<td><div style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</div></td>';
+      h2+='<td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--red);font-weight:700">'+(mora.dias||'--')+'d</td>';
+      h2+='<td><span style="font-family:var(--mono);font-size:9px;background:var(--redbg);color:var(--red);padding:1px 5px;border-radius:3px">'+(mora.tramo||'--')+'</span></td>';
+      h2+='<td style="text-align:right;font-family:var(--mono);font-size:11px">L '+fmt(c.cuota)+'</td>';
+      h2+='<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--red)">L '+fmt(c.saldo)+'</td>';
+      h2+='<td>'+estadoStr+'</td>';
+      h2+='</tr>';
+    });
+    h2+='</tbody></table></div></div>';
+    return h2;
+  }
+  h+=buildMoraTable(sinAcuerdo,'En mora sin acuerdo — riesgo de no cobrar','var(--orange)','Sin mora sin acuerdo');
+  h+=buildMoraTable(pagaronConMora,'Pagaron la cuota — pero tienen mora global pendiente','var(--purple)','Sin pagaron con mora');
+  return h;
 }
 
 async function onProyDiaChange(cartId,nombre,dia,itemIdx){
@@ -4888,6 +5022,14 @@ async function onProyMontoSave(cartId,nombre,itemIdx,val){
 async function onProySave(cartId,nombre,semStr,field,value){
   var changes={};changes[field]=value||null;
   await saveProyeccion(cartId,nombre,semStr,changes);
+}
+async function onProyComentarioEnter(cartId,nombre,idx,value,el){
+  el.blur();
+  if(!value||!value.trim())return;
+  var it=_PROY_ITEMS[idx];
+  var semStr=it?(it.proySemStr||(it.fechaProy?_fechaToSemStr(it.fechaProy):_d2s(_getLunes(0)))):_d2s(_getLunes(0));
+  await saveProyeccion(cartId,nombre,semStr,{comentario:value});
+  await dbSaveHist({cartera_id:cartId,cliente_nombre:nombre,tipo:'nota',nota:'[Proyeccion] '+value.trim(),fecha_accion:_d2s(HOY),gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
 }
 async function verNotasProy(idx,btn){
   var it=_PROY_ITEMS[idx];if(!it)return;
