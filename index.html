@@ -4887,86 +4887,87 @@ function _renderProyTab(cartId,container,weekOff){
 }
 
 function _buildTodosView(cartId,cl,mesActualStr){
-  var items=[];
+  var escCart=esc(cartId);
   cl.forEach(function(c){
     if(c.tramo==='INACTIVO')return;
     var p=PROMESAS[cartId+'::'+c.nombre];
     var pagoManual=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
     var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
-    if(pagado)return; // solo pendientes
+    if(pagado)return;
     var mora=calcMora(c.ultimo_pago,c.dia_pago,c.sin_pago,c.fecha_factura);
     var bp=_getBestProy(cartId,c.nombre);
     var fechaGestor=bp&&bp.fecha_proyectada?bp.fecha_proyectada:null;
     var fechaPromesa=p&&p.estado==='promesa'&&p.fecha?p.fecha:null;
-    // monto gestor: lo ingresado explicitamente o promesa; si no, fallback a cuota
     var montoExplicito=bp&&bp.monto_proyectado?bp.monto_proyectado:(p&&p.monto?p.monto:null);
     var montoGestor=montoExplicito||c.cuota||0;
     var tieneEdicion=!!montoExplicito;
     var enMora=mora&&mora.tramo&&mora.tramo!=='MES';
-    items.push({c:c,p:p,proy:bp,mora:mora,enMora:enMora,fechaGestor:fechaGestor,fechaPromesa:fechaPromesa,montoGestor:montoGestor,tieneEdicion:tieneEdicion});
+    var proySemStr=bp?bp.semana_inicio:null;
+    _PROY_ITEMS.push({cartId:cartId,c:c,p:p,proy:bp,mora:mora,enMora:enMora,fechaGestor:fechaGestor,fechaPromesa:fechaPromesa,fechaProy:fechaGestor,montoGestor:montoGestor,montoProy:montoExplicito||null,tieneEdicion:tieneEdicion,proySemStr:proySemStr});
   });
+  var items=_PROY_ITEMS.slice(); // copia para ordenar sin romper indices
   items.sort(function(a,b){
     var ma=a.mora&&a.mora.dias||0,mb=b.mora&&b.mora.dias||0;
     if(mb!==ma)return mb-ma;
     return a.c.nombre.localeCompare(b.c.nombre);
   });
-  var totalSistema=items.reduce(function(s,it){return s+(it.c.cuota||0);},0);
-  var totalGestor=items.reduce(function(s,it){return s+it.montoGestor;},0);
-  var nMora=items.filter(function(it){return it.enMora;}).length;
-  var nPromesa=items.filter(function(it){return it.p&&it.p.estado==='promesa';}).length;
-  var nEditados=items.filter(function(it){return it.tieneEdicion;}).length;
+  var totalSistema=_PROY_ITEMS.reduce(function(s,it){return s+(it.c.cuota||0);},0);
+  var totalGestor=_PROY_ITEMS.reduce(function(s,it){return s+it.montoGestor;},0);
+  var nMora=_PROY_ITEMS.filter(function(it){return it.enMora;}).length;
+  var nPromesa=_PROY_ITEMS.filter(function(it){return it.p&&it.p.estado==='promesa';}).length;
+  var nEditados=_PROY_ITEMS.filter(function(it){return it.tieneEdicion;}).length;
   var h='';
-  // Totales destacados
-  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">';
-  h+='<div style="flex:1;min-width:180px;background:var(--bg2);border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:8px;padding:14px 18px">';
-  h+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total sistema (cuotas)</div>';
-  h+='<div style="font-family:var(--mono);font-size:22px;font-weight:800;color:var(--blue)">L '+fmt(totalSistema)+'</div>';
-  h+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px">'+items.length+' clientes pendientes</div>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
+  h+='<div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:6px;padding:8px 12px">';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Total sistema</div>';
+  h+='<div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--blue)">L '+fmt(totalSistema)+'</div>';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3)">'+_PROY_ITEMS.length+' pendientes</div>';
   h+='</div>';
-  h+='<div style="flex:1;min-width:180px;background:var(--bg2);border:1px solid var(--border);border-left:4px solid var(--green);border-radius:8px;padding:14px 18px">';
-  h+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total segun asesor</div>';
-  h+='<div style="font-family:var(--mono);font-size:22px;font-weight:800;color:var(--green)">L '+fmt(totalGestor)+'</div>';
-  h+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px">'+nEditados+' editados · '+(items.length-nEditados)+' usan cuota sistema</div>';
+  h+='<div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:6px;padding:8px 12px">';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Segun asesor</div>';
+  h+='<div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--green)">L '+fmt(totalGestor)+'</div>';
+  h+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3)">'+nEditados+' editados · '+(nMora>0?nMora+' en mora · ':'')+nPromesa+' con promesa</div>';
   h+='</div>';
-  h+='</div>';
-  // KPIs secundarios
-  h+='<div class="kpi-row" style="margin-bottom:14px">';
-  h+='<div class="kpi-card" style="border-left:2px solid var(--orange)"><div class="kpi-l">En mora</div><div class="kpi-v" style="color:var(--orange)">'+nMora+'</div><div class="kpi-s">sin pago este mes</div></div>';
-  h+='<div class="kpi-card" style="border-left:2px solid var(--purple)"><div class="kpi-l">Con promesa</div><div class="kpi-v" style="color:var(--purple)">'+nPromesa+'</div><div class="kpi-s">acuerdo activo</div></div>';
-  h+='<div class="kpi-card" style="border-left:2px solid var(--green)"><div class="kpi-l">Editados</div><div class="kpi-v" style="color:var(--green)">'+nEditados+'</div><div class="kpi-s">monto por asesor</div></div>';
   h+='</div>';
   h+='<div style="overflow-x:auto"><table class="proy-tbl"><thead><tr>';
-  h+='<th style="min-width:170px">Cliente</th>';
-  h+='<th style="text-align:center">Dia sis.</th>';
-  h+='<th style="text-align:right">Cuota sistema</th>';
+  h+='<th style="min-width:150px">Cliente</th>';
+  h+='<th style="text-align:center">Dia</th>';
+  h+='<th style="text-align:right">Cuota</th>';
   h+='<th>Mora</th>';
   h+='<th>Estado</th>';
-  h+='<th style="text-align:center">Fecha asesor</th>';
-  h+='<th style="text-align:right">Monto asesor</th>';
+  h+='<th style="text-align:right;min-width:100px">Monto asesor</th>';
   h+='</tr></thead><tbody>';
-  items.forEach(function(it){
+  // Renderizar en orden mora-desc pero usando el idx real de _PROY_ITEMS
+  var sortedIdxs=_PROY_ITEMS.map(function(_,i){return i;});
+  sortedIdxs.sort(function(a,b){
+    var ma=_PROY_ITEMS[a].mora&&_PROY_ITEMS[a].mora.dias||0;
+    var mb=_PROY_ITEMS[b].mora&&_PROY_ITEMS[b].mora.dias||0;
+    if(mb!==ma)return mb-ma;
+    return _PROY_ITEMS[a].c.nombre.localeCompare(_PROY_ITEMS[b].c.nombre);
+  });
+  sortedIdxs.forEach(function(idx){
+    var it=_PROY_ITEMS[idx];
     var c=it.c,p=it.p,mora=it.mora;
+    var cN=esc(c.nombre);
     var rowBg=it.enMora?'background:var(--redbg)':p&&p.estado==='promesa'?'background:var(--bluebg)':'';
-    var moraCell=it.enMora?'<span style="font-family:var(--mono);font-size:9px;background:var(--redbg);color:var(--red);padding:1px 5px;border-radius:3px">'+(mora.tramo||'')+'</span><span style="font-family:var(--mono);font-size:10px;color:var(--red);margin-left:4px">'+(mora.dias||'')+'d</span>':'<span style="color:var(--text3);font-size:10px">--</span>';
+    var moraCell=it.enMora?'<span style="font-family:var(--mono);font-size:9px;background:var(--redbg);color:var(--red);padding:1px 4px;border-radius:3px">'+(mora.tramo||'')+'</span><span style="font-family:var(--mono);font-size:10px;color:var(--red);margin-left:3px">'+(mora.dias||'')+'d</span>':'<span style="color:var(--text3);font-size:10px">--</span>';
     var estadoCell=p&&p.estado?promBadge(p):'<span style="color:var(--text3);font-size:10px">Sin gestion</span>';
-    var fechaGCell=it.fechaGestor?'<span style="font-family:var(--mono);font-size:11px;color:var(--green);font-weight:600">'+it.fechaGestor.substring(8)+' '+_diaN(_s2d(it.fechaGestor))+'</span>':it.fechaPromesa?'<span style="font-family:var(--mono);font-size:10px;color:var(--purple)">'+it.fechaPromesa.substring(8)+'</span>':'<span style="color:var(--text3)">--</span>';
-    // Monto asesor: verde si editado, gris italica si es fallback de cuota
-    var montoGCell=it.tieneEdicion?'<span style="font-family:var(--mono);font-size:12px;color:var(--green);font-weight:700">L '+fmt(it.montoGestor)+'</span>':'<span style="font-family:var(--mono);font-size:11px;color:var(--text3);font-style:italic">L '+fmt(it.montoGestor)+'</span>';
+    var valInput=it.montoProy?String(it.montoProy):'';
+    var montoCell='<input type="number" class="proy-inp" style="width:90px;text-align:right;'+(it.tieneEdicion?'color:var(--green);font-weight:700':'')+'" value="'+valInput+'" placeholder="'+fmt(c.cuota)+'" onblur="onTodosMontoSave(\''+escCart+'\',\''+cN+'\','+idx+',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">';
     h+='<tr style="'+rowBg+'">';
-    h+='<td><div style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</div></td>';
+    h+='<td><div style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</div>'+(it.fechaGestor?'<div style="font-family:var(--mono);font-size:9px;color:var(--green)">'+it.fechaGestor+'</div>':it.fechaPromesa?'<div style="font-family:var(--mono);font-size:9px;color:var(--purple)">Promesa: '+it.fechaPromesa+'</div>':'')+'</td>';
     h+='<td style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--text2)">'+(c.dia_pago||'--')+'</td>';
     h+='<td style="text-align:right;font-family:var(--mono);font-size:11px">L '+fmt(c.cuota)+'</td>';
     h+='<td>'+moraCell+'</td>';
     h+='<td>'+estadoCell+'</td>';
-    h+='<td style="text-align:center">'+fechaGCell+'</td>';
-    h+='<td style="text-align:right">'+montoGCell+'</td>';
+    h+='<td style="text-align:right">'+montoCell+'</td>';
     h+='</tr>';
   });
   h+='<tr style="background:var(--bg3);font-weight:700">';
-  h+='<td colspan="2" style="font-family:var(--mono);font-size:11px;padding:8px;color:var(--text3)">TOTAL</td>';
-  h+='<td style="text-align:right;font-family:var(--mono);font-size:13px;color:var(--blue);padding:8px">L '+fmt(totalSistema)+'</td>';
-  h+='<td colspan="3"></td>';
-  h+='<td style="text-align:right;font-family:var(--mono);font-size:13px;color:var(--green);padding:8px">L '+fmt(totalGestor)+'</td>';
+  h+='<td colspan="2" style="font-family:var(--mono);font-size:11px;padding:7px 8px;color:var(--text3)">TOTAL</td>';
+  h+='<td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--blue);padding:7px 8px">L '+fmt(totalSistema)+'</td>';
+  h+='<td colspan="2"></td>';
+  h+='<td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--green);padding:7px 8px">L '+fmt(totalGestor)+'</td>';
   h+='</tr>';
   h+='</tbody></table></div>';
   return h;
@@ -5108,6 +5109,14 @@ async function onProyMontoSave(cartId,nombre,itemIdx,val){
 async function onProySave(cartId,nombre,semStr,field,value){
   var changes={};changes[field]=value||null;
   await saveProyeccion(cartId,nombre,semStr,changes);
+}
+async function onTodosMontoSave(cartId,nombre,idx,val){
+  var monto=parseFloat(val)||null;
+  var it=_PROY_ITEMS[idx];if(!it)return;
+  var semStr=it.proySemStr||(it.fechaProy?_fechaToSemStr(it.fechaProy):_d2s(_getLunes(0)));
+  await saveProyeccion(cartId,nombre,semStr,{monto_proyectado:monto});
+  var pane=document.getElementById('tp-PROYECCION');
+  if(pane)_renderProyTab(cartId,pane,pane._proySemOffset||0);
 }
 async function onProyComentarioEnter(cartId,nombre,idx,value,el){
   el.blur();
