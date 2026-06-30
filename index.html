@@ -5392,6 +5392,8 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   html+='<div class="kpi-card"><div class="kpi-l">Cobro esperado</div><div class="kpi-v" style="font-size:14px;color:var(--green)">L '+fmt(totalCobraEsperado)+'</div></div>';
   html+='<div class="kpi-card"><div class="kpi-l">Saldo sig. mes</div><div class="kpi-v" style="font-size:14px;color:var(--purple)">L '+fmt(totalSaldoEsperado)+'</div></div>';
   html+='<div class="kpi-card"><div class="kpi-l">En mora</div><div class="kpi-v" style="color:var(--red)">'+nConMora+'</div></div>';
+  var totalMora=items.reduce(function(s,it){return s+it.moraVal;},0);
+  if(totalMora>0)html+='<div class="kpi-card" style="border-left:2px solid var(--red)"><div class="kpi-l">Total mora</div><div class="kpi-v" style="font-size:14px;color:var(--red)">L '+fmt(totalMora)+'</div></div>';
   html+='</div>';
 
   // Tabla
@@ -5403,9 +5405,12 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   html+='<th style="text-align:right">Cuota</th>';
   html+='<th style="text-align:right">Cuotas trans.</th>';
   html+='<th style="text-align:right">Saldo sig. mes</th>';
-  html+='<th>Mora / Adelantado</th>';
+  html+='<th style="text-align:right">Mora estimada</th>';
+  html+='<th>Tramo</th>';
+  html+='<th>Últ. pago</th>';
   html+='<th style="text-align:center;min-width:75px">Día pago</th>';
   html+='<th style="text-align:right;min-width:100px">Monto asesor</th>';
+  html+='<th style="min-width:150px">Comentario</th>';
   html+='</tr></thead><tbody>';
 
   items.forEach(function(it,i){
@@ -5432,26 +5437,41 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
     var montoInput=isLocked
       ?'<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">L '+fmt(it.pagoEsperado)+'</span>'
       :'<input type="number" class="proy-inp" style="width:90px;text-align:right;'+(it.montoAsesor?'color:var(--green);font-weight:700':'')+'" value="'+montoVal+'" placeholder="'+fmt(c.cuota)+'" onblur="onProxMesMontoSave(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">';
+    var tramoCell=it.mora&&it.mora.tramo&&it.mora.tramo!=='MES'
+      ?'<span style="font-family:var(--mono);font-size:9px;color:var(--red);background:var(--redbg);padding:1px 5px;border-radius:3px">'+it.mora.tramo+'</span>'
+      :it.esAdelantado?'<span style="font-family:var(--mono);font-size:9px;color:var(--blue);background:var(--bluebg);padding:1px 5px;border-radius:3px">ADELANT.</span>'
+      :'<span style="font-family:var(--mono);font-size:9px;color:var(--green)">AL DÍA</span>';
+    var ultPagoCell=c.ultimo_pago
+      ?'<span style="font-family:var(--mono);font-size:10px;color:'+(it.moraVal>0?'var(--red)':'var(--text2)')+'">'+c.ultimo_pago+'</span>'
+      :'<span style="color:var(--text3);font-size:10px">--</span>';
     html+='<tr style="'+rowBg+'">';
     html+='<td><span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-right:4px">'+(i+1)+'</span><span style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</span></td>';
     html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700">L '+fmt(c.saldo)+'</td>';
     html+='<td style="text-align:right;font-family:var(--mono);font-size:11px">L '+fmt(c.cuota)+'</td>';
     html+='<td style="text-align:right;font-family:var(--mono);font-size:11px">'+(it.cuotasTrans!=null?it.cuotasTrans:'--')+'</td>';
     html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--purple)">L '+fmt(it.saldoEsperado)+'</td>';
-    html+='<td>'+moraCell+'</td>';
+    html+='<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--red)">'+(it.moraVal>0?'L '+fmt(it.moraVal):'<span style="color:var(--text3);font-weight:400">--</span>')+'</td>';
+    html+='<td>'+tramoCell+'</td>';
+    html+='<td>'+ultPagoCell+'</td>';
     html+='<td style="text-align:center">'+diaInput+'</td>';
     html+='<td style="text-align:right">'+montoInput+'</td>';
+    var pComent=PROMESAS[cartId+'::'+c.nombre]||null;
+    var comentCell=pComent&&pComent.nota?'<span style="font-size:10px;color:var(--text2)">'+esc2(pComent.nota.substring(0,50))+'</span>':'<span style="font-size:10px;color:var(--text3);font-style:italic">--</span>';
+    html+='<td>'+comentCell+'</td>';
     html+='</tr>';
   });
   // Fila total
+  var totalMoraTabla=items.reduce(function(s,it){return s+it.moraVal;},0);
   html+='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">';
   html+='<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3)">TOTAL · '+items.length+' clientes</td>';
   html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue)">L '+fmt(totalSaldoActual)+'</td>';
   html+='<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700">L '+fmt(items.reduce(function(s,it){return s+it.c.cuota;},0))+'</td>';
   html+='<td></td>';
   html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--purple)">L '+fmt(totalSaldoEsperado)+'</td>';
-  html+='<td></td><td></td>';
+  html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red)">'+(totalMoraTabla>0?'L '+fmt(totalMoraTabla):'--')+'</td>';
+  html+='<td></td><td></td><td></td><td></td>';
   html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">L '+fmt(totalCobraEsperado)+'</td>';
+  html+='<td></td>';
   html+='</tr>';
   html+='</tbody></table></div>';
   container.innerHTML=html;
@@ -5504,20 +5524,24 @@ function downloadProySigPDF(cartId){
   var css='<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#18202c;padding:15px}h1{font-size:13px;font-weight:700;margin-bottom:2px}h2{font-size:10px;color:#666;font-weight:normal;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:8px;text-transform:uppercase;letter-spacing:.04em;color:#555;padding:5px 6px;border-bottom:2px solid #ccc;text-align:left;white-space:nowrap;background:#f4f5f7}td{padding:4px 6px;border-bottom:1px solid #e8e8e8;white-space:nowrap}.num{text-align:right;font-family:monospace}.mora{color:#b01020;font-weight:700}.adelantado{color:#1a55a0}.tr{background:#eef0f3;font-weight:700;border-top:2px solid #ccc}@media print{button{display:none}}</style>';
   var rows=items.map(function(it,i){
     var c=it.c;
-    var moraStr=it.moraVal>0?'Mora L '+fmt(it.moraVal)+(it.mora&&it.mora.tramo?' ('+it.mora.tramo+')':''):it.esAdelantado?'Adelantado':'--';
-    var moraCls=it.moraVal>0?'mora':it.esAdelantado?'adelantado':'';
-    return '<tr><td>'+(i+1)+'. '+c.nombre+'</td><td class="num">L '+fmt(c.saldo)+'</td><td class="num">L '+fmt(c.cuota)+'</td><td class="num">'+(it.cuotasTrans!=null?it.cuotasTrans:'--')+'</td><td class="num">L '+fmt(it.saldoEsperado)+'</td><td class="'+moraCls+'">'+moraStr+'</td><td class="num">'+(it.diaAsesor||c.dia_pago||'--')+'</td><td class="num">'+(it.montoAsesor?'L '+fmt(it.montoAsesor):'L '+fmt(c.cuota))+'</td></tr>';
+    var moraStr=it.moraVal>0?'L '+fmt(it.moraVal):'--';
+    var moraCls=it.moraVal>0?'mora':'';
+    var tramoStr=it.mora&&it.mora.tramo&&it.mora.tramo!=='MES'?it.mora.tramo:it.esAdelantado?'ADELANT.':'AL DÍA';
+    var p=PROMESAS[it.cartId+'::'+c.nombre]||PROMESAS[cartId+'::'+c.nombre]||null;
+    var comentario=p&&p.nota?p.nota.substring(0,60):'';
+    return '<tr><td>'+(i+1)+'. '+c.nombre+'</td><td class="num">L '+fmt(c.saldo)+'</td><td class="num">L '+fmt(c.cuota)+'</td><td class="num">'+(it.cuotasTrans!=null?it.cuotasTrans:'--')+'</td><td class="num">L '+fmt(it.saldoEsperado)+'</td><td class="num '+moraCls+'">'+moraStr+'</td><td style="font-size:9px;color:#555">'+tramoStr+'</td><td style="font-size:9px;color:#555">'+(c.ultimo_pago||'--')+'</td><td class="num">'+(it.diaAsesor||c.dia_pago||'--')+'</td><td class="num">'+(it.montoAsesor?'L '+fmt(it.montoAsesor):'L '+fmt(c.cuota))+'</td><td style="font-size:9px;color:#555;max-width:120px;white-space:normal">'+comentario+'</td></tr>';
   }).join('');
   var tSA=items.reduce(function(s,it){return s+it.c.saldo;},0);
   var tSE=items.reduce(function(s,it){return s+it.saldoEsperado;},0);
   var tMA=items.reduce(function(s,it){return s+it.pagoEsperado;},0);
-  rows+='<tr class="tr"><td>TOTAL · '+items.length+' clientes</td><td class="num">L '+fmt(tSA)+'</td><td class="num"></td><td></td><td class="num">L '+fmt(tSE)+'</td><td></td><td></td><td class="num">L '+fmt(tMA)+'</td></tr>';
+  var tMora=items.reduce(function(s,it){return s+it.moraVal;},0);
+  rows+='<tr class="tr"><td>TOTAL · '+items.length+' clientes</td><td class="num">L '+fmt(tSA)+'</td><td></td><td></td><td class="num">L '+fmt(tSE)+'</td><td class="num mora">L '+fmt(tMora)+'</td><td></td><td></td><td></td><td class="num">L '+fmt(tMA)+'</td><td></td></tr>';
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proyeccion '+empresa+' - '+nextMonthName+'</title>'+css+'</head><body>');
   win.document.write('<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">');
   win.document.write('<div><h1>Proyección '+empresa+' — '+nextMonthName+'</h1><h2>'+HOY.toLocaleDateString('es-HN')+' · '+items.length+' clientes activos</h2></div>');
   win.document.write('<button onclick="window.print()" style="padding:5px 12px;border:1px solid #ccc;border-radius:4px;background:#f4f5f7;cursor:pointer;font-size:10px">Imprimir / PDF</button>');
   win.document.write('</div>');
-  win.document.write('<table><thead><tr><th>Cliente</th><th class="num">Saldo actual</th><th class="num">Cuota</th><th class="num">Cuotas trans.</th><th class="num">Saldo sig. mes</th><th>Mora/Adelantado</th><th class="num">Día pago</th><th class="num">Monto asesor</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  win.document.write('<table><thead><tr><th>Cliente</th><th class="num">Saldo actual</th><th class="num">Cuota</th><th class="num">Cuotas trans.</th><th class="num">Saldo sig. mes</th><th class="num">Mora estimada</th><th>Tramo</th><th>Últ. pago</th><th class="num">Día pago</th><th class="num">Monto asesor</th><th>Comentario</th></tr></thead><tbody>'+rows+'</tbody></table>');
   win.document.write('</body></html>');
   win.document.close();
 }
@@ -5532,17 +5556,19 @@ function downloadProySigExcel(cartId){
     wsData.push(['Proyeccion '+empresa+' — '+nextMonthName]);
     wsData.push(['Generado: '+HOY.toLocaleDateString('es-HN')+'   |   '+items.length+' clientes activos']);
     wsData.push([]);
-    wsData.push(['#','Cliente','Saldo actual (L)','Cuota (L)','Cuotas trans.','Saldo sig. mes (L)','Mora / Adelantado','Día pago asesor','Monto asesor (L)']);
+    wsData.push(['#','Cliente','Saldo actual (L)','Cuota (L)','Cuotas trans.','Saldo sig. mes (L)','Mora estimada (L)','Tramo','Últ. pago','Día pago asesor','Monto asesor (L)','Comentario']);
     items.forEach(function(it,i){
       var c=it.c;
-      var moraStr=it.moraVal>0?'Mora L '+fmt(it.moraVal)+(it.mora&&it.mora.tramo?' ('+it.mora.tramo+')':''):it.esAdelantado?'Adelantado':'Al dia';
-      wsData.push([i+1,c.nombre,c.saldo,c.cuota,it.cuotasTrans!=null?it.cuotasTrans:'',it.saldoEsperado,moraStr,it.diaAsesor||c.dia_pago||'',it.montoAsesor||c.cuota]);
+      var tramoStr=it.mora&&it.mora.tramo&&it.mora.tramo!=='MES'?it.mora.tramo:it.esAdelantado?'ADELANT.':'AL DÍA';
+      var pCoExcel=PROMESAS[cartId+'::'+c.nombre]||null;
+      var comentExcel=pCoExcel&&pCoExcel.nota?pCoExcel.nota:'';
+      wsData.push([i+1,c.nombre,c.saldo,c.cuota,it.cuotasTrans!=null?it.cuotasTrans:'',it.saldoEsperado,it.moraVal||0,tramoStr,c.ultimo_pago||'',it.diaAsesor||c.dia_pago||'',it.montoAsesor||c.cuota,comentExcel]);
     });
     wsData.push([]);
-    wsData.push(['TOTAL','',items.reduce(function(s,it){return s+it.c.saldo;},0),items.reduce(function(s,it){return s+it.c.cuota;},0),'',items.reduce(function(s,it){return s+it.saldoEsperado;},0),'','',items.reduce(function(s,it){return s+it.pagoEsperado;},0)]);
+    wsData.push(['TOTAL','',items.reduce(function(s,it){return s+it.c.saldo;},0),items.reduce(function(s,it){return s+it.c.cuota;},0),'',items.reduce(function(s,it){return s+it.saldoEsperado;},0),items.reduce(function(s,it){return s+it.moraVal;},0),'','','',items.reduce(function(s,it){return s+it.pagoEsperado;},0)]);
     var wb=XLSX.utils.book_new();
     var ws=XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols']=[{wch:4},{wch:36},{wch:16},{wch:12},{wch:14},{wch:18},{wch:28},{wch:16},{wch:16}];
+    ws['!cols']=[{wch:4},{wch:36},{wch:16},{wch:12},{wch:14},{wch:18},{wch:16},{wch:10},{wch:12},{wch:16},{wch:16},{wch:40}];
     XLSX.utils.book_append_sheet(wb,ws,'Proyeccion');
     XLSX.writeFile(wb,empresa.replace(/\s+/g,'-')+'-proyeccion-'+nextMonthName.replace(/\s+/g,'-')+'.xlsx');
   }
