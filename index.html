@@ -5373,15 +5373,11 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
   html+='<button class="btn btn-ghost btn-sm" onclick="downloadProySigPDF(\''+escCart+'\')">⬇ PDF</button>';
   if(isAdmin||isGerente)html+='<button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="downloadProySigExcel(\''+escCart+'\')">⬇ Excel</button>';
-  if(isAdmin){
-    if(cierre){
-      html+='<span class="proy-sig-lock-badge">🔒 Cerrado por '+esc2(cierre.cerrado_por||'admin')+' · '+(cierre.cerrado_at||'').substring(0,10)+'</span>';
-      html+='<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="reabrirCierreMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔓 Reabrir</button>';
-    } else {
-      html+='<button class="btn btn-sm" style="background:var(--red);color:#fff;border:none" onclick="cerrarMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔒 Cerrar mes</button>';
-    }
-  } else if(cierre){
-    html+='<span class="proy-sig-lock-badge">🔒 Cerrado '+((cierre.cerrado_at||'').substring(0,10))+'</span>';
+  if(cierre){
+    html+='<span class="proy-sig-lock-badge">🔒 Proyección '+nextMonthName+' guardada · '+(cierre.cerrado_at||'').substring(0,10)+'</span>';
+    if(isAdmin)html+='<button class="btn btn-ghost btn-sm" style="color:var(--amber)" onclick="reabrirCierreMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔓 Reabrir (admin)</button>';
+  } else {
+    html+='<button class="btn btn-sm" style="background:#22a050;color:#fff;border:none;font-weight:600" onclick="cerrarMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">💾 Guardar Proyección</button>';
   }
   html+='</div></div>';
 
@@ -5461,17 +5457,13 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
     var comentCell='';
     // Nota actual (gestión) — siempre visible, solo lectura
     if(notaActual)comentCell+='<div style="font-size:10px;color:var(--text2);margin-bottom:4px;padding:2px 4px;background:var(--bg3);border-radius:3px;line-height:1.3">'+esc2(notaActual.substring(0,60))+'</div>';
-    // Comentario de cierre
-    if(comentCierre){
-      // Ya guardado — bloqueado
-      comentCell+='<div style="display:flex;align-items:flex-start;gap:4px"><span style="font-size:10px;color:var(--text3)">🔒</span><span style="font-size:10px;color:var(--text);line-height:1.3">'+esc2(comentCierre)+'</span></div>';
+    // Comentario de proyección: bloqueado si hay cierre o si ya fue guardado
+    if(isLocked||(comentCierre&&!isAdmin)){
+      comentCell+=comentCierre?'<div style="font-size:10px;color:var(--text);line-height:1.3">'+esc2(comentCierre)+'</div>':'<span style="font-size:10px;color:var(--text3);font-style:italic">--</span>';
     } else {
-      // Editable — textarea + botón guardar
-      var taId='cc-'+escCart+'-'+i;
-      comentCell+='<div style="display:flex;flex-direction:column;gap:3px">';
-      comentCell+='<textarea id="'+taId+'" rows="2" style="width:100%;min-width:130px;border:1px solid var(--border2);border-radius:4px;padding:3px 5px;font-size:10px;font-family:var(--sans);resize:vertical;background:var(--bg);color:var(--text)" placeholder="Agregar comentario..."></textarea>';
-      comentCell+='<button onclick="guardarComentarioCierre(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',\''+taId+'\')" style="align-self:flex-end;padding:2px 9px;font-size:10px;background:#22a050;color:#fff;border:none;border-radius:3px;cursor:pointer;font-family:var(--sans)">Guardar</button>';
-      comentCell+='</div>';
+      // Editable: textarea que guarda en blur
+      var taVal=comentCierre||'';
+      comentCell+='<textarea rows="2" style="width:100%;min-width:130px;border:1px solid var(--border2);border-radius:4px;padding:3px 5px;font-size:10px;font-family:var(--sans);resize:vertical;background:var(--bg);color:var(--text);'+(comentCierre?'border-color:var(--green)':'')+'" placeholder="Comentario..." onblur="onProxMesComentarioSave(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',this.value)">'+esc2(taVal)+'</textarea>';
     }
     html+='<td style="min-width:160px;vertical-align:top;padding:6px 8px">'+comentCell+'</td>';
     html+='</tr>';
@@ -5493,14 +5485,9 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   container.innerHTML=html;
 }
 
-async function guardarComentarioCierre(cartId,nombre,semKey,taId){
-  var ta=document.getElementById(taId);if(!ta)return;
-  var texto=ta.value.trim();
-  if(!texto){alert('Escribe un comentario antes de guardar.');return;}
-  if(!confirm('¿Guardar este comentario?\n\n"'+texto+'"\n\nUna vez guardado no podrá editarse.'))return;
-  await saveProyeccion(cartId,nombre,semKey,{comentario_cierre:texto});
-  var pane=document.getElementById('tp-PROY_SIGUIENTE');
-  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+async function onProxMesComentarioSave(cartId,nombre,semKey,val){
+  var texto=val.trim();
+  await saveProyeccion(cartId,nombre,semKey,{comentario_cierre:texto||null});
 }
 async function onProxMesDiaChange(cartId,nombre,semKey,dia){
   var fecha=_diaToFechaNextMes(dia);if(!fecha)return;
@@ -5515,7 +5502,9 @@ async function onProxMesMontoSave(cartId,nombre,semKey,val){
   if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
 }
 async function cerrarMes(cartId,mesKey,semKey){
-  if(!confirm('¿Cerrar proyección de '+mesKey+'?\n\nLos asesores no podrán editar después del cierre.\nSolo el administrador podrá reabrirlo.'))return;
+  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var nextNom=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada y no podrá editarse.\nSolo el administrador podrá reabrirla.'))return;
   var items=PROY_SIG_ITEMS[cartId]||[];
   var snap=items.map(function(it){
     return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};
