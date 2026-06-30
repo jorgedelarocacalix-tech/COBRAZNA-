@@ -400,6 +400,9 @@ tr:hover td{background:#f5f8ff}
   .ai-score-v{font-size:38px}
   .ai-sec-title{font-size:11px}
 }
+/* ── Proyeccion Mes Siguiente ── */
+.proy-sig-locked input{pointer-events:none;background:var(--bg3);color:var(--text3);border-color:var(--border)}
+.proy-sig-lock-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:var(--redbg);color:var(--red);border:1px solid rgba(176,16,32,.2);font-family:var(--mono);font-size:10px;font-weight:600}
 </style>
 <script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script><script src="./La Roca — Cobranza_files/pdf(1).min.js"></script></head>
 <body>
@@ -1360,7 +1363,11 @@ function renderDash(id){
       id:'HISTORIAL', lbl:'📋 Historial', direct:true
     },
     {
-      id:'PROYECCION', lbl:'📊 Proyeccion', direct:true
+      id:'PROYECCION', lbl:'📊 Proyeccion', color:'var(--blue)', bgColor:'var(--bluebg)',
+      subs:[
+        {id:'PROYECCION',    lbl:'📅 Proyección actual', n:null, cls:''},
+        {id:'PROY_SIGUIENTE',lbl:'📆 Mes siguiente',     n:null, cls:''},
+      ]
     },
     {
       id:'ANALISIS', lbl:'📊 Análisis', color:'var(--blue)', bgColor:'var(--bluebg)',
@@ -1433,7 +1440,8 @@ function renderDash(id){
     {id:'VISITAS',   build:function(d){d.innerHTML='<div class="empty">Cargando visitas...</div>';buildVisitas(id,d);}},
     {id:'SIN_PAGO_INT',build:function(d){d.innerHTML=buildSinPagoInt(id,cl);}},
     {id:'HISTORIAL', build:function(d){d.innerHTML='<div class="empty">Cargando historial...</div>';buildHistorial(id,d);}},
-    {id:'PROYECCION',build:function(d){d.innerHTML='<div class="empty">Cargando proyeccion...</div>';buildProyeccion(id,d);}},
+    {id:'PROYECCION',    build:function(d){d.innerHTML='<div class="empty">Cargando proyeccion...</div>';buildProyeccion(id,d);}},
+    {id:'PROY_SIGUIENTE',build:function(d){d.innerHTML='<div class="empty">Cargando...</div>';buildProySiguiente(id,d);}},
     {id:'MORA_GLOBAL',build:function(d){d.innerHTML=buildMoraGlobal(id,cl);}},
     {id:'DIRECTORIO',build:function(d){d.innerHTML=buildDirectorio(id,cl);}},
     {id:'ECG',       build:function(d){d.innerHTML='<div class="empty">Cargando pulso...</div>';buildECG(id,d);}},
@@ -4655,6 +4663,8 @@ document.getElementById('modal-alerta').addEventListener('click',function(e){if(
 var PROYECCIONES={};      // key: cartId+'::'+nombre+'::'+semanaInicio
 var _PROY_ITEMS=[];       // lista plana del render actual (para ver notas por index)
 var _PROY_VIEW='todos';   // 'todos' | 'semana' | 'mes' | 'mora'
+var CIERRE_MES={};        // {cartId: {cartera_id,mes_key,cerrado_por,cerrado_at,datos}}
+var PROY_SIG_ITEMS={};    // {cartId: [...items]} para download
 
 function _getLunes(offset){
   var d=new Date(HOY);var dow=d.getDay();var diff=dow===0?-6:1-dow;
@@ -5282,6 +5292,267 @@ async function verNotasProy(idx,btn){
   }).join('');
 }
 // -- fin proyeccion semanal --
+
+// ══════════════════════════════════════════════════════════
+// ══ PROYECCION MES SIGUIENTE ══
+// ══════════════════════════════════════════════════════════
+function _nextMesKey(){
+  var d=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function _nextSemKey(){return 'NEXT-'+_nextMesKey();}
+function _diaToFechaNextMes(dia){
+  dia=parseInt(dia);if(!dia||dia<1||dia>31)return null;
+  var d=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var maxDia=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  if(dia>maxDia)dia=maxDia;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+}
+async function buildProySiguiente(cartId,container){
+  HOY=new Date();HOY.setHours(0,0,0,0);
+  var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');
+  var semKey=_nextSemKey();
+  if(supa){
+    var r=await supa.from('proyecciones').select('*').eq('cartera_id',cartId).like('semana_inicio','NEXT-%');
+    if(!r.error)(r.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
+  }
+  if(supa&&!CIERRE_MES[cartId]){
+    var rc=await supa.from('cierre_proyeccion').select('*').eq('cartera_id',cartId).eq('mes_key',mesKey);
+    if(!rc.error&&rc.data&&rc.data.length)CIERRE_MES[cartId]=rc.data[0];
+  }
+  _renderProySiguiente(cartId,container,mesKey,semKey);
+}
+function _renderProySiguiente(cartId,container,mesKey,semKey){
+  HOY=new Date();HOY.setHours(0,0,0,0);
+  var data=CARTERAS[cartId];if(!data)return;
+  var cl=data.clientes;
+  var isAdmin=USER&&(USER.rol==='admin');
+  var isGerente=USER&&USER.rol==='gerente';
+  var cierre=CIERRE_MES[cartId];
+  var isLocked=!!cierre&&!isAdmin;
+  var escCart=esc(cartId);
+  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+
+  var items=[];
+  cl.forEach(function(c){
+    if(c.tramo==='INACTIVO')return;
+    var p=PROMESAS[cartId+'::'+c.nombre];
+    var proy=PROYECCIONES[cartId+'::'+c.nombre+'::'+semKey]||null;
+    var mora=calcMora(c.ultimo_pago,c.dia_pago,c.sin_pago,c.fecha_factura);
+    var diaAsesor=proy&&proy.fecha_proyectada?parseInt(proy.fecha_proyectada.split('-')[2])||null:null;
+    var montoAsesor=proy&&proy.monto_proyectado?proy.monto_proyectado:null;
+    // Cuotas transcurridas: meses desde fecha_factura o desde fecha_emision de la cartera
+    var cuotasTrans=null;
+    var ff=parseHNDate(c.fecha_factura)||parseHNDate(data.fecha_emision);
+    if(ff){
+      cuotasTrans=(HOY.getFullYear()-ff.getFullYear())*12+(HOY.getMonth()-ff.getMonth());
+      if(cuotasTrans<0)cuotasTrans=0;
+    } else if(c.num_cuotas&&c.cuota&&c.saldo){
+      cuotasTrans=Math.max(0,Math.round((c.num_cuotas*c.cuota-c.saldo)/c.cuota));
+    }
+    var pagoEsperado=montoAsesor||c.cuota||0;
+    var saldoEsperado=Math.max(0,c.saldo-pagoEsperado);
+    var moraVal=mora&&mora.dias>0?Math.round(mora.dias*(c.cuota/30)):0;
+    var esAdelantado=p&&p.adelantado===true;
+    items.push({c:c,p:p,proy:proy,mora:mora,moraVal:moraVal,esAdelantado:esAdelantado,diaAsesor:diaAsesor,montoAsesor:montoAsesor,cuotasTrans:cuotasTrans,saldoEsperado:saldoEsperado,pagoEsperado:pagoEsperado});
+  });
+  items.sort(function(a,b){return a.c.nombre.localeCompare(b.c.nombre,'es');});
+  PROY_SIG_ITEMS[cartId]=items;
+
+  var totalSaldoActual=items.reduce(function(s,it){return s+it.c.saldo;},0);
+  var totalSaldoEsperado=items.reduce(function(s,it){return s+it.saldoEsperado;},0);
+  var totalCobraEsperado=items.reduce(function(s,it){return s+it.pagoEsperado;},0);
+  var nConMora=items.filter(function(it){return it.moraVal>0;}).length;
+
+  var html='';
+  // Header
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">';
+  html+='<div><div style="font-size:16px;font-weight:700">Proyección '+nextMonthName+'</div>';
+  html+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+items.length+' clientes activos · '+HOY.toLocaleDateString('es-HN')+'</div></div>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+  html+='<button class="btn btn-ghost btn-sm" onclick="downloadProySigPDF(\''+escCart+'\')">⬇ PDF</button>';
+  if(isAdmin||isGerente)html+='<button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="downloadProySigExcel(\''+escCart+'\')">⬇ Excel</button>';
+  if(isAdmin){
+    if(cierre){
+      html+='<span class="proy-sig-lock-badge">🔒 Cerrado por '+esc2(cierre.cerrado_por||'admin')+' · '+(cierre.cerrado_at||'').substring(0,10)+'</span>';
+      html+='<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="reabrirCierreMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔓 Reabrir</button>';
+    } else {
+      html+='<button class="btn btn-sm" style="background:var(--red);color:#fff;border:none" onclick="cerrarMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔒 Cerrar mes</button>';
+    }
+  } else if(cierre){
+    html+='<span class="proy-sig-lock-badge">🔒 Cerrado '+((cierre.cerrado_at||'').substring(0,10))+'</span>';
+  }
+  html+='</div></div>';
+
+  // KPIs
+  html+='<div class="kpi-row" style="margin-bottom:14px">';
+  html+='<div class="kpi-card"><div class="kpi-l">Activos</div><div class="kpi-v">'+items.length+'</div></div>';
+  html+='<div class="kpi-card"><div class="kpi-l">Saldo actual</div><div class="kpi-v" style="font-size:14px;color:var(--blue)">L '+fmt(totalSaldoActual)+'</div></div>';
+  html+='<div class="kpi-card"><div class="kpi-l">Cobro esperado</div><div class="kpi-v" style="font-size:14px;color:var(--green)">L '+fmt(totalCobraEsperado)+'</div></div>';
+  html+='<div class="kpi-card"><div class="kpi-l">Saldo sig. mes</div><div class="kpi-v" style="font-size:14px;color:var(--purple)">L '+fmt(totalSaldoEsperado)+'</div></div>';
+  html+='<div class="kpi-card"><div class="kpi-l">En mora</div><div class="kpi-v" style="color:var(--red)">'+nConMora+'</div></div>';
+  html+='</div>';
+
+  // Tabla
+  html+='<div style="overflow-x:auto"'+(isLocked?' class="proy-sig-locked"':'')+'>';
+  html+='<table class="proy-tbl" id="proy-sig-tbl-'+escCart+'">';
+  html+='<thead><tr>';
+  html+='<th style="min-width:160px">#&nbsp; Cliente</th>';
+  html+='<th style="text-align:right">Saldo actual</th>';
+  html+='<th style="text-align:right">Cuota</th>';
+  html+='<th style="text-align:right">Cuotas trans.</th>';
+  html+='<th style="text-align:right">Saldo sig. mes</th>';
+  html+='<th>Mora / Adelantado</th>';
+  html+='<th style="text-align:center;min-width:75px">Día pago</th>';
+  html+='<th style="text-align:right;min-width:100px">Monto asesor</th>';
+  html+='</tr></thead><tbody>';
+
+  items.forEach(function(it,i){
+    var c=it.c;var mora=it.mora;var cN=esc(c.nombre);
+    var rowBg=it.moraVal>0?'background:var(--redbg)':it.esAdelantado?'background:var(--bluebg)':'';
+    // Mora cell
+    var moraCell='';
+    if(it.moraVal>0){
+      moraCell='<span style="color:var(--red);font-family:var(--mono);font-size:10px;font-weight:700">mora L '+fmt(it.moraVal)+'</span>';
+      if(mora&&mora.tramo)moraCell+=' <span style="font-family:var(--mono);font-size:9px;color:var(--red);background:var(--redbg);padding:1px 4px;border-radius:3px">'+mora.tramo+'</span>';
+    } else if(it.esAdelantado){
+      moraCell='<span style="color:var(--blue);font-family:var(--mono);font-size:10px;font-weight:600">adelantado</span>';
+    } else {
+      moraCell='<span style="color:var(--text3);font-size:10px">--</span>';
+    }
+    // Día pago
+    var diaVal=it.diaAsesor||'';
+    var diaPlaceholder=c.dia_pago||'--';
+    var diaInput=isLocked
+      ?'<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+(it.diaAsesor?'var(--green)':'var(--text2)')+'">'+( it.diaAsesor||c.dia_pago||'--')+'</span>'
+      :'<input type="number" class="proy-inp" min="1" max="31" style="width:46px;text-align:center;'+(it.diaAsesor?'color:var(--green);font-weight:700':'')+'" value="'+diaVal+'" placeholder="'+diaPlaceholder+'" onchange="onProxMesDiaChange(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',this.value)">';
+    // Monto asesor
+    var montoVal=it.montoAsesor?String(it.montoAsesor):'';
+    var montoInput=isLocked
+      ?'<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">L '+fmt(it.pagoEsperado)+'</span>'
+      :'<input type="number" class="proy-inp" style="width:90px;text-align:right;'+(it.montoAsesor?'color:var(--green);font-weight:700':'')+'" value="'+montoVal+'" placeholder="'+fmt(c.cuota)+'" onblur="onProxMesMontoSave(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">';
+    html+='<tr style="'+rowBg+'">';
+    html+='<td><span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-right:4px">'+(i+1)+'</span><span style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</span></td>';
+    html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700">L '+fmt(c.saldo)+'</td>';
+    html+='<td style="text-align:right;font-family:var(--mono);font-size:11px">L '+fmt(c.cuota)+'</td>';
+    html+='<td style="text-align:right;font-family:var(--mono);font-size:11px">'+(it.cuotasTrans!=null?it.cuotasTrans:'--')+'</td>';
+    html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--purple)">L '+fmt(it.saldoEsperado)+'</td>';
+    html+='<td>'+moraCell+'</td>';
+    html+='<td style="text-align:center">'+diaInput+'</td>';
+    html+='<td style="text-align:right">'+montoInput+'</td>';
+    html+='</tr>';
+  });
+  // Fila total
+  html+='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">';
+  html+='<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3)">TOTAL · '+items.length+' clientes</td>';
+  html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue)">L '+fmt(totalSaldoActual)+'</td>';
+  html+='<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700">L '+fmt(items.reduce(function(s,it){return s+it.c.cuota;},0))+'</td>';
+  html+='<td></td>';
+  html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--purple)">L '+fmt(totalSaldoEsperado)+'</td>';
+  html+='<td></td><td></td>';
+  html+='<td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">L '+fmt(totalCobraEsperado)+'</td>';
+  html+='</tr>';
+  html+='</tbody></table></div>';
+  container.innerHTML=html;
+}
+
+async function onProxMesDiaChange(cartId,nombre,semKey,dia){
+  var fecha=_diaToFechaNextMes(dia);if(!fecha)return;
+  await saveProyeccion(cartId,nombre,semKey,{fecha_proyectada:fecha});
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+}
+async function onProxMesMontoSave(cartId,nombre,semKey,val){
+  var monto=parseFloat(val)||null;
+  await saveProyeccion(cartId,nombre,semKey,{monto_proyectado:monto});
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+}
+async function cerrarMes(cartId,mesKey,semKey){
+  if(!confirm('¿Cerrar proyección de '+mesKey+'?\n\nLos asesores no podrán editar después del cierre.\nSolo el administrador podrá reabrirlo.'))return;
+  var items=PROY_SIG_ITEMS[cartId]||[];
+  var snap=items.map(function(it){
+    return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};
+  });
+  if(supa){
+    var r=await supa.from('cierre_proyeccion').upsert({cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap},{onConflict:'cartera_id,mes_key'});
+    if(r.error){alert('Error al cerrar:\n'+r.error.message);return;}
+  }
+  CIERRE_MES[cartId]={cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap};
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
+}
+async function reabrirCierreMes(cartId,mesKey,semKey){
+  if(!confirm('¿Reabrir proyección de '+mesKey+'?\nLos asesores podrán volver a editar.'))return;
+  if(supa){
+    var r=await supa.from('cierre_proyeccion').delete().eq('cartera_id',cartId).eq('mes_key',mesKey);
+    if(r.error){alert('Error:\n'+r.error.message);return;}
+  }
+  delete CIERRE_MES[cartId];
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
+}
+
+function downloadProySigPDF(cartId){
+  var items=PROY_SIG_ITEMS[cartId]||[];
+  var data=CARTERAS[cartId];
+  var empresa=data?data.empresa:cartId;
+  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var win=window.open('','_blank');if(!win)return;
+  var css='<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#18202c;padding:15px}h1{font-size:13px;font-weight:700;margin-bottom:2px}h2{font-size:10px;color:#666;font-weight:normal;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:8px;text-transform:uppercase;letter-spacing:.04em;color:#555;padding:5px 6px;border-bottom:2px solid #ccc;text-align:left;white-space:nowrap;background:#f4f5f7}td{padding:4px 6px;border-bottom:1px solid #e8e8e8;white-space:nowrap}.num{text-align:right;font-family:monospace}.mora{color:#b01020;font-weight:700}.adelantado{color:#1a55a0}.tr{background:#eef0f3;font-weight:700;border-top:2px solid #ccc}@media print{button{display:none}}</style>';
+  var rows=items.map(function(it,i){
+    var c=it.c;
+    var moraStr=it.moraVal>0?'Mora L '+fmt(it.moraVal)+(it.mora&&it.mora.tramo?' ('+it.mora.tramo+')':''):it.esAdelantado?'Adelantado':'--';
+    var moraCls=it.moraVal>0?'mora':it.esAdelantado?'adelantado':'';
+    return '<tr><td>'+(i+1)+'. '+c.nombre+'</td><td class="num">L '+fmt(c.saldo)+'</td><td class="num">L '+fmt(c.cuota)+'</td><td class="num">'+(it.cuotasTrans!=null?it.cuotasTrans:'--')+'</td><td class="num">L '+fmt(it.saldoEsperado)+'</td><td class="'+moraCls+'">'+moraStr+'</td><td class="num">'+(it.diaAsesor||c.dia_pago||'--')+'</td><td class="num">'+(it.montoAsesor?'L '+fmt(it.montoAsesor):'L '+fmt(c.cuota))+'</td></tr>';
+  }).join('');
+  var tSA=items.reduce(function(s,it){return s+it.c.saldo;},0);
+  var tSE=items.reduce(function(s,it){return s+it.saldoEsperado;},0);
+  var tMA=items.reduce(function(s,it){return s+it.pagoEsperado;},0);
+  rows+='<tr class="tr"><td>TOTAL · '+items.length+' clientes</td><td class="num">L '+fmt(tSA)+'</td><td class="num"></td><td></td><td class="num">L '+fmt(tSE)+'</td><td></td><td></td><td class="num">L '+fmt(tMA)+'</td></tr>';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proyeccion '+empresa+' - '+nextMonthName+'</title>'+css+'</head><body>');
+  win.document.write('<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">');
+  win.document.write('<div><h1>Proyección '+empresa+' — '+nextMonthName+'</h1><h2>'+HOY.toLocaleDateString('es-HN')+' · '+items.length+' clientes activos</h2></div>');
+  win.document.write('<button onclick="window.print()" style="padding:5px 12px;border:1px solid #ccc;border-radius:4px;background:#f4f5f7;cursor:pointer;font-size:10px">Imprimir / PDF</button>');
+  win.document.write('</div>');
+  win.document.write('<table><thead><tr><th>Cliente</th><th class="num">Saldo actual</th><th class="num">Cuota</th><th class="num">Cuotas trans.</th><th class="num">Saldo sig. mes</th><th>Mora/Adelantado</th><th class="num">Día pago</th><th class="num">Monto asesor</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  win.document.write('</body></html>');
+  win.document.close();
+}
+function downloadProySigExcel(cartId){
+  var items=PROY_SIG_ITEMS[cartId]||[];
+  var data=CARTERAS[cartId];
+  var empresa=data?data.empresa:cartId;
+  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  function doExcel(){
+    var wsData=[];
+    wsData.push(['Proyeccion '+empresa+' — '+nextMonthName]);
+    wsData.push(['Generado: '+HOY.toLocaleDateString('es-HN')+'   |   '+items.length+' clientes activos']);
+    wsData.push([]);
+    wsData.push(['#','Cliente','Saldo actual (L)','Cuota (L)','Cuotas trans.','Saldo sig. mes (L)','Mora / Adelantado','Día pago asesor','Monto asesor (L)']);
+    items.forEach(function(it,i){
+      var c=it.c;
+      var moraStr=it.moraVal>0?'Mora L '+fmt(it.moraVal)+(it.mora&&it.mora.tramo?' ('+it.mora.tramo+')':''):it.esAdelantado?'Adelantado':'Al dia';
+      wsData.push([i+1,c.nombre,c.saldo,c.cuota,it.cuotasTrans!=null?it.cuotasTrans:'',it.saldoEsperado,moraStr,it.diaAsesor||c.dia_pago||'',it.montoAsesor||c.cuota]);
+    });
+    wsData.push([]);
+    wsData.push(['TOTAL','',items.reduce(function(s,it){return s+it.c.saldo;},0),items.reduce(function(s,it){return s+it.c.cuota;},0),'',items.reduce(function(s,it){return s+it.saldoEsperado;},0),'','',items.reduce(function(s,it){return s+it.pagoEsperado;},0)]);
+    var wb=XLSX.utils.book_new();
+    var ws=XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:4},{wch:36},{wch:16},{wch:12},{wch:14},{wch:18},{wch:28},{wch:16},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws,'Proyeccion');
+    XLSX.writeFile(wb,empresa.replace(/\s+/g,'-')+'-proyeccion-'+nextMonthName.replace(/\s+/g,'-')+'.xlsx');
+  }
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=doExcel;document.head.appendChild(s);
+  } else {doExcel();}
+}
+// -- fin proyeccion mes siguiente --
 
 // ══════════════════════════════════════════════════════════
 // ══ BIENVENIDA IA + BURBUJA DE RECOMENDACIONES ══
