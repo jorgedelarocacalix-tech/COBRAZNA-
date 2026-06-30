@@ -5456,8 +5456,24 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
     html+='<td style="text-align:center">'+diaInput+'</td>';
     html+='<td style="text-align:right">'+montoInput+'</td>';
     var pComent=PROMESAS[cartId+'::'+c.nombre]||null;
-    var comentCell=pComent&&pComent.nota?'<span style="font-size:10px;color:var(--text2)">'+esc2(pComent.nota.substring(0,50))+'</span>':'<span style="font-size:10px;color:var(--text3);font-style:italic">--</span>';
-    html+='<td>'+comentCell+'</td>';
+    var notaActual=pComent&&pComent.nota?pComent.nota:'';
+    var comentCierre=it.proy&&it.proy.comentario_cierre?it.proy.comentario_cierre:null;
+    var comentCell='';
+    // Nota actual (gestión) — siempre visible, solo lectura
+    if(notaActual)comentCell+='<div style="font-size:10px;color:var(--text2);margin-bottom:4px;padding:2px 4px;background:var(--bg3);border-radius:3px;line-height:1.3">'+esc2(notaActual.substring(0,60))+'</div>';
+    // Comentario de cierre
+    if(comentCierre){
+      // Ya guardado — bloqueado
+      comentCell+='<div style="display:flex;align-items:flex-start;gap:4px"><span style="font-size:10px;color:var(--text3)">🔒</span><span style="font-size:10px;color:var(--text);line-height:1.3">'+esc2(comentCierre)+'</span></div>';
+    } else {
+      // Editable — textarea + botón guardar
+      var taId='cc-'+escCart+'-'+i;
+      comentCell+='<div style="display:flex;flex-direction:column;gap:3px">';
+      comentCell+='<textarea id="'+taId+'" rows="2" style="width:100%;min-width:130px;border:1px solid var(--border2);border-radius:4px;padding:3px 5px;font-size:10px;font-family:var(--sans);resize:vertical;background:var(--bg);color:var(--text)" placeholder="Agregar comentario..."></textarea>';
+      comentCell+='<button onclick="guardarComentarioCierre(\''+escCart+'\',\''+cN+'\',\''+semKey+'\',\''+taId+'\')" style="align-self:flex-end;padding:2px 9px;font-size:10px;background:#22a050;color:#fff;border:none;border-radius:3px;cursor:pointer;font-family:var(--sans)">Guardar</button>';
+      comentCell+='</div>';
+    }
+    html+='<td style="min-width:160px;vertical-align:top;padding:6px 8px">'+comentCell+'</td>';
     html+='</tr>';
   });
   // Fila total
@@ -5477,6 +5493,15 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   container.innerHTML=html;
 }
 
+async function guardarComentarioCierre(cartId,nombre,semKey,taId){
+  var ta=document.getElementById(taId);if(!ta)return;
+  var texto=ta.value.trim();
+  if(!texto){alert('Escribe un comentario antes de guardar.');return;}
+  if(!confirm('¿Guardar este comentario?\n\n"'+texto+'"\n\nUna vez guardado no podrá editarse.'))return;
+  await saveProyeccion(cartId,nombre,semKey,{comentario_cierre:texto});
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+}
 async function onProxMesDiaChange(cartId,nombre,semKey,dia){
   var fecha=_diaToFechaNextMes(dia);if(!fecha)return;
   await saveProyeccion(cartId,nombre,semKey,{fecha_proyectada:fecha});
@@ -5556,19 +5581,20 @@ function downloadProySigExcel(cartId){
     wsData.push(['Proyeccion '+empresa+' — '+nextMonthName]);
     wsData.push(['Generado: '+HOY.toLocaleDateString('es-HN')+'   |   '+items.length+' clientes activos']);
     wsData.push([]);
-    wsData.push(['#','Cliente','Saldo actual (L)','Cuota (L)','Cuotas trans.','Saldo sig. mes (L)','Mora estimada (L)','Tramo','Últ. pago','Día pago asesor','Monto asesor (L)','Comentario']);
+    wsData.push(['#','Cliente','Saldo actual (L)','Cuota (L)','Cuotas trans.','Saldo sig. mes (L)','Mora estimada (L)','Tramo','Últ. pago','Día pago asesor','Monto asesor (L)','Nota gestión','Comentario cierre']);
     items.forEach(function(it,i){
       var c=it.c;
       var tramoStr=it.mora&&it.mora.tramo&&it.mora.tramo!=='MES'?it.mora.tramo:it.esAdelantado?'ADELANT.':'AL DÍA';
       var pCoExcel=PROMESAS[cartId+'::'+c.nombre]||null;
-      var comentExcel=pCoExcel&&pCoExcel.nota?pCoExcel.nota:'';
-      wsData.push([i+1,c.nombre,c.saldo,c.cuota,it.cuotasTrans!=null?it.cuotasTrans:'',it.saldoEsperado,it.moraVal||0,tramoStr,c.ultimo_pago||'',it.diaAsesor||c.dia_pago||'',it.montoAsesor||c.cuota,comentExcel]);
+      var notaExcel=pCoExcel&&pCoExcel.nota?pCoExcel.nota:'';
+      var cierreExcel=it.proy&&it.proy.comentario_cierre?it.proy.comentario_cierre:'';
+      wsData.push([i+1,c.nombre,c.saldo,c.cuota,it.cuotasTrans!=null?it.cuotasTrans:'',it.saldoEsperado,it.moraVal||0,tramoStr,c.ultimo_pago||'',it.diaAsesor||c.dia_pago||'',it.montoAsesor||c.cuota,notaExcel,cierreExcel]);
     });
     wsData.push([]);
     wsData.push(['TOTAL','',items.reduce(function(s,it){return s+it.c.saldo;},0),items.reduce(function(s,it){return s+it.c.cuota;},0),'',items.reduce(function(s,it){return s+it.saldoEsperado;},0),items.reduce(function(s,it){return s+it.moraVal;},0),'','','',items.reduce(function(s,it){return s+it.pagoEsperado;},0)]);
     var wb=XLSX.utils.book_new();
     var ws=XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols']=[{wch:4},{wch:36},{wch:16},{wch:12},{wch:14},{wch:18},{wch:16},{wch:10},{wch:12},{wch:16},{wch:16},{wch:40}];
+    ws['!cols']=[{wch:4},{wch:36},{wch:16},{wch:12},{wch:14},{wch:18},{wch:16},{wch:10},{wch:12},{wch:16},{wch:16},{wch:40},{wch:40}];
     XLSX.utils.book_append_sheet(wb,ws,'Proyeccion');
     XLSX.writeFile(wb,empresa.replace(/\s+/g,'-')+'-proyeccion-'+nextMonthName.replace(/\s+/g,'-')+'.xlsx');
   }
