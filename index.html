@@ -613,7 +613,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-9';
+var APP_VERSION='20260701-10';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -5359,6 +5359,18 @@ async function buildProySiguiente(cartId,container){
   }
   _renderProySiguiente(cartId,container,mesKey,semKey);
 }
+function filtrarProySig(cartId){
+  var inp=document.getElementById('proy-sig-search-'+cartId);
+  var q=inp?inp.value.trim().toLowerCase():'';
+  var tbl=document.getElementById('proy-sig-tbl-'+cartId);
+  if(!tbl)return;
+  var rows=tbl.querySelectorAll('tbody tr');
+  rows.forEach(function(row){
+    var nombre=row.querySelector('td:first-child');
+    var txt=nombre?nombre.textContent.toLowerCase():'';
+    row.style.display=(!q||txt.includes(q))?'':'none';
+  });
+}
 async function selectProyMes(cartId,newMesKey){
   PROY_SIG_MES[cartId]=newMesKey;
   var semKey='NEXT-'+newMesKey;
@@ -5461,6 +5473,11 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   html+='<div class="kpi-card"><div class="kpi-l">En mora</div><div class="kpi-v" style="color:var(--red)">'+nConMora+'</div></div>';
   var totalMora=items.reduce(function(s,it){return s+it.moraVal;},0);
   if(totalMora>0)html+='<div class="kpi-card" style="border-left:2px solid var(--red)"><div class="kpi-l">Total mora</div><div class="kpi-v" style="font-size:14px;color:var(--red)">L '+fmt(totalMora)+'</div></div>';
+  html+='</div>';
+
+  // Buscador
+  html+='<div style="margin-bottom:10px">';
+  html+='<input type="text" id="proy-sig-search-'+escCart+'" placeholder="🔍 Buscar cliente..." oninput="filtrarProySig(\''+escCart+'\')" style="width:100%;max-width:340px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);outline:none">';
   html+='</div>';
 
   // Tabla
