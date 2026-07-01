@@ -5329,7 +5329,8 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   var isAdmin=USER&&(USER.rol==='admin');
   var isGerente=USER&&USER.rol==='gerente';
   var cierre=CIERRE_MES[cartId];
-  var isLocked=!!cierre&&!isAdmin;
+  var pinUnlock=PROY_PIN_UNLOCK[cartId]||false;
+  var isLocked=!!cierre&&!isAdmin&&!pinUnlock;
   var escCart=esc(cartId);
   var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
   var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
@@ -5375,7 +5376,15 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   if(isAdmin||isGerente)html+='<button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="downloadProySigExcel(\''+escCart+'\')">⬇ Excel</button>';
   if(cierre){
     html+='<span class="proy-sig-lock-badge">🔒 Proyección '+nextMonthName+' guardada · '+(cierre.cerrado_at||'').substring(0,10)+'</span>';
-    if(isAdmin)html+='<button class="btn btn-ghost btn-sm" style="color:var(--amber)" onclick="reabrirCierreMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔓 Reabrir (admin)</button>';
+    if(isAdmin){
+      html+='<button class="btn btn-ghost btn-sm" style="color:var(--blue)" onclick="verPinEditor(\''+escCart+'\',\''+mesKey+'\')">🔑 Ver PIN</button>';
+      html+='<button class="btn btn-ghost btn-sm" style="color:var(--amber)" onclick="reabrirCierreMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔓 Reabrir</button>';
+    } else if(!isLocked){
+      // Ya ingresó el PIN esta sesión — mostrar indicador
+      html+='<span style="font-family:var(--mono);font-size:10px;color:var(--green);padding:3px 8px;background:var(--greenbg);border-radius:10px;border:1px solid rgba(26,122,60,.2)">🔑 Acceso temporal activo</span>';
+    } else {
+      html+='<button class="btn btn-ghost btn-sm" style="color:var(--blue)" onclick="solicitarPinEditor(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">🔑 Ingresar clave</button>';
+    }
   } else {
     html+='<button class="btn btn-sm" style="background:#22a050;color:#fff;border:none;font-weight:600" onclick="cerrarMes(\''+escCart+'\',\''+mesKey+'\',\''+semKey+'\')">💾 Guardar Proyección</button>';
   }
@@ -5501,29 +5510,82 @@ async function onProxMesMontoSave(cartId,nombre,semKey,val){
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
   if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
 }
+var PROY_PIN_UNLOCK={};  // {cartId: true} — acceso temporal por PIN esta sesión
+
 async function cerrarMes(cartId,mesKey,semKey){
   var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
   var nextNom=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
-  if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada y no podrá editarse.\nSolo el administrador podrá reabrirla.'))return;
+  if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada.\nPuedes compartir la clave de acceso con asesores autorizados.'))return;
+  // Generar PIN de 6 dígitos
+  var pin=String(Math.floor(100000+Math.random()*900000));
   var items=PROY_SIG_ITEMS[cartId]||[];
   var snap=items.map(function(it){
     return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};
   });
   if(supa){
-    var r=await supa.from('cierre_proyeccion').upsert({cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap},{onConflict:'cartera_id,mes_key'});
-    if(r.error){alert('Error al cerrar:\n'+r.error.message);return;}
+    var r=await supa.from('cierre_proyeccion').upsert({cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin},{onConflict:'cartera_id,mes_key'});
+    if(r.error){alert('Error al guardar:\n'+r.error.message);return;}
   }
-  CIERRE_MES[cartId]={cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap};
+  CIERRE_MES[cartId]={cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin};
+  // Mostrar PIN al admin
+  _mostrarPinModal(pin,nextNom);
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
   if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
 }
+
+function _mostrarPinModal(pin,mesNom){
+  var el=document.getElementById('pin-editor-modal');
+  if(el)el.remove();
+  var m=document.createElement('div');
+  m.id='pin-editor-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML='<div style="background:#fff;border-radius:12px;padding:32px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
+    +'<div style="font-size:32px;margin-bottom:8px">🔑</div>'
+    +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">Proyección guardada</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:20px">'+mesNom+'</div>'
+    +'<div style="font-size:11px;color:#444;margin-bottom:8px">Clave de acceso para edición:</div>'
+    +'<div style="font-family:monospace;font-size:42px;font-weight:800;letter-spacing:8px;color:#1a7a3c;background:#e6f4ec;border-radius:8px;padding:14px 10px;margin-bottom:16px">'+pin+'</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:20px">Comparte esta clave solo con asesores autorizados.<br>Ellos la ingresan para poder editar la proyección.</div>'
+    +'<button onclick="document.getElementById(\'pin-editor-modal\').remove()" style="padding:10px 28px;background:#22a050;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Entendido</button>'
+    +'</div>';
+  document.body.appendChild(m);
+}
+
+function verPinEditor(cartId,mesKey){
+  var c=CIERRE_MES[cartId];
+  if(!c||!c.pin_editor){alert('No hay PIN registrado para esta proyección.');return;}
+  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
+  var nextNom=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  _mostrarPinModal(c.pin_editor,nextNom);
+}
+
+async function solicitarPinEditor(cartId,mesKey,semKey){
+  var pin=prompt('Ingresa la clave de acceso de 6 dígitos:');
+  if(!pin)return;
+  var c=CIERRE_MES[cartId];
+  var pinReal=c&&c.pin_editor?c.pin_editor:null;
+  // Si no está en memoria, intentar cargar de Supabase
+  if(!pinReal&&supa){
+    var r=await supa.from('cierre_proyeccion').select('pin_editor').eq('cartera_id',cartId).eq('mes_key',mesKey);
+    if(!r.error&&r.data&&r.data.length)pinReal=r.data[0].pin_editor;
+  }
+  if(pin.trim()===pinReal){
+    PROY_PIN_UNLOCK[cartId]=true;
+    var pane=document.getElementById('tp-PROY_SIGUIENTE');
+    if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
+  } else {
+    alert('Clave incorrecta. Contacta al administrador.');
+  }
+}
+
 async function reabrirCierreMes(cartId,mesKey,semKey){
-  if(!confirm('¿Reabrir proyección de '+mesKey+'?\nLos asesores podrán volver a editar.'))return;
+  if(!confirm('¿Reabrir proyección?\nTodos podrán volver a editar y se generará nueva clave al guardar.'))return;
   if(supa){
     var r=await supa.from('cierre_proyeccion').delete().eq('cartera_id',cartId).eq('mes_key',mesKey);
     if(r.error){alert('Error:\n'+r.error.message);return;}
   }
   delete CIERRE_MES[cartId];
+  delete PROY_PIN_UNLOCK[cartId];
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
   if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
 }
