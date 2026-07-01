@@ -613,7 +613,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-10';
+var APP_VERSION='20260701-11';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -1026,7 +1026,8 @@ async function processPDF(file){
 function getCanonicalId(empresa){
   var m=Object.values(CARTERAS).find(function(c){return c.empresa.trim().toLowerCase()===empresa.trim().toLowerCase();});
   if(m)return m.id;
-  return empresa.replace(/[\s\/()#]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').toUpperCase();
+  var norm=empresa.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9\s\/()#]/g,'');
+  return norm.replace(/[\s\/()#]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').toUpperCase();
 }
 
 // ══ GERENTE HOME PANEL ══
