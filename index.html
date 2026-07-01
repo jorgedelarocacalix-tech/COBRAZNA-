@@ -839,10 +839,10 @@ function parseCartera(lines){
       var left=line.substring(0,slash).trim();var right=line.substring(slash+1).trim();
       // Normalizar: quitar espacios dobles y comparar en mayúsculas para tolerar diferencias mínimas del PDF
       var leftN=left.replace(/\s+/g,' ').toUpperCase();var rightN=right.replace(/\s+/g,' ').toUpperCase();
-      var isName=left.length>=4&&leftN===rightN&&/^[A-ZÁÉÍÓÚÑÜ\s\d]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
+      var isName=left.length>=4&&leftN===rightN&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
       if(isName){
         var nombre=toTC(leftN.trim());var allD=[],allN=[];
-        for(var j=i+1;j<Math.min(i+12,lines.length);j++){
+        for(var j=i+1;j<Math.min(i+25,lines.length);j++){
           var dl=lines[j];if(dl==='---')break;if(isNL(dl))break;if(dl.match(/^subtotal/i)){i=j;break;}
           var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
           var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
@@ -916,7 +916,7 @@ function genMsg(nombre,cuota,saldo,tr){
   if(tr==='150')return n+', 5 meses sin pago, saldo L '+s+'. Podemos buscar solucion.';
   return '';
 }
-function isNL(l){var s=l.indexOf('/');if(s<2)return false;var left=l.substring(0,s).trim();return left.length>=4&&left===l.substring(s+1).trim()&&/^[A-ZÁÉÍÓÚÑÜ\s\d]+$/.test(left)&&!left.match(/^(SUBTOTAL|TOTAL|FECHA)/i);}
+function isNL(l){var s=l.indexOf('/');if(s<2)return false;var lN=l.substring(0,s).trim().replace(/\s+/g,' ').toUpperCase();var rN=l.substring(s+1).trim().replace(/\s+/g,' ').toUpperCase();return lN.length>=4&&lN===rN&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.]+$/.test(lN)&&!lN.match(/^(SUBTOTAL|TOTAL|FECHA)/i);}
 function toTC(s){return s.toLowerCase().replace(/(?:^|\s)\S/g,function(a){return a.toUpperCase();});}
 function parseHNDate(s){if(!s)return null;var p=s.split('/');if(p.length!==3)return null;var d=new Date(+p[2],+p[1]-1,+p[0]);d.setHours(0,0,0,0);return isNaN(d)?null:d;}
 function daysSince(s){var d=parseHNDate(s);if(!d)return null;return Math.max(0,Math.floor((HOY-d)/86400000));}
