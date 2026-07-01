@@ -837,9 +837,11 @@ function parseCartera(lines){
     var line=lines[i];var slash=line.indexOf('/');
     if(slash>2&&slash<line.length-2){
       var left=line.substring(0,slash).trim();var right=line.substring(slash+1).trim();
-      var isName=left.length>=4&&left===right&&/^[A-ZÁÉÍÓÚÑÜ\s\d]+$/.test(left)&&!left.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
+      // Normalizar: quitar espacios dobles y comparar en mayúsculas para tolerar diferencias mínimas del PDF
+      var leftN=left.replace(/\s+/g,' ').toUpperCase();var rightN=right.replace(/\s+/g,' ').toUpperCase();
+      var isName=left.length>=4&&leftN===rightN&&/^[A-ZÁÉÍÓÚÑÜ\s\d]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
       if(isName){
-        var nombre=toTC(left);var allD=[],allN=[];
+        var nombre=toTC(leftN.trim());var allD=[],allN=[];
         for(var j=i+1;j<Math.min(i+12,lines.length);j++){
           var dl=lines[j];if(dl==='---')break;if(isNL(dl))break;if(dl.match(/^subtotal/i)){i=j;break;}
           var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
@@ -847,7 +849,8 @@ function parseCartera(lines){
           var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>0;});
           ns.forEach(function(n){allN.push(n);});
         }
-        if(allD.length>=1&&allN.length>=4){
+        // Relajar condición: aceptar con al menos 1 fecha y 1 número (antes era 4 números)
+        if(allD.length>=1&&allN.length>=1){
           var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
           var total=0,nCuotas=0,pagado=0,saldo=0,diaPago=0,cuota=0;
           var bI=allN.findIndex(function(n){return n>=100;});if(bI>=0)total=allN[bI];
