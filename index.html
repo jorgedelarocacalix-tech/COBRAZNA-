@@ -612,7 +612,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-2';
+var APP_VERSION='20260701-3';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -5319,29 +5319,41 @@ async function verNotasProy(idx,btn){
 // ══════════════════════════════════════════════════════════
 // ══ PROYECCION MES SIGUIENTE ══
 // ══════════════════════════════════════════════════════════
-function _nextMesKey(){
-  return HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');
-}
-function _nextSemKey(){return 'NEXT-'+_nextMesKey();}
-function _diaToFechaNextMes(dia){
+var PROY_SIG_MES={};  // {cartId: 'YYYY-MM'} — mes seleccionado por cartera
+function _curMesKey(){return HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');}
+function _mesKeyToNom(mk){var p=mk.split('-');return new Date(parseInt(p[0]),parseInt(p[1])-1,1).toLocaleDateString('es-HN',{month:'long',year:'numeric'});}
+function _diaToFechaNextMes(dia,mesKey){
   dia=parseInt(dia);if(!dia||dia<1||dia>31)return null;
-  var maxDia=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
+  var p=mesKey.split('-');var maxDia=new Date(parseInt(p[0]),parseInt(p[1]),0).getDate();
   if(dia>maxDia)dia=maxDia;
-  return HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  return mesKey+'-'+String(dia).padStart(2,'0');
 }
 async function buildProySiguiente(cartId,container){
   HOY=new Date();HOY.setHours(0,0,0,0);
-  var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');
-  var semKey=_nextSemKey();
+  if(!PROY_SIG_MES[cartId])PROY_SIG_MES[cartId]=_curMesKey();
+  var mesKey=PROY_SIG_MES[cartId];
+  var semKey='NEXT-'+mesKey;
   if(supa){
     var r=await supa.from('proyecciones').select('*').eq('cartera_id',cartId).like('semana_inicio','NEXT-%');
     if(!r.error)(r.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
   }
-  if(supa&&!CIERRE_MES[cartId]){
+  var ck=cartId+'::'+mesKey;
+  if(supa&&CIERRE_MES[ck]===undefined){
     var rc=await supa.from('cierre_proyeccion').select('*').eq('cartera_id',cartId).eq('mes_key',mesKey);
-    if(!rc.error&&rc.data&&rc.data.length)CIERRE_MES[cartId]=rc.data[0];
+    CIERRE_MES[ck]=(!rc.error&&rc.data&&rc.data.length)?rc.data[0]:null;
   }
   _renderProySiguiente(cartId,container,mesKey,semKey);
+}
+async function selectProyMes(cartId,newMesKey){
+  PROY_SIG_MES[cartId]=newMesKey;
+  var semKey='NEXT-'+newMesKey;
+  var ck=cartId+'::'+newMesKey;
+  if(supa&&CIERRE_MES[ck]===undefined){
+    var rc=await supa.from('cierre_proyeccion').select('*').eq('cartera_id',cartId).eq('mes_key',newMesKey);
+    CIERRE_MES[ck]=(!rc.error&&rc.data&&rc.data.length)?rc.data[0]:null;
+  }
+  var pane=document.getElementById('tp-PROY_SIGUIENTE');
+  if(pane)_renderProySiguiente(cartId,pane,newMesKey,semKey);
 }
 function _renderProySiguiente(cartId,container,mesKey,semKey){
   HOY=new Date();HOY.setHours(0,0,0,0);
@@ -5349,11 +5361,11 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   var cl=data.clientes;
   var isAdmin=USER&&(USER.rol==='admin');
   var isGerente=USER&&USER.rol==='gerente';
-  var cierre=CIERRE_MES[cartId];
-  var pinUnlock=PROY_PIN_UNLOCK[cartId]||false;
+  var cierre=CIERRE_MES[cartId+'::'+mesKey];
+  var pinUnlock=PROY_PIN_UNLOCK[cartId+'::'+mesKey]||false;
   var isLocked=!!cierre&&!isAdmin&&!pinUnlock;
   var escCart=esc(cartId);
-  var nextMonthName=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextMonthName=_mesKeyToNom(mesKey);
 
   var items=[];
   cl.forEach(function(c){
@@ -5387,6 +5399,19 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   var nConMora=items.filter(function(it){return it.moraVal>0;}).length;
 
   var html='';
+  // Selector de mes
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">';
+  html+='<span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-right:4px">MES:</span>';
+  for(var mi=-2;mi<=3;mi++){
+    var mD=new Date(HOY.getFullYear(),HOY.getMonth()+mi,1);
+    var mk=mD.getFullYear()+'-'+String(mD.getMonth()+1).padStart(2,'0');
+    var isSelMes=mk===mesKey;
+    var cierreMk=CIERRE_MES[cartId+'::'+mk];
+    var mLbl=mD.toLocaleDateString('es-HN',{month:'short',year:'2-digit'});
+    if(cierreMk)mLbl='🔒 '+mLbl;
+    html+='<button onclick="selectProyMes(\''+escCart+'\',\''+mk+'\')" style="padding:5px 13px;border-radius:16px;border:2px solid '+(isSelMes?'var(--blue)':'var(--border2)')+';background:'+(isSelMes?'var(--blue)':'transparent')+';color:'+(isSelMes?'#fff':'var(--text2)')+';font-size:11px;font-weight:600;cursor:pointer;transition:all .15s">'+mLbl+'</button>';
+  }
+  html+='</div>';
   // Header
   html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">';
   html+='<div><div style="font-size:16px;font-weight:700">Proyección '+nextMonthName+'</div>';
@@ -5519,34 +5544,32 @@ async function onProxMesComentarioSave(cartId,nombre,semKey,val){
   await saveProyeccion(cartId,nombre,semKey,{comentario_cierre:texto||null});
 }
 async function onProxMesDiaChange(cartId,nombre,semKey,dia){
-  var fecha=_diaToFechaNextMes(dia);if(!fecha)return;
+  var mesKey=PROY_SIG_MES[cartId]||_curMesKey();
+  var fecha=_diaToFechaNextMes(dia,mesKey);if(!fecha)return;
   await saveProyeccion(cartId,nombre,semKey,{fecha_proyectada:fecha});
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
-  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+  if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
 }
 async function onProxMesMontoSave(cartId,nombre,semKey,val){
   var monto=parseFloat(val)||null;
   await saveProyeccion(cartId,nombre,semKey,{monto_proyectado:monto});
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
-  if(pane){var mesKey=HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');_renderProySiguiente(cartId,pane,mesKey,semKey);}
+  var mesKey=PROY_SIG_MES[cartId]||_curMesKey();
+  if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
 }
 var PROY_PIN_UNLOCK={};  // {cartId: true} — acceso temporal por PIN esta sesión
 
 async function cerrarMes(cartId,mesKey,semKey){
-  var nextNom=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextNom=_mesKeyToNom(mesKey);
   if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada.\nPuedes compartir la clave de acceso con asesores autorizados.'))return;
-  // Generar PIN de 6 dígitos
   var pin=String(Math.floor(100000+Math.random()*900000));
   var items=PROY_SIG_ITEMS[cartId]||[];
-  var snap=items.map(function(it){
-    return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};
-  });
+  var snap=items.map(function(it){return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};});
   if(supa){
     var r=await supa.from('cierre_proyeccion').upsert({cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin},{onConflict:'cartera_id,mes_key'});
     if(r.error){alert('Error al guardar:\n'+r.error.message);return;}
   }
-  CIERRE_MES[cartId]={cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin};
-  // Mostrar PIN al admin
+  CIERRE_MES[cartId+'::'+mesKey]={cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin};
   _mostrarPinModal(pin,nextNom);
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
   if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
@@ -5571,24 +5594,22 @@ function _mostrarPinModal(pin,mesNom){
 }
 
 function verPinEditor(cartId,mesKey){
-  var c=CIERRE_MES[cartId];
+  var c=CIERRE_MES[cartId+'::'+mesKey];
   if(!c||!c.pin_editor){alert('No hay PIN registrado para esta proyección.');return;}
-  var nextNom=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
-  _mostrarPinModal(c.pin_editor,nextNom);
+  _mostrarPinModal(c.pin_editor,_mesKeyToNom(mesKey));
 }
 
 async function solicitarPinEditor(cartId,mesKey,semKey){
   var pin=prompt('Ingresa la clave de acceso de 6 dígitos:');
   if(!pin)return;
-  var c=CIERRE_MES[cartId];
+  var c=CIERRE_MES[cartId+'::'+mesKey];
   var pinReal=c&&c.pin_editor?c.pin_editor:null;
-  // Si no está en memoria, intentar cargar de Supabase
   if(!pinReal&&supa){
     var r=await supa.from('cierre_proyeccion').select('pin_editor').eq('cartera_id',cartId).eq('mes_key',mesKey);
     if(!r.error&&r.data&&r.data.length)pinReal=r.data[0].pin_editor;
   }
   if(pin.trim()===pinReal){
-    PROY_PIN_UNLOCK[cartId]=true;
+    PROY_PIN_UNLOCK[cartId+'::'+mesKey]=true;
     var pane=document.getElementById('tp-PROY_SIGUIENTE');
     if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
   } else {
@@ -5602,8 +5623,8 @@ async function reabrirCierreMes(cartId,mesKey,semKey){
     var r=await supa.from('cierre_proyeccion').delete().eq('cartera_id',cartId).eq('mes_key',mesKey);
     if(r.error){alert('Error:\n'+r.error.message);return;}
   }
-  delete CIERRE_MES[cartId];
-  delete PROY_PIN_UNLOCK[cartId];
+  delete CIERRE_MES[cartId+'::'+mesKey];
+  delete PROY_PIN_UNLOCK[cartId+'::'+mesKey];
   var pane=document.getElementById('tp-PROY_SIGUIENTE');
   if(pane)_renderProySiguiente(cartId,pane,mesKey,semKey);
 }
