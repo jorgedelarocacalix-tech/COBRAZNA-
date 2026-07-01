@@ -404,7 +404,8 @@ tr:hover td{background:#f5f8ff}
 .proy-sig-locked input{pointer-events:none;background:var(--bg3);color:var(--text3);border-color:var(--border)}
 .proy-sig-lock-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:var(--redbg);color:var(--red);border:1px solid rgba(176,16,32,.2);font-family:var(--mono);font-size:10px;font-weight:600}
 </style>
-<script src="./La Roca — Cobranza_files/pdf.min.js"></script><script src="./La Roca — Cobranza_files/supabase.js"></script><script src="./La Roca — Cobranza_files/pdf(1).min.js"></script></head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script></head>
 <body>
 <div id="login-screen" style="display: flex;">
   <div class="login-card">
@@ -612,7 +613,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-8';
+var APP_VERSION='20260701-9';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
