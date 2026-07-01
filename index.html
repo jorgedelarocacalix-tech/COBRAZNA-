@@ -612,7 +612,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-3';
+var APP_VERSION='20260701-4';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -739,14 +739,23 @@ async function syncNow(){
     var html=await res.text();
     var m=html.match(/APP_VERSION='([^']+)'/);
     if(m&&m[1]!==APP_VERSION){
-      var btn=document.getElementById('sync-update-btn');
-      if(!btn){
-        btn=document.createElement('button');
-        btn.id='sync-update-btn';
-        btn.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a7a3c;color:#fff;border:none;border-radius:20px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25)';
-        btn.textContent='⬆️ Hay una versión nueva — Toca para actualizar';
-        btn.onclick=function(){location.reload(true);};
-        document.body.appendChild(btn);
+      if(!document.getElementById('update-modal')){
+        var overlay=document.createElement('div');
+        overlay.id='update-modal';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .25s ease';
+        overlay.innerHTML=''
+          +'<div style="background:#fff;border-radius:16px;padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.3)">'
+          +'<div style="font-size:44px;margin-bottom:12px">🆕</div>'
+          +'<div style="font-size:18px;font-weight:800;color:#18202c;margin-bottom:8px">¡Nueva versión disponible!</div>'
+          +'<div style="font-size:13px;color:#555;margin-bottom:6px;line-height:1.5">El sistema tiene una actualización con mejoras y correcciones.</div>'
+          +'<div style="font-size:12px;color:#888;background:#f4f5f7;border-radius:8px;padding:10px 14px;margin-bottom:22px;line-height:1.6">'
+          +'<b>¿Qué hacer?</b><br>'
+          +'Toca el botón verde para recargar la app.<br>'
+          +'<span style="color:#b01020">⚠️ No perderás ningún dato</span> — todo está guardado en la nube.</div>'
+          +'<button onclick="location.reload(true)" style="width:100%;padding:13px;background:#1a7a3c;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px">✅ Actualizar ahora</button>'
+          +'<button onclick="document.getElementById(\'update-modal\').remove()" style="width:100%;padding:10px;background:transparent;color:#888;border:1px solid #ddd;border-radius:10px;font-size:13px;cursor:pointer">Recordar después</button>'
+          +'</div>';
+        document.body.appendChild(overlay);
       }
     }
   }catch(e){}
