@@ -612,7 +612,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-6';
+var APP_VERSION='20260701-7';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -889,14 +889,27 @@ function parseCartera(lines){
           var dpi=-1;for(var ni4=si+1;ni4<allN.length;ni4++){if(allN[ni4]>=1&&allN[ni4]<=31&&Number.isInteger(allN[ni4])){diaPago=Math.round(allN[ni4]);dpi=ni4;break;}}
           for(var ni5=Math.max(dpi,si)+1;ni5<allN.length;ni5++){if(allN[ni5]>=100){cuota=allN[ni5];break;}}
           var mor=calcMora(uPago,diaPago,sinP,fFact);
-          if(nombre.length>2&&!clientes.find(function(c){return c.nombre===nombre;})){
-            clientes.push({nombre:nombre,saldo:Math.round(saldo),cuota:Math.round(cuota),num_cuotas:nCuotas,pagado:Math.round(pagado),fecha_factura:fFact||'',ultimo_pago:uPago||'',dia_pago:diaPago,dias_mora:mor.dias,tramo:mor.tramo,sin_ultimo_pago:sinP,accion:getAccion(mor.tramo),mensaje_wa:genMsg(nombre,cuota,saldo,mor.tramo)});
+          if(nombre.length>2){
+            var existing=clientes.find(function(c){return c.nombre===nombre;});
+            if(existing){
+              // Cliente con múltiples créditos: acumular saldo y cuota
+              existing.saldo+=Math.round(saldo);
+              existing.cuota+=Math.round(cuota);
+              existing.pagado+=Math.round(pagado);
+              existing.num_cuotas=Math.max(existing.num_cuotas||0,nCuotas||0);
+              if(uPago&&(!existing.ultimo_pago||uPago>existing.ultimo_pago)){existing.ultimo_pago=uPago;existing.dia_pago=diaPago||existing.dia_pago;}
+              var mor2=calcMora(existing.ultimo_pago,existing.dia_pago,existing.sin_ultimo_pago,existing.fecha_factura);
+              existing.dias_mora=mor2.dias;existing.tramo=mor2.tramo;existing.accion=getAccion(mor2.tramo);
+            } else {
+              clientes.push({nombre:nombre,saldo:Math.round(saldo),cuota:Math.round(cuota),num_cuotas:nCuotas,pagado:Math.round(pagado),fecha_factura:fFact||'',ultimo_pago:uPago||'',dia_pago:diaPago,dias_mora:mor.dias,tramo:mor.tramo,sin_ultimo_pago:sinP,accion:getAccion(mor.tramo),mensaje_wa:genMsg(nombre,cuota,saldo,mor.tramo)});
+            }
           }
         }
       }
     }
     i++;
   }
+  console.log('[Parser] '+empresa+': '+clientes.length+' clientes → '+clientes.map(function(c){return c.nombre;}).join(' | '));
   return {empresa:empresa,fecha_emision:fechaEm,clientes:clientes};
 }
 function calcMora(up,dp,sinP,fFact){
