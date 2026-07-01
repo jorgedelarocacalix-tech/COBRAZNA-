@@ -612,6 +612,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
+var APP_VERSION='20260701-2';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -731,7 +732,26 @@ async function loadData(){
     DB_OK=true;setConn(true,'Conectado');
   }catch(e){DB_OK=false;setConn(false,'Sin conexión');console.error('loadData:',e);}
 }
-async function syncNow(){setConn(null,'Sincronizando...');await loadData();if(CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);else renderHome();}
+async function syncNow(){
+  setConn(null,'Sincronizando...');
+  try{
+    var res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+    var html=await res.text();
+    var m=html.match(/APP_VERSION='([^']+)'/);
+    if(m&&m[1]!==APP_VERSION){
+      var btn=document.getElementById('sync-update-btn');
+      if(!btn){
+        btn=document.createElement('button');
+        btn.id='sync-update-btn';
+        btn.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a7a3c;color:#fff;border:none;border-radius:20px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+        btn.textContent='⬆️ Hay una versión nueva — Toca para actualizar';
+        btn.onclick=function(){location.reload(true);};
+        document.body.appendChild(btn);
+      }
+    }
+  }catch(e){}
+  await loadData();if(CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);else renderHome();
+}
 function startSync(){
   stopSync();
   SYNC_T=setInterval(async function(){
@@ -5300,16 +5320,14 @@ async function verNotasProy(idx,btn){
 // ══ PROYECCION MES SIGUIENTE ══
 // ══════════════════════════════════════════════════════════
 function _nextMesKey(){
-  var d=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  return HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0');
 }
 function _nextSemKey(){return 'NEXT-'+_nextMesKey();}
 function _diaToFechaNextMes(dia){
   dia=parseInt(dia);if(!dia||dia<1||dia>31)return null;
-  var d=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var maxDia=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  var maxDia=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
   if(dia>maxDia)dia=maxDia;
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  return HOY.getFullYear()+'-'+String(HOY.getMonth()+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
 }
 async function buildProySiguiente(cartId,container){
   HOY=new Date();HOY.setHours(0,0,0,0);
@@ -5335,8 +5353,7 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
   var pinUnlock=PROY_PIN_UNLOCK[cartId]||false;
   var isLocked=!!cierre&&!isAdmin&&!pinUnlock;
   var escCart=esc(cartId);
-  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextMonthName=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
 
   var items=[];
   cl.forEach(function(c){
@@ -5516,8 +5533,7 @@ async function onProxMesMontoSave(cartId,nombre,semKey,val){
 var PROY_PIN_UNLOCK={};  // {cartId: true} — acceso temporal por PIN esta sesión
 
 async function cerrarMes(cartId,mesKey,semKey){
-  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var nextNom=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextNom=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
   if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada.\nPuedes compartir la clave de acceso con asesores autorizados.'))return;
   // Generar PIN de 6 dígitos
   var pin=String(Math.floor(100000+Math.random()*900000));
@@ -5557,8 +5573,7 @@ function _mostrarPinModal(pin,mesNom){
 function verPinEditor(cartId,mesKey){
   var c=CIERRE_MES[cartId];
   if(!c||!c.pin_editor){alert('No hay PIN registrado para esta proyección.');return;}
-  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var nextNom=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextNom=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
   _mostrarPinModal(c.pin_editor,nextNom);
 }
 
@@ -5597,8 +5612,7 @@ function downloadProySigPDF(cartId){
   var items=PROY_SIG_ITEMS[cartId]||[];
   var data=CARTERAS[cartId];
   var empresa=data?data.empresa:cartId;
-  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextMonthName=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
   var win=window.open('','_blank');if(!win)return;
   var css='<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#18202c;padding:15px}h1{font-size:13px;font-weight:700;margin-bottom:2px}h2{font-size:10px;color:#666;font-weight:normal;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:8px;text-transform:uppercase;letter-spacing:.04em;color:#555;padding:5px 6px;border-bottom:2px solid #ccc;text-align:left;white-space:nowrap;background:#f4f5f7}td{padding:4px 6px;border-bottom:1px solid #e8e8e8;white-space:nowrap}.num{text-align:right;font-family:monospace}.mora{color:#b01020;font-weight:700}.adelantado{color:#1a55a0}.tr{background:#eef0f3;font-weight:700;border-top:2px solid #ccc}@media print{button{display:none}}</style>';
   var rows=items.map(function(it,i){
@@ -5628,8 +5642,7 @@ function downloadProySigExcel(cartId){
   var items=PROY_SIG_ITEMS[cartId]||[];
   var data=CARTERAS[cartId];
   var empresa=data?data.empresa:cartId;
-  var nextDate=new Date(HOY.getFullYear(),HOY.getMonth()+1,1);
-  var nextMonthName=nextDate.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
+  var nextMonthName=HOY.toLocaleDateString('es-HN',{month:'long',year:'numeric'});
   function doExcel(){
     var wsData=[];
     wsData.push(['Proyeccion '+empresa+' — '+nextMonthName]);
