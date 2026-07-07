@@ -616,7 +616,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-14';
+var APP_VERSION='20260707-15';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -891,16 +891,18 @@ function parseCartera(lines){
       var isName=left.length>=4&&nameSim(leftN,rightN)&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
       if(isName){
         var nombre=toTC(leftN.trim());
-        // Recolectar líneas del bloque; saltar '---' si aún no hay datos (cliente en borde de página)
-        var blockLines=[],foundData=false;
-        for(var j=i+1;j<Math.min(i+40,lines.length);j++){
+        // Recolectar líneas del bloque; saltar '---' y SUBTOTAL para no perder 2dos créditos
+        var blockLines=[],foundData=false,lastJ=i;
+        for(var j=i+1;j<Math.min(i+80,lines.length);j++){
           var dl=lines[j];
           if(dl==='---'){if(foundData)break;else continue;}
           if(isNL(dl))break;
-          if(dl.match(/^subtotal/i)){i=j;break;}
+          if(dl.match(/^subtotal/i)){if(foundData)lastJ=j;continue;}
           if(dl.match(/^\d{2}\/\d{2}\/\d{4}/))foundData=true;
           blockLines.push(dl);
+          lastJ=j;
         }
+        i=lastJ;
         // Dividir en segmentos por factura (cada línea que empieza con fecha = nueva factura)
         var segments=[],seg2=null;
         blockLines.forEach(function(l){
