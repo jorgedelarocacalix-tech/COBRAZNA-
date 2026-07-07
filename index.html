@@ -457,7 +457,10 @@ tr:hover td{background:#f5f8ff}
   <div id="cart-list-wrap" style="display: block;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Carteras</span>
-      <span id="sync-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)">🟢 Conectado</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+        <span id="sync-lbl" style="font-family:var(--mono);font-size:10px;color:var(--text3)">🟢 Conectado</span>
+        <span id="ver-lbl" style="font-family:var(--mono);font-size:9px;color:var(--text3);opacity:.7"></span>
+      </div>
     </div>
     <div id="cart-list"><div class="cart-item" onclick="openCartera(&#39;SU_MUEBLE&#39;)"><div><div class="cart-name">Su Mueble</div><div class="cart-meta">Ultima carga: 15/06/2026 · 104 clientes · 44 promesas · 12 carga(s)</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MUEBLE&#39;)">🗑</button></div></div><div class="cart-item" onclick="openCartera(&#39;SU_MOTO_DANL•••&#39;)"><div><div class="cart-name">Su Moto ( Danl••• )</div><div class="cart-meta">Ultima carga: 15/06/2026 · 75 clientes · 25 promesas · 16 carga(s)</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;SU_MOTO_DANL•••&#39;)">🗑</button></div></div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)"><div><div class="cart-name">La Roca Motors ( La Libertad ) #2</div><div class="cart-meta">Ultima carga: 12/06/2026 · 60 clientes · 44 promesas · 24 carga(s)</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_LA_LIBERTAD_2&#39;)">🗑</button></div></div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)"><div><div class="cart-name">La Roca Motors ( Barrio Arriba ) #1</div><div class="cart-meta">Ultima carga: 15/06/2026 · 59 clientes · 38 promesas · 25 carga(s)</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_MOTORS_BARRIO_ARRIBA_1&#39;)">🗑</button></div></div><div class="cart-item" onclick="openCartera(&#39;LA_ROCA_COMERCIAL_1&#39;)"><div><div class="cart-name">La Roca Comercial #1</div><div class="cart-meta">Ultima carga: 15/06/2026 · 168 clientes · 41 promesas · 25 carga(s)</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--green)">Ver →</span><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delCart(&#39;LA_ROCA_COMERCIAL_1&#39;)">🗑</button></div></div></div>
   </div>
@@ -613,7 +616,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-13';
+var APP_VERSION='20260707-14';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -1286,6 +1289,7 @@ function renderHome(){
   dz.className='drop-zone'+(canUpload()?'':' disabled');
   document.getElementById('drop-lbl').textContent=canUpload()?'Arrastra el PDF aqui o haz clic':'Solo el admin puede subir PDFs';
   document.getElementById('sync-lbl').textContent=DB_OK?'🟢 Conectado':'🟡 Sin conexion';
+  var vl=document.getElementById('ver-lbl');if(vl){var vp=APP_VERSION.match(/^(\d{4})(\d{2})(\d{2})-(\d+)$/);vl.textContent=vp?'v'+vp[4]+' · '+vp[3]+'/'+vp[2]+'/'+vp[1]:'v'+APP_VERSION;}
   var vis=getVisibles();
   var wrap=document.getElementById('cart-list-wrap'),list=document.getElementById('cart-list');
   if(!vis.length){wrap.style.display='none';return;}
