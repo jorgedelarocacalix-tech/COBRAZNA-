@@ -613,7 +613,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260701-12';
+var APP_VERSION='20260707-13';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -862,42 +862,61 @@ function parseCartera(lines){
   var empresa='La Roca',fechaEm=HOY.toLocaleDateString('es-HN');
   for(var li=0;li<Math.min(10,lines.length);li++){var l=lines[li];if(l.length>4&&!l.match(/^(fecha|proyecci|facturas|---)/i)){empresa=l.trim();break;}}
   for(var li2=0;li2<Math.min(15,lines.length);li2++){var m=lines[li2].match(/(\d{2}\/\d{2}\/\d{4})/);if(m){fechaEm=m[1];break;}}
+  // nameSim: acepta typos (≤2 chars distintos misma longitud) y truncaciones (uno es prefijo del otro)
+  var nameSim=function(a,b){if(a===b)return true;var lo=a.length>=b.length?a:b,sh=a.length<b.length?a:b;if(sh.length<4)return false;if(lo.startsWith(sh))return true;if(a.length===b.length){var d=0;for(var k=0;k<a.length;k++)if(a[k]!==b[k])d++;return d<=2;}return false;};
+  var pushCliente=function(nombre,allD,allN){
+    if(allD.length<1||allN.length<1||nombre.length<3)return;
+    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
+    var total=0,nCuotas=0,pagado=0,saldo=0,diaPago=0,cuota=0;
+    var bI=allN.findIndex(function(n){return n>=100;});if(bI>=0)total=allN[bI];
+    var nci=-1;for(var ni=bI+1;ni<allN.length;ni++){if(allN[ni]>=1&&allN[ni]<=36&&Number.isInteger(allN[ni])){nCuotas=Math.round(allN[ni]);nci=ni;break;}}
+    var pi=-1;for(var ni2=Math.max(nci,bI)+1;ni2<allN.length;ni2++){if(allN[ni2]>=0){pagado=allN[ni2];pi=ni2;break;}}
+    var si=-1;for(var ni3=pi+1;ni3<allN.length;ni3++){if(allN[ni3]>=0){saldo=allN[ni3];si=ni3;break;}}
+    var dpi=-1;for(var ni4=si+1;ni4<allN.length;ni4++){if(allN[ni4]>=1&&allN[ni4]<=31&&Number.isInteger(allN[ni4])){diaPago=Math.round(allN[ni4]);dpi=ni4;break;}}
+    for(var ni5=Math.max(dpi,si)+1;ni5<allN.length;ni5++){if(allN[ni5]>=100){cuota=allN[ni5];break;}}
+    var mor=calcMora(uPago,diaPago,sinP,fFact);
+    var nombreFinal=nombre;var cnt=2;
+    while(clientes.find(function(c){return c.nombre===nombreFinal;})){nombreFinal=nombre+' ('+cnt+')';cnt++;}
+    clientes.push({nombre:nombreFinal,saldo:Math.round(saldo),cuota:Math.round(cuota),num_cuotas:nCuotas,pagado:Math.round(pagado),fecha_factura:fFact||'',ultimo_pago:uPago||'',dia_pago:diaPago,dias_mora:mor.dias,tramo:mor.tramo,sin_ultimo_pago:sinP,accion:getAccion(mor.tramo),mensaje_wa:genMsg(nombreFinal,cuota,saldo,mor.tramo)});
+  };
   var clientes=[],i=0;
   while(i<lines.length){
     var line=lines[i];var slash=line.indexOf('/');
     if(slash>2&&slash<line.length-2){
       var left=line.substring(0,slash).trim();var right=line.substring(slash+1).trim();
-      // Normalizar: quitar espacios dobles y comparar en mayúsculas para tolerar diferencias mínimas del PDF
       var leftN=left.replace(/\s+/g,' ').toUpperCase();var rightN=right.replace(/\s+/g,' ').toUpperCase();
-      var isName=left.length>=4&&leftN===rightN&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
+      var isName=left.length>=4&&nameSim(leftN,rightN)&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(leftN)&&!leftN.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i);
       if(isName){
-        var nombre=toTC(leftN.trim());var allD=[],allN=[];
-        for(var j=i+1;j<Math.min(i+25,lines.length);j++){
-          var dl=lines[j];if(dl==='---')break;if(isNL(dl))break;if(dl.match(/^subtotal/i)){i=j;break;}
-          var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
-          var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
-          var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>0;});
-          ns.forEach(function(n){allN.push(n);});
+        var nombre=toTC(leftN.trim());
+        // Recolectar líneas del bloque; saltar '---' si aún no hay datos (cliente en borde de página)
+        var blockLines=[],foundData=false;
+        for(var j=i+1;j<Math.min(i+40,lines.length);j++){
+          var dl=lines[j];
+          if(dl==='---'){if(foundData)break;else continue;}
+          if(isNL(dl))break;
+          if(dl.match(/^subtotal/i)){i=j;break;}
+          if(dl.match(/^\d{2}\/\d{2}\/\d{4}/))foundData=true;
+          blockLines.push(dl);
         }
-        // Relajar condición: aceptar con al menos 1 fecha y 1 número (antes era 4 números)
-        if(allD.length>=1&&allN.length>=1){
-          var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
-          var total=0,nCuotas=0,pagado=0,saldo=0,diaPago=0,cuota=0;
-          var bI=allN.findIndex(function(n){return n>=100;});if(bI>=0)total=allN[bI];
-          var nci=-1;for(var ni=bI+1;ni<allN.length;ni++){if(allN[ni]>=1&&allN[ni]<=36&&Number.isInteger(allN[ni])){nCuotas=Math.round(allN[ni]);nci=ni;break;}}
-          var pi=-1;for(var ni2=Math.max(nci,bI)+1;ni2<allN.length;ni2++){if(allN[ni2]>=0){pagado=allN[ni2];pi=ni2;break;}}
-          var si=-1;for(var ni3=pi+1;ni3<allN.length;ni3++){if(allN[ni3]>=0){saldo=allN[ni3];si=ni3;break;}}
-          var dpi=-1;for(var ni4=si+1;ni4<allN.length;ni4++){if(allN[ni4]>=1&&allN[ni4]<=31&&Number.isInteger(allN[ni4])){diaPago=Math.round(allN[ni4]);dpi=ni4;break;}}
-          for(var ni5=Math.max(dpi,si)+1;ni5<allN.length;ni5++){if(allN[ni5]>=100){cuota=allN[ni5];break;}}
-          var mor=calcMora(uPago,diaPago,sinP,fFact);
-          if(nombre.length>2){
-            // Si el nombre ya existe, agregar sufijo numérico para distinguir créditos individuales
-            var nombreFinal=nombre;
-            var cnt=2;
-            while(clientes.find(function(c){return c.nombre===nombreFinal;})){nombreFinal=nombre+' ('+cnt+')';cnt++;}
-            clientes.push({nombre:nombreFinal,saldo:Math.round(saldo),cuota:Math.round(cuota),num_cuotas:nCuotas,pagado:Math.round(pagado),fecha_factura:fFact||'',ultimo_pago:uPago||'',dia_pago:diaPago,dias_mora:mor.dias,tramo:mor.tramo,sin_ultimo_pago:sinP,accion:getAccion(mor.tramo),mensaje_wa:genMsg(nombreFinal,cuota,saldo,mor.tramo)});
-          }
-        }
+        // Dividir en segmentos por factura (cada línea que empieza con fecha = nueva factura)
+        var segments=[],seg2=null;
+        blockLines.forEach(function(l){
+          if(l.match(/^\d{2}\/\d{2}\/\d{4}/)){if(seg2)segments.push(seg2);seg2=[l];}
+          else if(seg2)seg2.push(l);
+        });
+        if(seg2&&seg2.length>0)segments.push(seg2);
+        if(segments.length===0)segments=[blockLines];
+        // Procesar cada factura como cliente independiente
+        segments.forEach(function(grpLines){
+          var allD=[],allN=[];
+          grpLines.forEach(function(dl){
+            var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
+            var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
+            var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>0;});
+            ns.forEach(function(n){allN.push(n);});
+          });
+          pushCliente(nombre,allD,allN);
+        });
       }
     }
     i++;
@@ -951,7 +970,7 @@ function genMsg(nombre,cuota,saldo,tr){
   if(tr==='150')return n+', 5 meses sin pago, saldo L '+s+'. Podemos buscar solucion.';
   return '';
 }
-function isNL(l){var s=l.indexOf('/');if(s<2)return false;var lN=l.substring(0,s).trim().replace(/\s+/g,' ').toUpperCase();var rN=l.substring(s+1).trim().replace(/\s+/g,' ').toUpperCase();return lN.length>=4&&lN===rN&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(lN)&&!lN.match(/^(SUBTOTAL|TOTAL|FECHA)/i);}
+function isNL(l){var s=l.indexOf('/');if(s<2)return false;var lN=l.substring(0,s).trim().replace(/\s+/g,' ').toUpperCase();var rN=l.substring(s+1).trim().replace(/\s+/g,' ').toUpperCase();var lo=lN.length>=rN.length?lN:rN,sh=lN.length<rN.length?lN:rN;var sim=lN===rN||(sh.length>=4&&lo.startsWith(sh))||(lN.length===rN.length&&lN.length>=4&&(function(){var d=0;for(var k=0;k<lN.length;k++)if(lN[k]!==rN[k])d++;return d<=2;}()));return lN.length>=4&&sim&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(lN)&&!lN.match(/^(SUBTOTAL|TOTAL|FECHA)/i);}
 function toTC(s){return s.toLowerCase().replace(/(?:^|\s)\S/g,function(a){return a.toUpperCase();});}
 function parseHNDate(s){if(!s)return null;var p=s.split('/');if(p.length!==3)return null;var d=new Date(+p[2],+p[1]-1,+p[0]);d.setHours(0,0,0,0);return isNaN(d)?null:d;}
 function daysSince(s){var d=parseHNDate(s);if(!d)return null;return Math.max(0,Math.floor((HOY-d)/86400000));}
