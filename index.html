@@ -4388,7 +4388,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
 
     // ── CONTROLES: mes + cartera ──
     html+='<div style="padding:10px 12px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)">';
-    html+='<span style="font-size:12px;font-weight:700;color:var(--text)">💰 Análisis de Cobro</span>';
+    html+='<span style="font-size:12px;font-weight:700;color:var(--text)">💰 Análisis de '+mesLabel+'</span>';
     html+='<div style="display:flex;align-items:center;gap:5px;margin-left:auto">';
     // selector mes
     html+='<select onchange="window._reloadCobroAnalisis(this.value,window._cobroAnalisisCartFiltro)" style="font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">';
@@ -4435,54 +4435,62 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     });
     html+='</div>';
 
-    // ── SIN ABONO EN EL MES ──
-    html+='<div style="padding:8px 12px 4px">';
-    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
-    html+='<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Sin abono en '+mesLabel+'</div>';
-    html+='<span style="background:var(--redbg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:10px">'+sinAbono.length+' clientes</span>';
-    html+='<span style="font-size:10px;color:var(--text3);margin-left:auto">mora acum: <strong style="color:var(--red)">'+fL(sinAbono.reduce(function(s,c){return s+c.moraVal;},0))+'</strong></span>';
-    html+='</div>';
-    if(sinAbono.length===0){
-      html+='<div style="font-size:11px;color:var(--green);padding:6px 0">✅ Todos abonaron en este mes.</div>';
-    }else{
-      html+='<div style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
-      sinAbono.forEach(function(c,i){
-        var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
-        html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
-        html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
-        html+='<div style="font-size:9px;color:var(--text3)">'+c.cartNombre+'</div></div>';
-        html+='<div style="text-align:right"><div style="font-size:10px;font-family:var(--mono);color:var(--text2)">saldo '+fL(c.saldo)+'</div>';
-        if(c.moraVal>0)html+='<div style="font-size:10px;font-weight:700;font-family:var(--mono);color:'+tc+'">mora '+fL(c.moraVal)+'</div>';
-        html+='</div></div>';
-      });
+    // ── DETALLE CLIENTES: solo cuando se selecciona una cartera específica ──
+    if(cartFiltro==='TODAS'){
+      html+='<div style="margin:4px 12px 14px;background:var(--bg3);border-radius:8px;padding:12px 14px;text-align:center">';
+      html+='<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Selecciona una cartera para ver el detalle de clientes</div>';
+      html+='<div style="font-size:10px;color:var(--text3)">Sin abono en el mes · Clientes altos en mora</div>';
       html+='</div>';
-    }
-    html+='</div>';
-
-    // ── TOP MORA (altos en mora global) ──
-    html+='<div style="padding:8px 12px 14px">';
-    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
-    html+='<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Clientes altos en mora</div>';
-    html+='<span style="background:var(--orangebg);color:var(--orange);font-size:10px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:10px">top '+topMora.length+'</span>';
-    html+='</div>';
-    if(topMora.length===0){
-      html+='<div style="font-size:11px;color:var(--green)">✅ Sin mora acumulada en este filtro.</div>';
     }else{
-      html+='<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
-      topMora.forEach(function(c,i){
-        var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
-        var pctMora=pct(c.moraVal,c.saldo);
-        html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
-        html+='<div style="font-size:11px;font-weight:700;color:var(--text3);font-family:var(--mono);width:16px;text-align:center">'+(i+1)+'</div>';
-        html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
-        html+='<div style="font-size:9px;color:var(--text3)">'+c.cartNombre+' · saldo '+fL(c.saldo)+'</div></div>';
-        html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:12px;font-weight:800;font-family:var(--mono);color:'+tc+'">'+fL(c.moraVal)+'</div>';
-        html+='<div style="font-size:9px;color:'+tc+';font-family:var(--mono)">'+pctMora+'% mora · '+c.tramo+'</div></div>';
+      // ── SIN ABONO EN EL MES ──
+      html+='<div style="padding:8px 12px 4px">';
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html+='<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Sin abono en '+mesLabel+'</div>';
+      html+='<span style="background:var(--redbg);color:var(--red);font-size:10px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:10px">'+sinAbono.length+' clientes</span>';
+      html+='<span style="font-size:10px;color:var(--text3);margin-left:auto">mora acum: <strong style="color:var(--red)">'+fL(sinAbono.reduce(function(s,c){return s+c.moraVal;},0))+'</strong></span>';
+      html+='</div>';
+      if(sinAbono.length===0){
+        html+='<div style="font-size:11px;color:var(--green);padding:6px 0">✅ Todos abonaron en este mes.</div>';
+      }else{
+        html+='<div style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
+        sinAbono.forEach(function(c,i){
+          var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
+          html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
+          html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
+          if(c.moraVal>0)html+='<div style="font-size:9px;color:'+tc+';font-weight:700">mora acum: '+fL(c.moraVal)+'</div>';
+          html+='</div>';
+          html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:10px;font-family:var(--mono);color:var(--text2)">saldo '+fL(c.saldo)+'</div></div>';
+          html+='</div>';
+        });
         html+='</div>';
-      });
+      }
+      html+='</div>';
+
+      // ── TOP MORA ──
+      html+='<div style="padding:8px 12px 14px">';
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html+='<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Clientes altos en mora</div>';
+      html+='<span style="background:var(--orangebg);color:var(--orange);font-size:10px;font-weight:700;font-family:var(--mono);padding:1px 7px;border-radius:10px">'+topMora.length+'</span>';
+      html+='</div>';
+      if(topMora.length===0){
+        html+='<div style="font-size:11px;color:var(--green)">✅ Sin mora acumulada.</div>';
+      }else{
+        html+='<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+        topMora.forEach(function(c,i){
+          var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
+          var pctMora=pct(c.moraVal,c.saldo);
+          html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
+          html+='<div style="font-size:11px;font-weight:700;color:var(--text3);font-family:var(--mono);width:16px;text-align:center">'+(i+1)+'</div>';
+          html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
+          html+='<div style="font-size:9px;color:var(--text3)">saldo '+fL(c.saldo)+' · tramo <span style="color:'+tc+';font-weight:700">'+c.tramo+'</span></div></div>';
+          html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:12px;font-weight:800;font-family:var(--mono);color:'+tc+'">'+fL(c.moraVal)+'</div>';
+          html+='<div style="font-size:9px;color:'+tc+';font-family:var(--mono)">'+pctMora+'% mora</div></div>';
+          html+='</div>';
+        });
+        html+='</div>';
+      }
       html+='</div>';
     }
-    html+='</div>';
 
     container.innerHTML=html;
     window._cobroAnalisisContainer=container;
