@@ -630,7 +630,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-22';
+var APP_VERSION='20260707-23';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -1046,6 +1046,19 @@ async function processPDF(file){
     });
     data.no_capturados=noSePudo.length?noSePudo.map(function(n){return{nombre:n,lineas:[]};}):[]; // solo quedan los que fallaron
     data._autoAgregados=autoAgregados;
+    // Si hay clientes sin datos suficientes → alerta urgente automática al programador
+    if(noSePudo.length>0){
+      try{
+        await supa.from('alertas').insert({
+          tipo:'urgente',
+          titulo:'Error parser PDF — '+data.empresa,
+          mensaje:'Al subir el PDF de "'+data.empresa+'" no se pudieron recuperar '+noSePudo.length+' cliente(s) por datos insuficientes en el PDF:\n'+noSePudo.join(', ')+'\n\nRevisar con el programador.',
+          cliente:noSePudo.join(', '),
+          autor:'Sistema',
+          created_at:new Date().toISOString()
+        });
+      }catch(e){console.error('alerta programador:',e);}
+    }
     // Mostrar informe (solo informativo, no requiere acción adicional)
     var ok=await showInforme(data,CARTERAS[id]);
     if(!ok)return;
@@ -4816,8 +4829,9 @@ function showInforme(data,existing){
   // Sección: no se pudo (datos insuficientes en el PDF)
   if(noSePudo.length>0){
     warn+='<div style="background:#fde8e8;border:1px solid #e53935;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#b71c1c">'
-      +'⚠️ <b>'+noSePudo.length+' cliente'+(noSePudo.length>1?'s sin datos suficientes en el PDF':' sin datos suficientes en el PDF')+'</b> — necesita revisión manual:<br>'
-      +'<span style="font-family:var(--mono)">'+noSePudo.map(function(b){return esc2(b.nombre);}).join(' · ')+'</span></div>';
+      +'🚨 <b>'+noSePudo.length+' cliente'+(noSePudo.length>1?'s sin datos legibles en el PDF':' sin datos legibles en el PDF')+':</b><br>'
+      +'<span style="font-family:var(--mono)">'+noSePudo.map(function(b){return esc2(b.nombre);}).join(' · ')+'</span><br>'
+      +'<span style="font-size:11px;opacity:.8">Se generó una alerta automática — el programador revisará el error.</span></div>';
   }
   // PDF completo
   if(autoAgr.length===0&&noSePudo.length===0&&pdfCount>0){
