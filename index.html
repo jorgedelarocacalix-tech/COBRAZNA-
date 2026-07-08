@@ -3396,7 +3396,10 @@ async function buildECG(cartId,container){
       {id:'150',label:'150 dias',color:'#b01020'},
       {id:'INACTIVO',label:'+180 días / Incobrable',color:'#4a4a4a',alerta:true},
     ];
-    var html='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px">'+snaps.length+' punto(s) · '+snaps[0].fecha+' → '+snaps[snaps.length-1].fecha+'</div>';
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+snaps.length+' punto(s) · '+snaps[0].fecha+' → '+snaps[snaps.length-1].fecha+'</span>'
+      +'<button onclick="descargarExcelSnapshots(\''+cartId+'\',\'INACTIVO\')" style="font-size:11px;padding:5px 14px;border-radius:6px;border:1px solid rgba(26,122,60,.4);background:var(--greenbg);color:var(--green);cursor:pointer;font-family:var(--mono);font-weight:600">📗 Excel +180d por fecha</button>'
+      +'</div>';
 
     // ── Detectar clientes que pasaron de 150 → INACTIVO entre el penúltimo y último snapshot ──
     var alertaInactivos=[];
