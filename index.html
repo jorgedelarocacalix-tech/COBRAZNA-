@@ -1038,6 +1038,7 @@ async function processPDF(file){
   try{
     var ab=await file.arrayBuffer();var lines=await extractText(ab);var data=parseCartera(lines);
     if(!data.clientes.length){showErr('Sin clientes en: '+file.name);return;}
+    var id=getCanonicalId(data.empresa);
     // Auto-agregar todos los no capturados usando sus datos del PDF
     var autoAgregados=[],noSePudo=[];
     (data.no_capturados||[]).forEach(function(b){
