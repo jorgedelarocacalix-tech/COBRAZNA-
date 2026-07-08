@@ -1136,6 +1136,12 @@ async function _renderGerentePanel(){
     var rp=await supa.from('proyecciones').select('*');
     if(!rp.error)(rp.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
   }
+  // Cargar cierre_proyeccion (último por cartera) para columna Proyectado
+  var cierreMap={};var totCierreGlobal=0;
+  if(supa){
+    var rc=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').order('mes_key',{ascending:false});
+    if(!rc.error){var _vC={};(rc.data||[]).forEach(function(row){if(_vC[row.cartera_id])return;_vC[row.cartera_id]=true;var s=0;(row.datos||[]).forEach(function(c){if(c.mora!=='INACTIVO')s+=(c.montoAsesor||0);});cierreMap[row.cartera_id]=Math.round(s);});}
+  }
 
   // ── Agregados globales ──
   var totClientes=0,totPagaron=0,totMora60=0,totMora120=0,totVencidos=0;
@@ -1189,7 +1195,8 @@ async function _renderGerentePanel(){
       totalGes+=montoExp||x.cuota||0;
     });
     totSisGlobal+=totalSis;totGesGlobal+=totalGes;
-    proyGlobal.push({id:id,nombre:c.empresa,totalSis:totalSis,totalGes:totalGes,nEditados:nEditados,nPendientes:nPendientes});
+    var cierre=cierreMap[id]||0;totCierreGlobal+=cierre;
+    proyGlobal.push({id:id,nombre:c.empresa,totalSis:totalSis,totalGes:totalGes,nEditados:nEditados,nPendientes:nPendientes,cierre:cierre});
   });
 
   // ── Proyección global hasta fin de mes ──
@@ -1252,6 +1259,7 @@ async function _renderGerentePanel(){
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:left;padding:4px 6px;text-transform:uppercase">Cartera</th>';
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Pendientes</th>';
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Sistema</th>';
+  h+='<th style="font-family:var(--mono);font-size:9px;color:var(--orange);text-align:right;padding:4px 6px;text-transform:uppercase" title="Suma de montoAsesor del cierre de proyección (Excel)">Proyectado</th>';
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Asesores</th>';
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right;padding:4px 6px;text-transform:uppercase">Diferencia</th>';
   h+='<th style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:center;padding:4px 6px;text-transform:uppercase">Editados</th>';
@@ -1265,6 +1273,7 @@ async function _renderGerentePanel(){
     h+='<td style="padding:5px 6px;font-weight:600;color:var(--text)">'+esc2(r.nombre)+'</td>';
     h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text3)">'+r.nPendientes+'</td>';
     h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--blue);font-weight:600">L '+fmt(r.totalSis)+'</td>';
+    h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--orange);font-weight:600">'+(r.cierre?'L '+fmt(r.cierre):'—')+'</td>';
     h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--green);font-weight:600">L '+fmt(r.totalGes)+'</td>';
     h+='<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:'+diffCol+';font-weight:600">'+diffLabel+'</td>';
     h+='<td style="padding:5px 6px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3)">'+r.nEditados+'/'+r.nPendientes+' ('+pctEdit+'%)</td>';
@@ -1275,6 +1284,7 @@ async function _renderGerentePanel(){
   h+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border)">';
   h+='<td colspan="2" style="padding:6px 6px;font-family:var(--mono);font-size:11px;color:var(--text3)">TOTAL GLOBAL</td>';
   h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--blue)">L '+fmt(totSisGlobal)+'</td>';
+  h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange)">L '+fmt(totCierreGlobal)+'</td>';
   h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--green)">L '+fmt(totGesGlobal)+'</td>';
   h+='<td style="padding:6px 6px;text-align:right;font-family:var(--mono);font-size:12px;color:'+(diffT>=0?'var(--green)':'var(--red)')+'">'+( diffT>0?'▲ L '+fmt(diffT):diffT<0?'▼ L '+fmt(Math.abs(diffT)):'=')+'</td>';
   h+='<td></td></tr>';
