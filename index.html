@@ -630,7 +630,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-20';
+var APP_VERSION='20260707-21';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -4758,37 +4758,92 @@ function fmt(n){return Number(n).toLocaleString('es-HN');}
 function esc(s){return String(s).replace(/'/g,"\\'");}
 function esc2(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function closeModal(id){document.getElementById(id).classList.remove('show');MODAL_AC=null;}
-var _informeResolve=null;
-function showInforme(data,existing){
+var _informeResolve=null,_informeData=null;
+// Parsea las líneas crudas de un bloque PDF y agrega el cliente a la lista
+function parseBloqueCliente(nombre,lineas,clientes){
+  var segments=[],seg2=null;
+  lineas.forEach(function(l){
+    if(l.match(/^\d{2}\/\d{2}\/\d{4}/)){if(seg2)segments.push(seg2);seg2=[l];}
+    else if(seg2)seg2.push(l);
+  });
+  if(seg2&&seg2.length>0)segments.push(seg2);
+  if(segments.length===0)segments=[lineas];
+  var agregados=0;
+  segments.forEach(function(grp){
+    var allD=[],allN=[];
+    grp.forEach(function(dl){
+      var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
+      var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
+      var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>0;});
+      ns.forEach(function(n){allN.push(n);});
+    });
+    if(allD.length<1||allN.length<1)return;
+    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
+    var bI=allN.findIndex(function(n){return n>=100;});var total=bI>=0?allN[bI]:0;
+    var nci=-1,nCuotas=0;for(var ni=bI+1;ni<allN.length;ni++){if(allN[ni]>=1&&allN[ni]<=36&&Number.isInteger(allN[ni])){nCuotas=Math.round(allN[ni]);nci=ni;break;}}
+    var pi=-1,pagado=0;for(var ni2=Math.max(nci,bI)+1;ni2<allN.length;ni2++){if(allN[ni2]>=0){pagado=allN[ni2];pi=ni2;break;}}
+    var si=-1,saldo=0;for(var ni3=pi+1;ni3<allN.length;ni3++){if(allN[ni3]>=0){saldo=allN[ni3];si=ni3;break;}}
+    var dpi=-1,diaPago=0;for(var ni4=si+1;ni4<allN.length;ni4++){if(allN[ni4]>=1&&allN[ni4]<=31&&Number.isInteger(allN[ni4])){diaPago=Math.round(allN[ni4]);dpi=ni4;break;}}
+    var cuota=0;for(var ni5=Math.max(dpi,si)+1;ni5<allN.length;ni5++){if(allN[ni5]>=100){cuota=allN[ni5];break;}}
+    var mor=calcMora(uPago,diaPago,sinP,fFact);
+    var nf=nombre;var cnt=2;while(clientes.find(function(c){return c.nombre===nf;})){nf=nombre+' ('+cnt+')';cnt++;}
+    clientes.push({nombre:nf,saldo:Math.round(saldo),cuota:Math.round(cuota),num_cuotas:nCuotas,pagado:Math.round(pagado),fecha_factura:fFact||'',ultimo_pago:uPago||'',dia_pago:diaPago,dias_mora:mor.dias,tramo:mor.tramo,sin_ultimo_pago:sinP,accion:getAccion(mor.tramo),mensaje_wa:genMsg(nf,cuota,saldo,mor.tramo)});
+    agregados++;
+  });
+  return agregados;
+}
+function _renderInforme(){
+  var data=_informeData;
+  var noCapt=data.no_capturados||[];
   var pdfCount=data.subtotal_count||0;
   var parsedCount=data.clientes.length;
-  var pagesCount=data.pages_count||0;
-  var noCapt=data.no_capturados||[];
   var warn='';
-  if(pdfCount>0&&noCapt.length>0){
-    var bloqHtml=noCapt.map(function(b){
-      var lineas=b.lineas.filter(function(l){return l.trim();}).slice(0,6);
-      return '<div style="margin-bottom:10px;padding:8px;background:#fff8f8;border-radius:6px;border-left:3px solid #e53935">'
-        +'<div style="font-weight:600;font-size:12px;color:#b71c1c;margin-bottom:4px">'+b.nombre+'</div>'
-        +'<div style="font-size:11px;color:#555;font-family:var(--mono);line-height:1.6">'+lineas.map(function(l){return esc2(l);}).join('<br>')+'</div>'
+  if(noCapt.length>0){
+    var bloqHtml=noCapt.map(function(b,idx){
+      var lineas=b.lineas.filter(function(l){return l.trim();}).slice(0,8);
+      return '<div id="nc-blq-'+idx+'" style="margin-bottom:8px;padding:8px;background:#fff8f8;border-radius:6px;border-left:3px solid #e53935">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        +'<span style="font-weight:600;font-size:12px;color:#b71c1c">'+esc2(b.nombre)+'</span>'
+        +'<button onclick="agregarFaltante('+idx+')" style="font-size:11px;padding:3px 10px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer">Agregar</button>'
+        +'</div>'
+        +'<div style="font-size:11px;color:#666;font-family:var(--mono);line-height:1.6">'+lineas.map(function(l){return esc2(l);}).join('<br>')+'</div>'
         +'</div>';
     }).join('');
-    warn='<div style="background:#fde8e8;border:1px solid #e53935;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#b71c1c;line-height:1.6">'
-      +'<b>⚠️ '+noCapt.length+' cliente'+(noCapt.length>1?'s':'')+' en el PDF no fueron capturados:</b></div>'
-      +'<div style="max-height:200px;overflow-y:auto;margin-bottom:10px;padding-right:4px">'+bloqHtml+'</div>';
-  }else if(pdfCount>0&&parsedCount===pdfCount){
-    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">'
-      +'✅ PDF completo — todos los <b>'+pdfCount+'</b> clientes fueron capturados.</div>';
-  }else if(!existing){
-    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">Cartera nueva — se creará con '+parsedCount+' clientes.</div>';
+    warn='<div style="background:#fde8e8;border:1px solid #e53935;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#b71c1c">'
+      +'<b>⚠️ '+noCapt.length+' cliente'+(noCapt.length>1?'s no fueron capturados':' no fue capturado')+'</b> — presione "Agregar" para incluirlos antes de guardar:</div>'
+      +'<div style="max-height:220px;overflow-y:auto;margin-bottom:8px;padding-right:2px">'+bloqHtml+'</div>';
+  }else if(pdfCount>0&&parsedCount>=pdfCount){
+    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#2e7d32">✅ PDF completo — todos los <b>'+pdfCount+'</b> clientes capturados.</div>';
+  }else if(pdfCount===0){
+    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#2e7d32">Cartera nueva — se creará con '+parsedCount+' clientes.</div>';
   }
-  document.getElementById('inf-titulo').textContent=data.empresa;
-  document.getElementById('inf-contador').textContent='PDF: '+pdfCount+' clientes  |  Capturados: '+parsedCount+(noCapt.length?' ⚠️ Faltan '+noCapt.length:'  ✅')+'  |  Páginas: '+pagesCount;
+  document.getElementById('inf-contador').textContent='PDF: '+pdfCount+'  |  Capturados: '+parsedCount+(noCapt.length?' ⚠️ Faltan: '+noCapt.length:' ✅');
   document.getElementById('inf-warn').innerHTML=warn;
   var listHtml=data.clientes.map(function(c,idx){
     return '<div style="padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)">'+(idx+1)+'. '+c.nombre+'</div>';
   }).join('');
   document.getElementById('inf-lista').innerHTML=listHtml;
+}
+function agregarFaltante(idx){
+  var b=_informeData.no_capturados[idx];
+  var n=parseBloqueCliente(b.nombre,b.lineas,_informeData.clientes);
+  if(n>0){
+    _informeData.no_capturados.splice(idx,1);
+    _renderInforme();
+  }else{
+    // No se pudo extraer datos automáticamente — marcar como pendiente pero agregar con saldo 0
+    var nf=b.nombre;var cnt=2;
+    while(_informeData.clientes.find(function(c){return c.nombre===nf;})){nf=b.nombre+' ('+cnt+')';cnt++;}
+    _informeData.clientes.push({nombre:nf,saldo:0,cuota:0,num_cuotas:0,pagado:0,fecha_factura:'',ultimo_pago:'',dia_pago:0,dias_mora:null,tramo:'MES',sin_ultimo_pago:true,accion:'Recordatorio',mensaje_wa:''});
+    _informeData.no_capturados.splice(idx,1);
+    _renderInforme();
+    showErr('Datos incompletos para "'+b.nombre+'" — agregado con saldo 0, actualice manualmente.');
+  }
+}
+function showInforme(data,existing){
+  _informeData=data;
+  document.getElementById('inf-titulo').textContent=data.empresa+' — Informe de Carga';
+  _renderInforme();
   document.getElementById('modal-informe').classList.add('show');
   return new Promise(function(resolve){_informeResolve=resolve;});
 }
