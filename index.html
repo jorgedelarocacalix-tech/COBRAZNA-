@@ -4333,8 +4333,8 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     var NOMBRES={'LA_ROCA_COMERCIAL_1':'La Roca Comercial','LA_ROCA_MOTORS_BARRIO_ARRIBA_1':'Motors Barrio Arriba','LA_ROCA_MOTORS_LA_LIBERTAD_2':'Motors La Libertad','SU_MOTO_DANLI':'Su Moto Danlí','SU_MUEBLE':'Su Mueble'};
     var IDS=['LA_ROCA_COMERCIAL_1','LA_ROCA_MOTORS_BARRIO_ARRIBA_1','LA_ROCA_MOTORS_LA_LIBERTAD_2','SU_MOTO_DANLI','SU_MUEBLE'];
 
-    // 1. Proyectado — latest cierre por cartera (excluye INACTIVO)
-    var r1=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').order('mes_key',{ascending:false});
+    // 1. Proyectado — cierre del mes seleccionado o el más reciente anterior (excluye INACTIVO)
+    var r1=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').lte('mes_key',mesKey).order('mes_key',{ascending:false});
     if(r1.error)throw r1.error;
     var mesRefLabel='';var vistosCart={};
     var todosClientes=[]; // {cartera_id, nombre, saldo, cuota, moraVal, tramo}
@@ -4406,7 +4406,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     for(var si=0;si<8;si++){dS.setMonth(dS.getMonth()-1);var sk=dS.getFullYear()+'-'+String(dS.getMonth()+1).padStart(2,'0');var sl=MESES[dS.getMonth()+1]+' '+dS.getFullYear();selOpts.push('<option value="'+sk+'"'+(sk===mesKey?' selected':'')+'>'+sl+'</option>');}
     html+=selOpts.join('')+'</select>';
     // selector cartera
-    html+='<select onchange="window._reloadCobroAnalisis(\''+mesKey+'\',this.value)" style="font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">';
+    html+='<select onchange="window._reloadCobroAnalisis(window._cobroAnalisisMesKey||\''+mesKey+'\',this.value)" style="font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">';
     html+='<option value="TODAS"'+(cartFiltro==='TODAS'?' selected':'')+'>Todas</option>';
     IDS.forEach(function(cid){html+='<option value="'+cid+'"'+(cartFiltro===cid?' selected':'')+'>'+NOMBRES[cid]+'</option>';});
     html+='</select>';
@@ -4508,6 +4508,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
 
     window._cobroSinAbono=sinAbono;
     window._cobroTopMora=topMora;
+    window._cobroAnalisisMesKey=mesKey;
     window._cobroAnalisisLastData={mesKey:mesKey,cartFiltro:cartFiltro,mesLabel:mesLabel,sinAbono:sinAbono,topMora:topMora,rows:rows,tot:tot,NOMBRES:NOMBRES};
     container.innerHTML=html;
     window._cobroAnalisisContainer=container;
