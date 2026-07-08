@@ -4400,6 +4400,8 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     html+='<option value="TODAS"'+(cartFiltro==='TODAS'?' selected':'')+'>Todas</option>';
     IDS.forEach(function(cid){html+='<option value="'+cid+'"'+(cartFiltro===cid?' selected':'')+'>'+NOMBRES[cid]+'</option>';});
     html+='</select>';
+    html+='<button onclick="window._cobroExportPDF()" title="Exportar PDF" style="padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer">📄 PDF</button>';
+    html+='<button onclick="window._cobroExportCSV()" title="Exportar Excel/CSV" style="padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer">📊 Excel</button>';
     html+='</div></div>';
 
     // ── TOTAL ÚNICO MORA ──
@@ -4460,6 +4462,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
           if(c.moraVal>0)html+='<div style="font-size:9px;color:'+tc+';font-weight:700">mora acum: '+fL(c.moraVal)+'</div>';
           html+='</div>';
           html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:10px;font-family:var(--mono);color:var(--text2)">saldo '+fL(c.saldo)+'</div></div>';
+          html+='<button onclick="window._cobroAgregarNota('+i+',\'sin\')" title="Agregar nota al historial" style="flex-shrink:0;padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:10px;cursor:pointer">💬</button>';
           html+='</div>';
         });
         html+='</div>';
@@ -4485,6 +4488,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
           html+='<div style="font-size:9px;color:var(--text3)">saldo '+fL(c.saldo)+' · tramo <span style="color:'+tc+';font-weight:700">'+c.tramo+'</span></div></div>';
           html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:12px;font-weight:800;font-family:var(--mono);color:'+tc+'">'+fL(c.moraVal)+'</div>';
           html+='<div style="font-size:9px;color:'+tc+';font-family:var(--mono)">'+pctMora+'% mora</div></div>';
+          html+='<button onclick="window._cobroAgregarNota('+i+',\'top\')" title="Agregar nota al historial" style="flex-shrink:0;padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:10px;cursor:pointer">💬</button>';
           html+='</div>';
         });
         html+='</div>';
@@ -4492,6 +4496,9 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
       html+='</div>';
     }
 
+    window._cobroSinAbono=sinAbono;
+    window._cobroTopMora=topMora;
+    window._cobroAnalisisLastData={mesKey:mesKey,cartFiltro:cartFiltro,mesLabel:mesLabel,sinAbono:sinAbono,topMora:topMora,rows:rows,tot:tot,NOMBRES:NOMBRES};
     container.innerHTML=html;
     window._cobroAnalisisContainer=container;
     window._cobroAnalisisCartFiltro=cartFiltro;
@@ -4503,6 +4510,122 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
 window._reloadCobroAnalisis=async function(mesKey,cartFiltro){
   var c=window._cobroAnalisisContainer;
   if(c){window._cobroAnalisisCartFiltro=cartFiltro||'TODAS';await _renderCobroAnalisis(c,mesKey,cartFiltro||'TODAS');}
+};
+
+window._cobroAgregarNota=function(idx,lista){
+  var c=lista==='sin'?(window._cobroSinAbono||[])[idx]:(window._cobroTopMora||[])[idx];
+  if(!c)return;
+  window._cobroNotaActual=c;
+  var ov=document.createElement('div');
+  ov.id='cobro-nota-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:20px;width:100%;max-width:360px;box-shadow:var(--shadow2)">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">💬 Agregar nota</div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.4">'+c.nombre+'<br><span style="font-size:10px">'+c.cartNombre+'</span></div>'
+    +'<textarea id="cobro-nota-txt" rows="3" style="width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;resize:vertical;outline:none" placeholder="Escribe el comentario..."></textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'cobro-nota-ov\').remove()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer">Cancelar</button>'
+    +'<button id="cobro-nota-btn" onclick="window._cobroGuardarNota()" style="padding:6px 16px;border-radius:6px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer">Guardar</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  setTimeout(function(){var t=document.getElementById('cobro-nota-txt');if(t)t.focus();},80);
+};
+
+window._cobroGuardarNota=async function(){
+  var c=window._cobroNotaActual;
+  var t=document.getElementById('cobro-nota-txt');
+  if(!c||!t||!t.value.trim()){if(t)t.style.borderColor='var(--red)';return;}
+  var btn=document.getElementById('cobro-nota-btn');
+  if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+  try{
+    var hoy=new Date().toISOString().split('T')[0];
+    await dbSaveHist({cartera_id:c.cartera_id,cliente_nombre:c.nombre,tipo:'nota',nota:'[Análisis] '+t.value.trim(),monto:null,fecha_accion:hoy,gestor:(USER&&USER.nombre)||'—',created_at:new Date().toISOString()});
+    document.getElementById('cobro-nota-ov').remove();
+    var toast=document.createElement('div');
+    toast.style.cssText='position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:700;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    toast.textContent='✓ Nota guardada en historial de '+c.nombre;
+    document.body.appendChild(toast);
+    setTimeout(function(){toast.remove();},2800);
+  }catch(e){
+    alert('Error al guardar nota: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Guardar';}
+  }
+};
+
+window._cobroExportCSV=function(){
+  var d=window._cobroAnalisisLastData;
+  if(!d){alert('Primero carga el análisis.');return;}
+  var fL=function(n){return Math.round(n||0);};
+  var rows=[['Análisis de Cobro — '+d.mesLabel],[]];
+  rows.push(['RESUMEN POR CARTERA']);
+  rows.push(['Cartera','Clientes','Cobrado','Mora Acumulada','% Mora']);
+  d.rows.forEach(function(r){
+    var mp=r.saldo>0?Math.round(r.moraVal/r.saldo*100):0;
+    rows.push([r.nombre,r.clientes,fL(r.cobrado),fL(r.moraVal),mp+'%']);
+  });
+  rows.push(['TOTAL',d.tot.clientes,fL(d.tot.cobrado),fL(d.tot.moraVal),(d.tot.saldo>0?Math.round(d.tot.moraVal/d.tot.saldo*100):0)+'%']);
+  if(d.sinAbono&&d.sinAbono.length){
+    rows.push([],[]);
+    rows.push(['SIN ABONO EN '+d.mesLabel.toUpperCase()]);
+    rows.push(['Nombre','Cartera','Saldo','Mora Acumulada','Tramo']);
+    d.sinAbono.forEach(function(c){rows.push([c.nombre,c.cartNombre,fL(c.saldo),fL(c.moraVal),c.tramo]);});
+  }
+  if(d.topMora&&d.topMora.length){
+    rows.push([],[]);
+    rows.push(['CLIENTES ALTOS EN MORA']);
+    rows.push(['#','Nombre','Cartera','Saldo','Mora Acumulada','% Mora','Tramo']);
+    d.topMora.forEach(function(c,i){
+      var pm=c.saldo>0?Math.round(c.moraVal/c.saldo*100):0;
+      rows.push([i+1,c.nombre,c.cartNombre,fL(c.saldo),fL(c.moraVal),pm+'%',c.tramo]);
+    });
+  }
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+(String(v||'').replace(/"/g,'""'))+'"';}).join(',');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Analisis_Cobro_'+d.mesKey+(d.cartFiltro!=='TODAS'?'_'+d.cartFiltro:'')+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+window._cobroExportPDF=function(){
+  var d=window._cobroAnalisisLastData;
+  if(!d){alert('Primero carga el análisis.');return;}
+  var fL=function(n){return 'L '+Math.round(n||0).toLocaleString('es-HN');};
+  var pct=function(n,x){return x>0?Math.round(n/x*100):0;};
+  var moraPct=pct(d.tot.moraVal,d.tot.saldo);
+  var w=window.open('','_blank');
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Análisis '+d.mesLabel+'</title><style>';
+  h+='body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:24px;} h1{font-size:16px;margin-bottom:2px;} .sub{font-size:11px;color:#666;margin-bottom:18px;}';
+  h+='table{width:100%;border-collapse:collapse;margin-bottom:18px;} th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;} td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;}';
+  h+='.hero{background:#fff3f3;border:2px solid #c0392b;border-radius:8px;padding:14px 18px;margin-bottom:18px;} .hero-val{font-size:24px;font-weight:900;color:#c0392b;font-family:monospace;}';
+  h+='.hero-sub{font-size:11px;color:#555;margin-top:4px;} h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px;}';
+  h+='@media print{body{margin:10px;} button{display:none;}} .red{color:#c0392b;font-weight:700;} .green{color:#27ae60;font-weight:700;}';
+  h+='</style></head><body>';
+  h+='<h1>Análisis de Cobro — '+d.mesLabel+'</h1>';
+  h+='<div class="sub">Corporación La Roca · '+(d.cartFiltro==='TODAS'?'Todas las carteras':d.NOMBRES[d.cartFiltro]||d.cartFiltro)+' · Generado '+new Date().toLocaleDateString('es-HN')+'</div>';
+  h+='<div class="hero"><div style="font-size:10px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total mora acumulada</div>';
+  h+='<div class="hero-val">'+fL(d.tot.moraVal)+'</div>';
+  h+='<div class="hero-sub">'+d.tot.clientesEnMora+' clientes con cuotas vencidas · '+moraPct+'% del saldo activo</div></div>';
+  h+='<h2>Resumen por cartera</h2><table><tr><th>Cartera</th><th>Clientes</th><th>Cobrado</th><th>Mora acumulada</th><th>% Mora</th></tr>';
+  d.rows.forEach(function(r){var mp=pct(r.moraVal,r.saldo);h+='<tr><td>'+r.nombre+'</td><td>'+r.clientes+'</td><td>'+fL(r.cobrado)+'</td><td class="red">'+fL(r.moraVal)+'</td><td class="'+(mp<8?'green':'red')+'">'+mp+'%</td></tr>';});
+  h+='<tr style="font-weight:700;background:#fafafa"><td>TOTAL</td><td>'+d.tot.clientes+'</td><td>'+fL(d.tot.cobrado)+'</td><td class="red">'+fL(d.tot.moraVal)+'</td><td class="red">'+moraPct+'%</td></tr></table>';
+  if(d.sinAbono&&d.sinAbono.length){
+    h+='<h2>Sin abono en '+d.mesLabel+' ('+d.sinAbono.length+' clientes)</h2>';
+    h+='<table><tr><th>Nombre</th><th>Cartera</th><th>Saldo</th><th>Mora acum.</th><th>Tramo</th></tr>';
+    d.sinAbono.forEach(function(c){h+='<tr><td>'+c.nombre+'</td><td>'+c.cartNombre+'</td><td>'+fL(c.saldo)+'</td><td class="red">'+fL(c.moraVal)+'</td><td>'+c.tramo+'</td></tr>';});
+    h+='</table>';
+  }
+  if(d.topMora&&d.topMora.length){
+    h+='<h2>Clientes altos en mora</h2>';
+    h+='<table><tr><th>#</th><th>Nombre</th><th>Cartera</th><th>Saldo</th><th>Mora acum.</th><th>% Mora</th><th>Tramo</th></tr>';
+    d.topMora.forEach(function(c,i){var pm=pct(c.moraVal,c.saldo);h+='<tr><td>'+(i+1)+'</td><td>'+c.nombre+'</td><td>'+c.cartNombre+'</td><td>'+fL(c.saldo)+'</td><td class="red">'+fL(c.moraVal)+'</td><td class="red">'+pm+'%</td><td>'+c.tramo+'</td></tr>';});
+    h+='</table>';
+  }
+  h+='</body></html>';
+  w.document.write(h);w.document.close();
+  setTimeout(function(){w.print();},400);
 };
 
 // ── Filtros Mora Global ──
