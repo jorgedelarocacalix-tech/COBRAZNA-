@@ -4350,7 +4350,9 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
         nClientes++;
         proj+=(c.montoAsesor||0);cuota+=(c.cuota||0);mora+=(c.moraVal||0);saldo+=(c.saldo||0);
         if((c.moraVal||0)>0)nMora++;
-        todosClientes.push({cartera_id:row.cartera_id,cartNombre:NOMBRES[row.cartera_id]||row.cartera_id,nombre:c.nombre,saldo:c.saldo||0,cuota:c.cuota||0,moraVal:c.moraVal||0,tramo:c.mora||'MES'});
+        var _cartCl=((typeof CARTERAS!=='undefined'&&CARTERAS[row.cartera_id]&&CARTERAS[row.cartera_id].clientes)||[]);
+        var _cli=_cartCl.find(function(x){return x.nombre.toLowerCase().trim()===c.nombre.toLowerCase().trim();});
+        todosClientes.push({cartera_id:row.cartera_id,cartNombre:NOMBRES[row.cartera_id]||row.cartera_id,nombre:c.nombre,saldo:c.saldo||0,cuota:c.cuota||0,moraVal:c.moraVal||0,tramo:c.mora||'MES',ultimoPago:(_cli&&_cli.ultimo_pago)||null});
       });
       proyMap[row.cartera_id]={proyectado:Math.round(proj),cuota:Math.round(cuota),moraVal:Math.round(mora),saldo:Math.round(saldo),clientes:nClientes,clientesEnMora:nMora};
     });
@@ -4498,6 +4500,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
           var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
           html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
           html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
+          html+='<div style="font-size:9px;color:var(--text3)">último pago: <span style="color:'+(c.ultimoPago?'var(--text2)':'var(--red)')+'font-weight:600">'+(c.ultimoPago||'sin registro')+'</span></div>';
           if(c.moraVal>0)html+='<div style="font-size:9px;color:'+tc+';font-weight:700">mora acum: '+fL(c.moraVal)+'</div>';
           html+='</div>';
           html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:10px;font-family:var(--mono);color:var(--text2)">saldo '+fL(c.saldo)+'</div></div>';
