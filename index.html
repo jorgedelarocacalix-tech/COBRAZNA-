@@ -4360,11 +4360,40 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     var fechaFin=yrN+'-'+String(moN).padStart(2,'0')+'-01';
     var r2=await supa.from('historial_clientes').select('cartera_id,cliente_nombre,monto').in('tipo',['pago','abono']).gte('fecha_accion',mesKey+'-01').lt('fecha_accion',fechaFin).limit(5000);
     if(r2.error)throw r2.error;
-    var cobradoMap={};var pagaronSet=new Set();
+    var cobradoMap={};var pagaronSet=new Set();var pagaronList=[];
     (r2.data||[]).forEach(function(row){
       cobradoMap[row.cartera_id]=(cobradoMap[row.cartera_id]||0)+(row.monto||0);
-      if(row.cliente_nombre)pagaronSet.add(row.cartera_id+'::'+row.cliente_nombre.toLowerCase().trim());
+      if(row.cliente_nombre){
+        var k=row.cartera_id+'::'+row.cliente_nombre.toLowerCase().trim();
+        pagaronSet.add(k);
+        pagaronList.push({cid:row.cartera_id,nom:row.cliente_nombre.toLowerCase().trim()});
+      }
     });
+
+    // Matching por palabras — tolera 1 char de diferencia por palabra (ej: Adoni vs Adonis)
+    function _palabrasParecidas(a,b){
+      if(a===b)return true;
+      var wa=a.split(/\s+/),wb=b.split(/\s+/);
+      if(Math.abs(wa.length-wb.length)>1)return false;
+      var min=Math.min(wa.length,wb.length),ok=0;
+      for(var i=0;i<min;i++){
+        var x=wa[i],y=wb[i];
+        if(x===y){ok++;continue;}
+        if(x.startsWith(y)||y.startsWith(x)){ok++;continue;}
+        if(Math.abs(x.length-y.length)<=1){
+          var lo=x.length>=y.length?x:y,sh=x.length<y.length?x:y,d=0;
+          for(var k=0;k<sh.length;k++)if(sh[k]!==lo[k])d++;
+          if(d<=1){ok++;continue;}
+        }
+      }
+      return ok>=min;
+    }
+    function _pagaron(cartId,nombre){
+      var key=cartId+'::'+nombre.toLowerCase().trim();
+      if(pagaronSet.has(key))return true;
+      var n=nombre.toLowerCase().trim();
+      return pagaronList.some(function(p){return p.cid===cartId&&_palabrasParecidas(n,p.nom);});
+    }
 
     // 3. Aplicar filtro cartera
     var idsFiltro=cartFiltro==='TODAS'?IDS:[cartFiltro];
@@ -4372,7 +4401,7 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
 
     // 4. Sin abono en el mes
     var sinAbono=clientesFiltro.filter(function(c){
-      return !pagaronSet.has(c.cartera_id+'::'+c.nombre.toLowerCase().trim());
+      return !_pagaron(c.cartera_id,c.nombre);
     }).sort(function(a,b){return b.moraVal-a.moraVal;});
 
     // 5. Top mora (excluye moraVal=0)
