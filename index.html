@@ -4319,7 +4319,8 @@ function buildMoraGlobal(cartId, cl){
 async function buildCobroAnalisis(container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion a Supabase.</div>';return;}
   var ahora=new Date();
-  var defKey=ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
+  var prev=new Date(ahora.getFullYear(),ahora.getMonth()-1,1);
+  var defKey=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');
   window._cobroAnalisisContainer=container;
   window._cobroAnalisisCartFiltro='TODAS';
   await _renderCobroAnalisis(container,defKey,'TODAS');
