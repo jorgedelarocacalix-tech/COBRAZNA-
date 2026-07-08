@@ -4398,6 +4398,17 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
       return pagaronList.some(function(p){return p.cid===cartId&&_palabrasParecidas(n,p.nom);});
     }
 
+    // 2b. Historial reciente (notas, visitas, promesas) por cliente para mostrar en la lista
+    var histMap={};
+    var r3=await supa.from('historial_clientes').select('cartera_id,cliente_nombre,tipo,nota,monto,fecha_accion,gestor').not('tipo','in','("pago","abono")').in('cartera_id',IDS).order('fecha_accion',{ascending:false}).limit(1500);
+    if(!r3.error){
+      (r3.data||[]).forEach(function(h){
+        var k=h.cartera_id+'::'+(h.cliente_nombre||'').toLowerCase().trim();
+        if(!histMap[k])histMap[k]=[];
+        if(histMap[k].length<4)histMap[k].push(h);
+      });
+    }
+
     // 3. Aplicar filtro cartera
     var idsFiltro=cartFiltro==='TODAS'?IDS:[cartFiltro];
     var clientesFiltro=todosClientes.filter(function(c){return idsFiltro.indexOf(c.cartera_id)>=0;});
@@ -4499,9 +4510,24 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
         sinAbono.forEach(function(c,i){
           var tc=TRAMO_COLORS[c.tramo]||'var(--text3)';
           html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;'+(i%2===0?'background:var(--bg2)':'')+'">';
+          var _hKey=c.cartera_id+'::'+c.nombre.toLowerCase().trim();
+          var _hItems=histMap[_hKey]||[];
+          var _HICO={'nota':'💬','promesa':'📅','promesa_cumplida':'✅','promesa_incumplida':'🚨','visita_realizada':'🚗','visita_agenda':'📆'};
+          var _HCOL={'nota':'var(--blue)','promesa':'var(--purple)','promesa_cumplida':'var(--green)','promesa_incumplida':'var(--red)','visita_realizada':'var(--orange)','visita_agenda':'var(--text3)'};
           html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.nombre+'</div>';
-          html+='<div style="font-size:9px;color:var(--text3)">último pago: <span style="color:'+(c.ultimoPago?'var(--text2)':'var(--red)')+'font-weight:600">'+(c.ultimoPago||'sin registro')+'</span></div>';
-          if(c.moraVal>0)html+='<div style="font-size:9px;color:'+tc+';font-weight:700">mora acum: '+fL(c.moraVal)+'</div>';
+          html+='<div style="font-size:9px;color:var(--text3)">último pago: <span style="color:'+(c.ultimoPago?'var(--text2)':'var(--red)')+';font-weight:600">'+(c.ultimoPago||'sin registro')+'</span> · mora: <span style="color:'+tc+';font-weight:700">'+fL(c.moraVal)+'</span></div>';
+          if(_hItems.length){
+            html+='<div style="margin-top:3px;display:flex;flex-direction:column;gap:2px">';
+            _hItems.forEach(function(h){
+              var ico=_HICO[h.tipo]||'📝';
+              var col=_HCOL[h.tipo]||'var(--text3)';
+              var fecha=h.fecha_accion?h.fecha_accion.substring(5).replace('-','/'):'';
+              var nota=(h.nota||'').replace(/^\[Análisis\]\s*/,'').replace(/^\[Proyeccion\]\s*/,'');
+              if(nota.length>55)nota=nota.substring(0,55)+'…';
+              html+='<div style="font-size:9px;color:var(--text3);display:flex;gap:3px;align-items:flex-start"><span>'+ico+'</span><span style="color:'+col+';font-weight:600;white-space:nowrap">'+fecha+'</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nota+'</span></div>';
+            });
+            html+='</div>';
+          }
           html+='</div>';
           html+='<div style="text-align:right;white-space:nowrap"><div style="font-size:10px;font-family:var(--mono);color:var(--text2)">saldo '+fL(c.saldo)+'</div></div>';
           html+='<button onclick="window._cobroAgregarNota('+i+',\'sin\')" title="Agregar nota al historial" style="flex-shrink:0;padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:10px;cursor:pointer">💬</button>';
