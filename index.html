@@ -630,7 +630,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-18';
+var APP_VERSION='20260707-19';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -940,10 +940,32 @@ function parseCartera(lines){
     }
     i++;
   }
-  var subtotalCount=lines.filter(function(l){return l.match(/^subtotal/i);}).length;
   var pagesCount=lines.filter(function(l){return l==='---';}).length;
-  console.log('[Parser] '+empresa+': '+clientes.length+'/'+subtotalCount+' clientes ('+pagesCount+' páginas) → '+clientes.map(function(c){return c.nombre;}).join(' | '));
-  return {empresa:empresa,fecha_emision:fechaEm,clientes:clientes,subtotal_count:subtotalCount,pages_count:pagesCount};
+  // Segunda pasada: identificar todos los bloques NAME→SUBTOTAL del PDF
+  // para detectar cuáles no fueron capturados por el parser
+  var pdfBloques=[];
+  var blqNombre=null,blqLineas=[];
+  for(var bi=0;bi<lines.length;bi++){
+    var bl=lines[bi];if(bl==='---')continue;
+    var bSlash=bl.indexOf('/');
+    if(bSlash>2&&bSlash<bl.length-2){
+      var bL=bl.substring(0,bSlash).trim().replace(/\s+/g,' ').toUpperCase();
+      var bR=bl.substring(bSlash+1).trim().replace(/\s+/g,' ').toUpperCase();
+      if(bL.length>=4&&nameSim(bL,bR)&&/^[A-ZÁÉÍÓÚÑÜÀÈÌÒÙÂÊÎÔÛÄÖÝ\s\d\-\.•]+$/.test(bL)&&!bL.match(/^(SUBTOTAL|TOTAL|FECHA|NUM|PAGADO|SALDO|CUOTA|DEBE|LA ROCA|PROYECCI|FACTURAS)/i)){
+        if(blqNombre)pdfBloques.push({nombre:toTC(blqNombre),lineas:blqLineas});
+        blqNombre=bL;blqLineas=[];continue;
+      }
+    }
+    if(blqNombre&&bl.match(/^subtotal/i)){pdfBloques.push({nombre:toTC(blqNombre),lineas:blqLineas});blqNombre=null;blqLineas=[];continue;}
+    if(blqNombre)blqLineas.push(bl);
+  }
+  if(blqNombre)pdfBloques.push({nombre:toTC(blqNombre),lineas:blqLineas});
+  var parsedNombres=clientes.map(function(c){return c.nombre.replace(/ \(\d+\)$/,'');});
+  var noCapturados=pdfBloques.filter(function(b){return !parsedNombres.some(function(n){return nameSim(n.toUpperCase(),b.nombre.toUpperCase());});});
+  var subtotalCount=pdfBloques.length;
+  console.log('[Parser] '+empresa+': '+clientes.length+'/'+subtotalCount+' clientes ('+pagesCount+' páginas)');
+  if(noCapturados.length)console.warn('[Parser] No capturados:',noCapturados.map(function(b){return b.nombre;}));
+  return {empresa:empresa,fecha_emision:fechaEm,clientes:clientes,subtotal_count:subtotalCount,pages_count:pagesCount,no_capturados:noCapturados};
 }
 function calcMora(up,dp,sinP,fFact){
   var hD=HOY.getDate();
@@ -4738,25 +4760,30 @@ function esc2(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 function closeModal(id){document.getElementById(id).classList.remove('show');MODAL_AC=null;}
 var _informeResolve=null;
 function showInforme(data,existing){
-  var pdfCount=data.subtotal_count||0; // clientes reales según SUBTOTAL del PDF
+  var pdfCount=data.subtotal_count||0;
   var parsedCount=data.clientes.length;
   var pagesCount=data.pages_count||0;
+  var noCapt=data.no_capturados||[];
   var warn='';
-  // Advertencia principal: parser vs. SUBTOTAL del PDF
-  if(pdfCount>0&&parsedCount<pdfCount){
-    var faltanParser=pdfCount-parsedCount;
+  if(pdfCount>0&&noCapt.length>0){
+    var bloqHtml=noCapt.map(function(b){
+      var lineas=b.lineas.filter(function(l){return l.trim();}).slice(0,6);
+      return '<div style="margin-bottom:10px;padding:8px;background:#fff8f8;border-radius:6px;border-left:3px solid #e53935">'
+        +'<div style="font-weight:600;font-size:12px;color:#b71c1c;margin-bottom:4px">'+b.nombre+'</div>'
+        +'<div style="font-size:11px;color:#555;font-family:var(--mono);line-height:1.6">'+lineas.map(function(l){return esc2(l);}).join('<br>')+'</div>'
+        +'</div>';
+    }).join('');
     warn='<div style="background:#fde8e8;border:1px solid #e53935;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#b71c1c;line-height:1.6">'
-      +'<b>⚠️ El parser no capturó todos los clientes:</b><br>'
-      +'PDF contiene <b>'+pdfCount+'</b> clientes (líneas SUBTOTAL) pero se detectaron <b>'+parsedCount+'</b>.<br>'
-      +'<b>Faltan '+faltanParser+' clientes</b> — revise el PDF o agregue manualmente los que no aparezcan en la lista.</div>';
+      +'<b>⚠️ '+noCapt.length+' cliente'+(noCapt.length>1?'s':'')+' en el PDF no fueron capturados:</b></div>'
+      +'<div style="max-height:200px;overflow-y:auto;margin-bottom:10px;padding-right:4px">'+bloqHtml+'</div>';
   }else if(pdfCount>0&&parsedCount===pdfCount){
     warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">'
-      +'✅ PDF completo — todos los <b>'+pdfCount+'</b> clientes fueron detectados correctamente.</div>';
+      +'✅ PDF completo — todos los <b>'+pdfCount+'</b> clientes fueron capturados.</div>';
   }else if(!existing){
     warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">Cartera nueva — se creará con '+parsedCount+' clientes.</div>';
   }
   document.getElementById('inf-titulo').textContent=data.empresa;
-  document.getElementById('inf-contador').textContent='Parser: '+parsedCount+' clientes  |  PDF (SUBTOTAL): '+(pdfCount||'?')+'  |  Páginas: '+pagesCount;
+  document.getElementById('inf-contador').textContent='PDF: '+pdfCount+' clientes  |  Capturados: '+parsedCount+(noCapt.length?' ⚠️ Faltan '+noCapt.length:'  ✅')+'  |  Páginas: '+pagesCount;
   document.getElementById('inf-warn').innerHTML=warn;
   var listHtml=data.clientes.map(function(c,idx){
     return '<div style="padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)">'+(idx+1)+'. '+c.nombre+'</div>';
