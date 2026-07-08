@@ -4319,9 +4319,7 @@ function buildMoraGlobal(cartId, cl){
 async function buildCobroAnalisis(container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion a Supabase.</div>';return;}
   var ahora=new Date();
-  var mesN=ahora.getMonth();var anoN=ahora.getFullYear();
-  if(mesN===0){mesN=12;anoN--;}
-  var defKey=anoN+'-'+String(mesN).padStart(2,'0');
+  var defKey=ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
   window._cobroAnalisisContainer=container;
   window._cobroAnalisisCartFiltro='TODAS';
   await _renderCobroAnalisis(container,defKey,'TODAS');
@@ -4334,8 +4332,8 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     var NOMBRES={'LA_ROCA_COMERCIAL_1':'La Roca Comercial','LA_ROCA_MOTORS_BARRIO_ARRIBA_1':'Motors Barrio Arriba','LA_ROCA_MOTORS_LA_LIBERTAD_2':'Motors La Libertad','SU_MOTO_DANLI':'Su Moto Danlí','SU_MUEBLE':'Su Mueble'};
     var IDS=['LA_ROCA_COMERCIAL_1','LA_ROCA_MOTORS_BARRIO_ARRIBA_1','LA_ROCA_MOTORS_LA_LIBERTAD_2','SU_MOTO_DANLI','SU_MUEBLE'];
 
-    // 1. Proyectado — cierre del mes seleccionado o el más reciente anterior (excluye INACTIVO)
-    var r1=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').lte('mes_key',mesKey).order('mes_key',{ascending:false});
+    // 1. Proyectado — cierre más reciente por cartera (excluye INACTIVO)
+    var r1=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').order('mes_key',{ascending:false});
     if(r1.error)throw r1.error;
     var mesRefLabel='';var vistosCart={};
     var todosClientes=[]; // {cartera_id, nombre, saldo, cuota, moraVal, tramo}
