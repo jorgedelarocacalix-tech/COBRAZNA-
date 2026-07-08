@@ -630,7 +630,7 @@ var USUARIOS={
 };
 
 // ══ STATE ══
-var APP_VERSION='20260707-17';
+var APP_VERSION='20260707-18';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -940,8 +940,10 @@ function parseCartera(lines){
     }
     i++;
   }
-  console.log('[Parser] '+empresa+': '+clientes.length+' clientes → '+clientes.map(function(c){return c.nombre;}).join(' | '));
-  return {empresa:empresa,fecha_emision:fechaEm,clientes:clientes};
+  var subtotalCount=lines.filter(function(l){return l.match(/^subtotal/i);}).length;
+  var pagesCount=lines.filter(function(l){return l==='---';}).length;
+  console.log('[Parser] '+empresa+': '+clientes.length+'/'+subtotalCount+' clientes ('+pagesCount+' páginas) → '+clientes.map(function(c){return c.nombre;}).join(' | '));
+  return {empresa:empresa,fecha_emision:fechaEm,clientes:clientes,subtotal_count:subtotalCount,pages_count:pagesCount};
 }
 function calcMora(up,dp,sinP,fFact){
   var hD=HOY.getDate();
@@ -4736,24 +4738,25 @@ function esc2(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 function closeModal(id){document.getElementById(id).classList.remove('show');MODAL_AC=null;}
 var _informeResolve=null;
 function showInforme(data,existing){
-  var prevCount=existing&&existing.clientes?existing.clientes.length:0;
-  var newCount=data.clientes.length;
+  var pdfCount=data.subtotal_count||0; // clientes reales según SUBTOTAL del PDF
+  var parsedCount=data.clientes.length;
+  var pagesCount=data.pages_count||0;
   var warn='';
-  if(existing&&newCount<prevCount-2){
-    var faltantes=prevCount-newCount;
-    warn='<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#856404;line-height:1.5">'
-      +'<b>⚠️ Advertencia:</b> El PDF tiene <b>'+newCount+'</b> clientes pero la cartera anterior tenía <b>'+prevCount+'</b>. '
-      +'Pueden faltar <b>'+faltantes+'</b> clientes. Verifique que el PDF esté completo antes de guardar.</div>';
+  // Advertencia principal: parser vs. SUBTOTAL del PDF
+  if(pdfCount>0&&parsedCount<pdfCount){
+    var faltanParser=pdfCount-parsedCount;
+    warn='<div style="background:#fde8e8;border:1px solid #e53935;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#b71c1c;line-height:1.6">'
+      +'<b>⚠️ El parser no capturó todos los clientes:</b><br>'
+      +'PDF contiene <b>'+pdfCount+'</b> clientes (líneas SUBTOTAL) pero se detectaron <b>'+parsedCount+'</b>.<br>'
+      +'<b>Faltan '+faltanParser+' clientes</b> — revise el PDF o agregue manualmente los que no aparezcan en la lista.</div>';
+  }else if(pdfCount>0&&parsedCount===pdfCount){
+    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">'
+      +'✅ PDF completo — todos los <b>'+pdfCount+'</b> clientes fueron detectados correctamente.</div>';
   }else if(!existing){
-    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;color:#2e7d32">Cartera nueva — se creará con '+newCount+' clientes.</div>';
-  }else{
-    var diff=newCount-prevCount;
-    var color=diff>=0?'#1b5e20':'#e65100';
-    var txt=diff===0?'Mismo número de clientes que antes.':(diff>0?'+'+diff+' clientes nuevos respecto a la versión anterior.':diff+' clientes menos que antes.');
-    warn='<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;color:'+color+'">'+txt+'</div>';
+    warn='<div style="background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#2e7d32">Cartera nueva — se creará con '+parsedCount+' clientes.</div>';
   }
   document.getElementById('inf-titulo').textContent=data.empresa;
-  document.getElementById('inf-contador').textContent=newCount+' clientes detectados'+(existing?' (antes: '+prevCount+')':' — cartera nueva');
+  document.getElementById('inf-contador').textContent='Parser: '+parsedCount+' clientes  |  PDF (SUBTOTAL): '+(pdfCount||'?')+'  |  Páginas: '+pagesCount;
   document.getElementById('inf-warn').innerHTML=warn;
   var listHtml=data.clientes.map(function(c,idx){
     return '<div style="padding:3px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)">'+(idx+1)+'. '+c.nombre+'</div>';
