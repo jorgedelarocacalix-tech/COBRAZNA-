@@ -3376,6 +3376,88 @@ function descargarComparacion(cartId,tramoId){
   descargarExcelSnapshots(cartId,tramoId);
 }
 
+function descargarExcelTodosClientes(cartId){
+  function _doExcel(){
+    var TRAMOS=['VENCIDO','60','90','120','150','INACTIVO'];
+    var TRAMO_LBL={'VENCIDO':'Este mes','60':'60d','90':'90d','120':'120d','150':'150d','INACTIVO':'+180d'};
+    var allKeys=Object.keys(ECG_DATA).filter(function(k){return k.startsWith(cartId+'_');});
+    if(!allKeys.length){alert('Sin datos de snapshots.');return;}
+    var idxSet=new Set();
+    allKeys.forEach(function(k){var p=k.split('_');idxSet.add(parseInt(p[p.length-1]));});
+    var idxArr=Array.from(idxSet).sort(function(a,b){return a-b;});
+
+    var snaps=idxArr.map(function(idx){
+      var fecha='',clientes=[],map={};
+      TRAMOS.forEach(function(tr){
+        var key=cartId+'_'+tr+'_'+idx;
+        if(!ECG_DATA[key])return;
+        var d=ECG_DATA[key];
+        if(!fecha)fecha=d.created_at?d.created_at.substring(0,10):d.fecha;
+        (d.clientes||[]).forEach(function(c){
+          var obj=typeof c==='string'?{nombre:c,saldo:0}:c;
+          if(!map[obj.nombre]){map[obj.nombre]=true;clientes.push({nombre:obj.nombre,saldo:obj.saldo||0,tramo:tr});}
+        });
+      });
+      clientes.sort(function(a,b){return(b.saldo||0)-(a.saldo||0);});
+      var cMap={};clientes.forEach(function(c){cMap[c.nombre]=c;});
+      return{fecha:fecha,clientes:clientes,map:cMap};
+    }).filter(function(s){return s.fecha;});
+
+    if(!snaps.length){alert('Sin datos de snapshots.');return;}
+    var empresa=(CARTERAS[cartId]||{}).empresa||cartId;
+    var wb=XLSX.utils.book_new();
+    var VERDE='C6EFCE',ROJO='FFC7CE';
+    var COL_PER_SNAP=4,GAP=1;
+    var maxRows=Math.max.apply(null,snaps.map(function(s){return s.clientes.length;}));
+    var wsData=[];
+
+    var titleRow=[];
+    snaps.forEach(function(s,si){var col=si*(COL_PER_SNAP+GAP);while(titleRow.length<col)titleRow.push('');titleRow.push(s.fecha);titleRow.push('');titleRow.push('');titleRow.push('');if(si<snaps.length-1)titleRow.push('');});
+    wsData.push(titleRow);
+
+    var subHdr=[];
+    snaps.forEach(function(s,si){var col=si*(COL_PER_SNAP+GAP);while(subHdr.length<col)subHdr.push('');subHdr.push('#');subHdr.push('Cliente');subHdr.push('Mora');subHdr.push('Saldo (L)');if(si<snaps.length-1)subHdr.push('');});
+    wsData.push(subHdr);
+
+    for(var ri=0;ri<maxRows;ri++){
+      var row=[];
+      snaps.forEach(function(s,si){var col=si*(COL_PER_SNAP+GAP);while(row.length<col)row.push('');var c=s.clientes[ri];if(c){row.push(ri+1);row.push(c.nombre);row.push(TRAMO_LBL[c.tramo]||c.tramo);row.push(c.saldo||0);}else{row.push('');row.push('');row.push('');row.push('');}if(si<snaps.length-1)row.push('');});
+      wsData.push(row);
+    }
+
+    var totRow=[];
+    snaps.forEach(function(s,si){var col=si*(COL_PER_SNAP+GAP);while(totRow.length<col)totRow.push('');var tot=s.clientes.reduce(function(acc,c){return acc+(c.saldo||0);},0);totRow.push('');totRow.push('TOTAL ('+s.clientes.length+')');totRow.push('');totRow.push(tot);if(si<snaps.length-1)totRow.push('');});
+    wsData.push(totRow);
+
+    var wsLista=XLSX.utils.aoa_to_sheet(wsData);
+    var cols=[];snaps.forEach(function(){cols.push({wch:4},{wch:32},{wch:8},{wch:12},{wch:2});});
+    wsLista['!cols']=cols;
+
+    snaps.forEach(function(s,si){
+      var baseCol=si*(COL_PER_SNAP+GAP);
+      var prevMap=si>0?snaps[si-1].map:{};
+      var nextMap=si<snaps.length-1?snaps[si+1].map:{};
+      var hAddr=XLSX.utils.encode_cell({r:0,c:baseCol});
+      if(wsLista[hAddr])wsLista[hAddr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'2F5496'}}};
+      [0,1,2,3].forEach(function(ci){var a=XLSX.utils.encode_cell({r:1,c:baseCol+ci});if(wsLista[a])wsLista[a].s={font:{bold:true}};});
+      s.clientes.forEach(function(c,ri){
+        var fila=ri+2;
+        var esNuevo=!prevMap.hasOwnProperty(c.nombre);
+        var saleNext=!nextMap.hasOwnProperty(c.nombre)&&si<snaps.length-1;
+        var fill=esNuevo?{patternType:'solid',fgColor:{rgb:VERDE}}:saleNext?{patternType:'solid',fgColor:{rgb:ROJO}}:null;
+        if(fill)[baseCol,baseCol+1,baseCol+2,baseCol+3].forEach(function(ci){var a=XLSX.utils.encode_cell({r:fila,c:ci});if(wsLista[a])wsLista[a].s={fill:fill};});
+      });
+      var totFila=maxRows+2;
+      var tAddr=XLSX.utils.encode_cell({r:totFila,c:baseCol+1});if(wsLista[tAddr])wsLista[tAddr].s={font:{bold:true}};
+      var tAddr2=XLSX.utils.encode_cell({r:totFila,c:baseCol+3});if(wsLista[tAddr2])wsLista[tAddr2].s={font:{bold:true}};
+    });
+
+    XLSX.utils.book_append_sheet(wb,wsLista,'Todos los clientes');
+    XLSX.writeFile(wb,'pulso_todos_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx',{cellStyles:true});
+  }
+  if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=_doExcel;document.head.appendChild(s);}else{_doExcel();}
+}
+
 // FIX #2: buildEcgGestion excluye clientes que ya pagaron
 async function buildECG(cartId,container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion a Supabase.</div>';return;}
@@ -3396,9 +3478,12 @@ async function buildECG(cartId,container){
       {id:'150',label:'150 dias',color:'#b01020'},
       {id:'INACTIVO',label:'+180 días / Incobrable',color:'#4a4a4a',alerta:true},
     ];
-    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:12px">'
       +'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">'+snaps.length+' punto(s) · '+snaps[0].fecha+' → '+snaps[snaps.length-1].fecha+'</span>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button onclick="descargarExcelTodosClientes(\''+cartId+'\')" style="font-size:11px;padding:5px 14px;border-radius:6px;border:1px solid rgba(26,80,180,.4);background:rgba(26,80,180,.08);color:#1a50b4;cursor:pointer;font-family:var(--mono);font-weight:600">📊 Excel todos por fecha</button>'
       +'<button onclick="descargarExcelSnapshots(\''+cartId+'\',\'INACTIVO\')" style="font-size:11px;padding:5px 14px;border-radius:6px;border:1px solid rgba(26,122,60,.4);background:var(--greenbg);color:var(--green);cursor:pointer;font-family:var(--mono);font-weight:600">📗 Excel +180d por fecha</button>'
+      +'</div>'
       +'</div>';
 
     // ── Detectar clientes que pasaron de 150 → INACTIVO entre el penúltimo y último snapshot ──
