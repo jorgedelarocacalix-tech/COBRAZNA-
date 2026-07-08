@@ -1071,9 +1071,16 @@ async function processPDF(file){
       var newNames=new Set(data.clientes.map(function(c){return c.nombre;}));
       existing.clientes.forEach(function(c){
         if(!newNames.has(c.nombre)){
-          histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'pago',monto:c.saldo,nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()}));
-          var key=id+'::'+c.nombre;
-          if(PROMESAS[key]){delete PROMESAS[key];dbSaveProm(id,c.nombre);}
+          if(c.tramo==='INACTIVO'){
+            // Clientes INACTIVO que no aparecen en el PDF nuevo siguen debiendo —
+            // el PDF los omite pero la deuda existe. Se preservan en la cartera.
+            data.clientes.push(c);
+            newNames.add(c.nombre);
+          } else {
+            histPromises.push(dbSaveHist({cartera_id:id,cliente_nombre:c.nombre,tipo:'pago',monto:c.saldo,nota:'Cliente cancelado — ya no aparece en la cartera (saldo anterior: L '+fmt(c.saldo)+')',fecha_accion:HOY.toISOString().split('T')[0],gestor:'Sistema',created_at:new Date().toISOString()}));
+            var key=id+'::'+c.nombre;
+            if(PROMESAS[key]){delete PROMESAS[key];dbSaveProm(id,c.nombre);}
+          }
         }
       });
       data.clientes.forEach(function(c){
@@ -2398,12 +2405,48 @@ function fmtK(n){
 }
 
 // ══ TABLE ══
+function exportTramoExcel(){
+  var d=window._tramoExcelData;
+  if(!d||!d.rows||!d.rows.length){alert('Sin datos para exportar.');return;}
+  function _do(){
+    var tramoLabel={'VENCIDO':'Este mes','60':'60 dias','90':'90 dias','120':'120 dias','150':'150 dias','INACTIVO':'+180 Incobrable','PAGARON':'Pagaron'}[d.tramo]||d.tramo;
+    var header=['#','Cliente','Saldo (L)','Cuota (L)','Mora/Adelanto (L)','Ultimo pago','Dia pago','Tramo','Gestion','Fecha promesa','Nota'];
+    var wsData=[header];
+    d.rows.forEach(function(r,i){
+      var p=PROMESAS[d.cartId+'::'+r.nombre]||{};
+      var m=calcMoraCliente(r,d.cartId);
+      var dif=m?(m.diferencia>0?m.diferencia:m.diferencia<0?m.diferencia:0):0;
+      var tl=r.tramo==='INACTIVO'?'+180d':r.tramo==='MES'?'Al dia':r.tramo==='VENCIDO'?'Este mes':(r.tramo||'')+'d';
+      var gest=p.estado?({promesa:'Promesa',pago:'Pago',visita:'Visita',visita_agenda:'Visita agendada','no-contesta':'No contesta',no_contesta:'No contesta',nota:'Nota',posponer:'Posponer'}[p.estado]||p.estado):'Sin gestion';
+      wsData.push([i+1,r.nombre,r.saldo||0,r.cuota||0,dif,r.ultimo_pago||'',r.dia_pago||'',tl,gest,p.fecha||'',p.nota||'']);
+    });
+    var totalSaldo=d.rows.reduce(function(s,r){return s+(r.saldo||0);},0);
+    wsData.push(['','TOTAL ('+d.rows.length+' clientes)',totalSaldo,'','','','','','','','']);
+    var wb=XLSX.utils.book_new();
+    var ws=XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:4},{wch:32},{wch:12},{wch:12},{wch:16},{wch:12},{wch:8},{wch:14},{wch:16},{wch:12},{wch:30}];
+    // Encabezado en negrita
+    header.forEach(function(_,ci){var a=XLSX.utils.encode_cell({r:0,c:ci});if(ws[a])ws[a].s={font:{bold:true}};});
+    // Fila total en negrita
+    var tr=wsData.length-1;
+    [0,1,2].forEach(function(ci){var a=XLSX.utils.encode_cell({r:tr,c:ci});if(ws[a])ws[a].s={font:{bold:true}};});
+    var empresa=(CARTERAS[d.cartId]||{}).empresa||d.cartId;
+    XLSX.utils.book_append_sheet(wb,ws,'Mora '+tramoLabel);
+    XLSX.writeFile(wb,'mora_'+tramoLabel+'_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx',{cellStyles:true});
+  }
+  if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=_do;document.head.appendChild(s);}else{_do();}
+}
+
 function buildTbl(cartId,rows,cls,note){
   if(!rows.length)return '<div class="empty">Sin clientes en este tramo.</div>';
   var sorted=[...rows].sort(function(a,b){return (b.saldo||0)-(a.saldo||0);});
+  // Determinar tramo desde la primera fila
+  var tramo=(sorted[0]&&sorted[0].tramo)||'';
+  window._tramoExcelData={cartId:cartId,rows:sorted,tramo:tramo};
   var total=sorted.reduce(function(s,r){return s+(r.saldo||0);},0);
   var uid='T'+Math.random().toString(36).slice(2,6);
   var html=(note?'<div class="tbl-note">'+note+'</div>':'')
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button onclick="exportTramoExcel()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(26,122,60,.4);background:var(--greenbg);color:var(--green);cursor:pointer;font-family:var(--mono);font-weight:600">📗 Excel</button></div>'
     +'<input class="tbl-search" id="S'+uid+'" onkeyup="flt(\''+uid+'\',\'S'+uid+'\')" placeholder="Buscar...">'
     +'<div class="tbl-wrap"><table id="'+uid+'"><thead><tr>'
     +'<th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th>'
@@ -3199,6 +3242,140 @@ async function quickComentarioGuardar(cartId,nombre){
 }
 
 // ══ ECG ══
+function descargarExcelSnapshots(cartId,tramoId){
+  function _doExcel(){
+    var keys=Object.keys(ECG_DATA).filter(function(k){return k.startsWith(cartId+'_'+tramoId+'_');});
+    keys.sort(function(a,b){return parseInt(a.split('_').pop())-parseInt(b.split('_').pop());});
+    if(!keys.length){alert('Sin datos de snapshots.');return;}
+    function norm(arr){return (arr||[]).map(function(c){return typeof c==='string'?{nombre:c,saldo:0}:c;});}
+
+    var snaps=keys.map(function(k){
+      var d=ECG_DATA[k];
+      var fecha=d.created_at?d.created_at.substring(0,10):d.fecha;
+      var clientes=norm(d.clientes).sort(function(a,b){return (b.saldo||0)-(a.saldo||0);});
+      var map={};clientes.forEach(function(c){map[c.nombre]=c.saldo;});
+      return {fecha:fecha,map:map,clientes:clientes};
+    });
+
+    var empresa=(CARTERAS[cartId]||{}).empresa||cartId;
+    var tramoLabel={'VENCIDO':'Este mes','60':'60 dias','90':'90 dias','120':'120 dias','150':'150 dias','INACTIVO':'+180 Incobrable'}[tramoId]||tramoId;
+    var wb=XLSX.utils.book_new();
+    var VERDE='C6EFCE',ROJO='FFC7CE';
+
+    // ── Hoja 1: Listados por fecha en columnas paralelas ──
+    // Estructura: [#] [Cliente dd/mm] [Saldo] [espacio] [#] [Cliente dd/mm] [Saldo] ...
+    var COL_PER_SNAP=3; // #, Cliente, Saldo
+    var GAP=1;          // columna vacía entre fechas
+    var maxRows=Math.max.apply(null,snaps.map(function(s){return s.clientes.length;}));
+    var wsData=[];
+
+    // Fila 0: títulos de fecha (cada bloque ocupa COL_PER_SNAP + GAP columnas)
+    var titleRow=[];
+    snaps.forEach(function(s,si){
+      var col=si*(COL_PER_SNAP+GAP);
+      while(titleRow.length<col) titleRow.push('');
+      titleRow.push(s.fecha);
+      titleRow.push('');
+      titleRow.push('');
+      if(si<snaps.length-1) titleRow.push('');
+    });
+    wsData.push(titleRow);
+
+    // Fila 1: sub-encabezados #, Cliente, Saldo
+    var subHdr=[];
+    snaps.forEach(function(s,si){
+      var col=si*(COL_PER_SNAP+GAP);
+      while(subHdr.length<col) subHdr.push('');
+      subHdr.push('#'); subHdr.push('Cliente'); subHdr.push('Saldo (L)');
+      if(si<snaps.length-1) subHdr.push('');
+    });
+    wsData.push(subHdr);
+
+    // Filas de clientes
+    for(var ri=0;ri<maxRows;ri++){
+      var row=[];
+      snaps.forEach(function(s,si){
+        var col=si*(COL_PER_SNAP+GAP);
+        while(row.length<col) row.push('');
+        var c=s.clientes[ri];
+        if(c){row.push(ri+1);row.push(c.nombre);row.push(c.saldo||0);}
+        else{row.push('');row.push('');row.push('');}
+        if(si<snaps.length-1) row.push('');
+      });
+      wsData.push(row);
+    }
+
+    // Fila de totales
+    var totRow=[];
+    snaps.forEach(function(s,si){
+      var col=si*(COL_PER_SNAP+GAP);
+      while(totRow.length<col) totRow.push('');
+      var tot=s.clientes.reduce(function(acc,c){return acc+(c.saldo||0);},0);
+      totRow.push('');totRow.push('TOTAL ('+s.clientes.length+')');totRow.push(tot);
+      if(si<snaps.length-1) totRow.push('');
+    });
+    wsData.push(totRow);
+
+    var wsLista=XLSX.utils.aoa_to_sheet(wsData);
+
+    // Estilos y anchos
+    var cols=[];
+    snaps.forEach(function(){cols.push({wch:4},{wch:32},{wch:12},{wch:2});});
+    wsLista['!cols']=cols;
+
+    // Colorear encabezados de fecha + detectar entraron/salieron
+    var cellS={};
+    snaps.forEach(function(s,si){
+      var baseCol=si*(COL_PER_SNAP+GAP);
+      var prevMap=si>0?snaps[si-1].map:{};
+      var nextMap=si<snaps.length-1?snaps[si+1].map:{};
+      // Encabezado fecha: fila 0
+      var hAddr=XLSX.utils.encode_cell({r:0,c:baseCol});
+      if(wsLista[hAddr])wsLista[hAddr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'2F5496'}}};
+      var h2Addr=XLSX.utils.encode_cell({r:1,c:baseCol});
+      if(wsLista[h2Addr])wsLista[h2Addr].s={font:{bold:true}};
+      var h3Addr=XLSX.utils.encode_cell({r:1,c:baseCol+1});
+      if(wsLista[h3Addr])wsLista[h3Addr].s={font:{bold:true}};
+      var h4Addr=XLSX.utils.encode_cell({r:1,c:baseCol+2});
+      if(wsLista[h4Addr])wsLista[h4Addr].s={font:{bold:true}};
+
+      s.clientes.forEach(function(c,ri){
+        var fila=ri+2; // +2 por fila título y sub-encabezado
+        var esNuevo=!prevMap.hasOwnProperty(c.nombre);
+        var saleNext=!nextMap.hasOwnProperty(c.nombre)&&si<snaps.length-1;
+        var fill=esNuevo?{patternType:'solid',fgColor:{rgb:VERDE}}:saleNext?{patternType:'solid',fgColor:{rgb:ROJO}}:null;
+        if(fill){
+          [baseCol,baseCol+1,baseCol+2].forEach(function(ci){
+            var a=XLSX.utils.encode_cell({r:fila,c:ci});
+            if(wsLista[a])wsLista[a].s={fill:fill};
+          });
+        }
+      });
+      // Fila total
+      var totFila=maxRows+2;
+      var tAddr=XLSX.utils.encode_cell({r:totFila,c:baseCol+1});
+      if(wsLista[tAddr])wsLista[tAddr].s={font:{bold:true}};
+      var tAddr2=XLSX.utils.encode_cell({r:totFila,c:baseCol+2});
+      if(wsLista[tAddr2])wsLista[tAddr2].s={font:{bold:true}};
+    });
+
+    XLSX.utils.book_append_sheet(wb,wsLista,'Listados por fecha');
+    XLSX.writeFile(wb,'pulso_'+tramoLabel+'_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx',{cellStyles:true});
+  }
+
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=_doExcel;document.head.appendChild(s);
+  } else {
+    _doExcel();
+  }
+}
+
+function descargarComparacion(cartId,tramoId){
+  descargarExcelSnapshots(cartId,tramoId);
+}
+
 // FIX #2: buildEcgGestion excluye clientes que ya pagaron
 async function buildECG(cartId,container){
   if(!supa){container.innerHTML='<div class="empty">Sin conexion a Supabase.</div>';return;}
@@ -3299,7 +3476,51 @@ async function buildECG(cartId,container){
 
       // Borde especial para INACTIVO si hay clientes
       var wrapStyle=tr.alerta&&last>0?'border-left:3px solid #b01020;background:rgba(176,16,32,.03)':'';
-      html+='<div class="ecg-wrap" style="'+wrapStyle+'"><div class="ecg-hdr"><span><span style="width:10px;height:10px;border-radius:50%;background:'+tr.color+';display:inline-block;margin-right:6px"></span>Mora <strong>'+tr.label+'</strong>'+(tr.alerta&&last>0?' <span style="background:#b01020;color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-family:var(--mono)">'+last+' incobrables</span>':'')+'</span><span class="ecg-badge '+(tr.alerta&&trend==='up'?'up':trend)+'">'+tLbl+'</span></div>'+svg+'<div class="snap-detail" id="snap-'+cartId+'-'+tr.id+'"></div></div>';
+
+      // Listado siempre visible del último snapshot
+      var lastPt=pts[pts.length-1];
+      var lastClientes=lastPt.clientes||[];
+      var prevPt=pts.length>1?pts[pts.length-2]:null;
+      var prevClientes=prevPt?prevPt.clientes||[]:[];
+      var lastNames=new Set(lastClientes.map(function(c){return typeof c==='string'?c:c.nombre;}));
+      var prevNames=new Set(prevClientes.map(function(c){return typeof c==='string'?c:c.nombre;}));
+      var listaHTML='';
+      if(lastClientes.length){
+        var lastDate=lastPt.created_at?lastPt.created_at.substring(5,10):lastPt.fecha;
+        var prevDate=prevPt?(prevPt.created_at?prevPt.created_at.substring(5,10):prevPt.fecha):'';
+        listaHTML+='<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">';
+        listaHTML+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+        listaHTML+='<span style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Listado al '+lastDate+' ('+lastClientes.length+')</span>';
+        listaHTML+='<button onclick="descargarExcelSnapshots(\''+cartId+'\',\''+tr.id+'\')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:var(--mono)">⬇ Excel</button>';
+        listaHTML+='</div>';
+        var sorted=[...lastClientes].map(function(c){return typeof c==='string'?{nombre:c,saldo:0,cuota:0}:c;});
+        sorted.forEach(function(c){
+          var esSumado=prevPt&&!prevNames.has(c.nombre);
+          var tag=esSumado?'<span style="font-size:9px;background:#b01020;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">NUEVO</span>':'';
+          listaHTML+='<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-radius:5px;margin-bottom:1px;background:'+(esSumado?'rgba(176,16,32,.06)':'transparent')+'">';
+          listaHTML+='<span style="font-size:11px;font-family:var(--mono);color:'+(esSumado?'#b01020':'var(--text)')+'">'+(esSumado?'▲ ':'')+''+c.nombre+tag+'</span>';
+          listaHTML+='<span style="font-size:11px;font-family:var(--mono);color:var(--text3);white-space:nowrap">L '+fmt(c.saldo||0)+'</span>';
+          listaHTML+='</div>';
+        });
+        // Quienes estaban antes y ya no están
+        if(prevPt){
+          var salidos=prevClientes.map(function(c){return typeof c==='string'?{nombre:c,saldo:0}:c;}).filter(function(c){return !lastNames.has(c.nombre);});
+          if(salidos.length){
+            listaHTML+='<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)">';
+            listaHTML+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px">Ya no aparecen vs '+prevDate+'</div>';
+            salidos.forEach(function(c){
+              listaHTML+='<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-radius:5px;margin-bottom:1px;background:rgba(34,160,80,.06)">';
+              listaHTML+='<span style="font-size:11px;font-family:var(--mono);color:var(--green)">▼ '+c.nombre+'</span>';
+              listaHTML+='<span style="font-size:11px;font-family:var(--mono);color:var(--text3);white-space:nowrap">L '+fmt(c.saldo||0)+'</span>';
+              listaHTML+='</div>';
+            });
+            listaHTML+='</div>';
+          }
+        }
+        listaHTML+='</div>';
+      }
+
+      html+='<div class="ecg-wrap" style="'+wrapStyle+'"><div class="ecg-hdr"><span><span style="width:10px;height:10px;border-radius:50%;background:'+tr.color+';display:inline-block;margin-right:6px"></span>Mora <strong>'+tr.label+'</strong>'+(tr.alerta&&last>0?' <span style="background:#b01020;color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-family:var(--mono)">'+last+' incobrables</span>':'')+'</span><span class="ecg-badge '+(tr.alerta&&trend==='up'?'up':trend)+'">'+tLbl+'</span></div>'+svg+(tr.alerta?listaHTML:'')+'<div class="snap-detail" id="snap-'+cartId+'-'+tr.id+'"></div></div>';
     });
     html+=buildEcgGestion(snaps,cartId);
     container.innerHTML=html;
@@ -3371,23 +3592,41 @@ function showEcgDetail(key){
   if(el.style.display!=='none'&&el.dataset.key===key){el.style.display='none';return;}
   el.dataset.key=key;el.style.display='block';
   var cartId=data.cartId;
+  var isInactivo=data.tramoId==='INACTIVO';
+
+  // Normalizar: algunos snapshots guardan strings, otros objetos {nombre,saldo}
+  function norm(arr){
+    return (arr||[]).map(function(c){return typeof c==='string'?{nombre:c,saldo:0}:c;});
+  }
+
   var prevKey=cartId+'_'+data.tramoId+'_'+(data.idx-1);
   var prevData=data.idx>0?ECG_DATA[prevKey]:null;
-  var currNames=new Set((data.clientes||[]).map(function(c){return c.nombre;}));
-  var prevNames=prevData?new Set((prevData.clientes||[]).map(function(c){return c.nombre;})):new Set();
-  var salieron=prevData?(prevData.clientes||[]).filter(function(c){
-    if(currNames.has(c.nombre)) return false;
-    // Excluir INACTIVOS — no "salieron de mora", solo cambiaron de tramo
+  var currList=norm(data.clientes);
+  var prevList=prevData?norm(prevData.clientes):[];
+  var currNames=new Set(currList.map(function(c){return c.nombre;}));
+  var prevNames=new Set(prevList.map(function(c){return c.nombre;}));
+
+  // Quiénes rebajaron (estaban antes, ya no están)
+  var rebajaron=prevData?prevList.filter(function(c){
+    if(currNames.has(c.nombre))return false;
+    // Verificar estado actual en CARTERAS para confirmar que realmente salieron
     var cl2=((CARTERAS[cartId]||{}).clientes||[]).find(function(x){return x.nombre===c.nombre;});
-    if(cl2&&cl2.tramo==='INACTIVO') return false;
-    // Excluir los que no tienen ultimo_pago real (string vacío)
-    if(cl2&&(!cl2.ultimo_pago||cl2.ultimo_pago==='')) return false;
+    if(isInactivo){
+      // Para INACTIVO: solo mostrar como "rebajaron" si el cliente YA NO es INACTIVO hoy
+      // Si no se encuentra en CARTERAS o sigue INACTIVO, no mostrar (puede ser error de snapshot)
+      if(!cl2||cl2.tramo==='INACTIVO')return false;
+    } else {
+      if(cl2&&cl2.tramo==='INACTIVO')return false;
+      if(cl2&&(!cl2.ultimo_pago||cl2.ultimo_pago===''))return false;
+    }
     return true;
   }):[];
-  var entraron=prevData?(data.clientes||[]).filter(function(c){return !prevNames.has(c.nombre);}):[];
 
-  // FIX #3: filtrar pagados reales del snapshot "siguen en mora"
-  var siguen=(data.clientes||[]).filter(function(c){
+  // Quiénes se sumaron (no estaban antes, ahora sí)
+  var sumaron=prevData?currList.filter(function(c){return !prevNames.has(c.nombre);}):[];
+
+  // Quiénes siguen (filtrar pagados reales)
+  var siguen=currList.filter(function(c){
     var cl2=((CARTERAS[cartId]||{}).clientes||[]).find(function(x){return x.nombre===c.nombre;});
     if(!cl2)return true;
     var p2=PROMESAS[cartId+'::'+c.nombre];
@@ -3397,31 +3636,55 @@ function showEcgDetail(key){
 
   function gestBadge(nombre){
     var p=PROMESAS[cartId+'::'+nombre];if(!p||!p.estado)return '';
-    if(p.estado==='promesa')return ' <span style="font-size:10px">📅</span>';
-    if(p.estado==='visita'||p.estado==='visita_agenda'||p.estado==='visita_realizada')return ' <span style="font-size:10px">🚗</span>';
-    if(p.estado==='pago')return ' <span style="font-size:10px">✅</span>';
-    if(p.estado==='no-contesta'||p.estado==='no_contesta')return ' <span style="font-size:10px">📵</span>';
+    if(p.estado==='promesa')return ' 📅';
+    if(p.estado==='visita'||p.estado==='visita_agenda'||p.estado==='visita_realizada')return ' 🚗';
+    if(p.estado==='pago')return ' ✅';
+    if(p.estado==='no-contesta'||p.estado==='no_contesta')return ' 📵';
     return '';
   }
   function hasGestion(nombre){var p=PROMESAS[cartId+'::'+nombre];return p&&p.estado&&p.estado!=='';}
-  function chip(c,baseClass){
-    var badge=gestBadge(c.nombre);var noAct=!hasGestion(c.nombre);
-    var chipClass=baseClass==='chip-gray'&&noAct?'chip-red':baseClass;
-    return '<span class="'+chipClass+'">'+c.nombre+badge+' — L '+fmt(c.saldo||0)+'</span>';
+
+  function listRow(c,accentColor,prefix){
+    var badge=gestBadge(c.nombre);
+    var noAct=!hasGestion(c.nombre);
+    var rowBg=noAct&&accentColor==='var(--text2)'?'rgba(176,16,32,.04)':'transparent';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;background:'+rowBg+';margin-bottom:2px">'
+      +'<span style="font-size:12px;color:'+accentColor+';font-family:var(--mono)">'+(prefix||'')+c.nombre+badge+'</span>'
+      +'<span style="font-size:11px;color:var(--text3);font-family:var(--mono);white-space:nowrap;margin-left:8px">L '+fmt(c.saldo||0)+'</span>'
+      +'</div>';
   }
+
   var dateLabel=data.created_at?new Date(data.created_at).toLocaleDateString('es-HN'):data.fecha;
-  var html='<div class="snap-title">📅 '+dateLabel+' — '+data.count+' cliente(s) en mora</div>';
-  html+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:6px">📅=promesa &nbsp; 🚗=visita &nbsp; sin ícono = sin gestión</div>';
-  if(salieron.length){html+='<div class="snap-section" style="color:var(--green)">✅ Salieron de mora ('+salieron.length+')</div><div class="snap-chips">'+salieron.map(function(c){return chip(c,'chip-green');}).join('')+'</div>';}
-  if(entraron.length){html+='<div class="snap-section" style="color:var(--red)">⚠️ Entraron a mora ('+entraron.length+')</div><div class="snap-chips">'+entraron.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';}
+  var html='<div class="snap-title">📅 '+dateLabel+' — '+data.count+' cliente(s)</div>';
+  html+='<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:8px">📅=promesa &nbsp; 🚗=visita &nbsp; sin ícono = sin gestión</div>';
+
+  if(sumaron.length){
+    var lbl=isInactivo?'Se sumaron a incobrable':'Se sumaron a mora';
+    html+='<div style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">▲ '+lbl+' ('+sumaron.length+')</div>';
+    html+='<div style="border-left:3px solid var(--red);padding-left:8px;margin-bottom:10px">';
+    sumaron.forEach(function(c){html+=listRow(c,'var(--red)','+  ');});
+    html+='</div>';
+  }
+
+  if(rebajaron.length){
+    var lbl2=isInactivo?'Salieron de incobrable':'Salieron / pagaron';
+    html+='<div style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">▼ '+lbl2+' ('+rebajaron.length+')</div>';
+    html+='<div style="border-left:3px solid var(--green);padding-left:8px;margin-bottom:10px">';
+    rebajaron.forEach(function(c){html+=listRow(c,'var(--green)','−  ');});
+    html+='</div>';
+  }
+
   if(siguen.length){
     var sinAct=siguen.filter(function(c){return !hasGestion(c.nombre);}).length;
-    var lbl=(prevData?'Siguen en mora':'En mora')+' ('+siguen.length+')'+(sinAct?' — <span style="color:var(--red)">'+sinAct+' sin gestión</span>':'');
-    html+='<div class="snap-section" style="color:var(--text3)">🔴 '+lbl+'</div>';
+    var lbl3=(prevData?'Siguen':'En mora')+' ('+siguen.length+')'+(sinAct?' · <span style="color:var(--red)">'+sinAct+' sin gestión</span>':'');
+    html+='<div style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">● '+lbl3+'</div>';
+    html+='<div style="border-left:3px solid var(--bg4);padding-left:8px;margin-bottom:10px">';
     var sorted=[...siguen].sort(function(a,b){return (hasGestion(a.nombre)?1:0)-(hasGestion(b.nombre)?1:0);});
-    html+='<div class="snap-chips">'+sorted.map(function(c){return chip(c,'chip-gray');}).join('')+'</div>';
+    sorted.forEach(function(c){html+=listRow(c,hasGestion(c.nombre)?'var(--text)':'var(--red)','');});
+    html+='</div>';
   }
-  if(!salieron.length&&!entraron.length&&!siguen.length)html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
+
+  if(!sumaron.length&&!rebajaron.length&&!siguen.length)html+='<span style="color:var(--text3);font-size:11px">Sin clientes</span>';
   el.innerHTML=html;
 }
 
