@@ -4399,9 +4399,9 @@ async function _renderCobroAnalisis(container,mesKey,cartFiltro){
     var idsFiltro=cartFiltro==='TODAS'?IDS:[cartFiltro];
     var clientesFiltro=todosClientes.filter(function(c){return idsFiltro.indexOf(c.cartera_id)>=0;});
 
-    // 4. Sin abono en el mes
+    // 4. Sin abono en el mes — solo los que tienen mora acumulada (mora=0 significa al día aunque no tenga historial)
     var sinAbono=clientesFiltro.filter(function(c){
-      return !_pagaron(c.cartera_id,c.nombre);
+      return c.moraVal>0 && !_pagaron(c.cartera_id,c.nombre);
     }).sort(function(a,b){return b.moraVal-a.moraVal;});
 
     // 5. Top mora (excluye moraVal=0)
