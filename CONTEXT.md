@@ -1,8 +1,12 @@
 # Cobranza App — Contexto del proyecto
 
 Repo: https://github.com/jorgedelarocacalix-tech/COBRAZNA-  
-Stack: Vanilla JS · HTML único (index.html) · Supabase · Claude Haiku (Anthropic)  
+**Netlify (producción):** https://laroca-cobranza-app.netlify.app  
+GitHub Pages (secundario): https://jorgedelarocacalix-tech.github.io/COBRAZNA-/  
+Stack: Vanilla JS · HTML único (index.html ~6500 líneas) · Supabase · Claude Haiku (Anthropic)  
 Supabase project ID: `ixskgawbpwwxdjnkiixt`
+
+Deploy: `netlify deploy --prod --dir=.` desde `/Users/jorgecalix/cobranza-app`
 
 ---
 
@@ -19,6 +23,18 @@ El PIN 7777 (gerente) al entrar abre automáticamente el chat IA en modo "Todas 
 
 ---
 
+## IDs de carteras en Supabase
+
+| ID Supabase | Nombre |
+|---|---|
+| `LA_ROCA_COMERCIAL_1` | La Roca Comercial #1 |
+| `LA_ROCA_MOTORS_BARRIO_ARRIBA_1` | La Roca Motors Barrio Arriba #1 |
+| `LA_ROCA_MOTORS_LA_LIBERTAD_2` | La Roca Motors La Libertad #2 |
+| `SU_MOTO_DANLI` | Su Moto Danlí |
+| `SU_MUEBLE` | Su Mueble |
+
+---
+
 ## Edge Functions Supabase
 
 | Función           | Versión | Descripción                                              |
@@ -28,55 +44,68 @@ El PIN 7777 (gerente) al entrar abre automáticamente el chat IA en modo "Todas 
 
 ---
 
+## Tablas Supabase clave
+
+| Tabla | Descripción |
+|---|---|
+| `carteras` | Clientes JSONB por cartera, actualizado al subir PDF |
+| `historial_clientes` | Notas, visitas, promesas, pagos por cliente |
+| `snapshots` | Snapshot de tramos por cartera al subir PDF (usado por Pulso ECG) |
+| `cierre_proyeccion` | Excel de proyección subido por gerente — `{nombre, saldo, cuota, mora, moraVal, montoAsesor}` |
+| `promesas` | Estado actual de gestión por cliente |
+| `alertas` | Alertas automáticas del parser |
+
+---
+
 ## Funcionalidades implementadas
+
+### Pantalla Inicio (gerente PIN 7777)
+- KPIs globales: pagaron este mes, meta global %, vencidos hoy, mora 120d+, Prometido
+- Tabla "Sistema vs Asesores" con columnas: Cartera, Pendientes, Sistema, **Proyectado** (de cierre_proyeccion), Asesores, Diferencia, Editados
+
+### Parser PDF (v23)
+- Parsea PDFs del ERP client-side con pdf.js
+- Auto-recuperación de clientes no capturados
+- Alerta urgente si hay clientes sin recuperar
+- Informe de Carga antes de guardar
+
+### Pulso ECG (`buildECG`)
+- Gráfico de línea por tramo (Este mes, 60d, 90d, 120d, 150d, +180d) por fecha de upload
+- Detecta clientes nuevos (verde) y que salen (rojo)
+- **"📊 Excel todos por fecha"** — descarga todos los clientes de todos los tramos por fecha (`descargarExcelTodosClientes`)
+- **"📗 Excel +180d por fecha"** — solo INACTIVO por fecha (`descargarExcelSnapshots`)
+- Cada tramo tiene su propio botón "⬇ Excel"
+- Alerta roja si clientes pasaron de 150d → INACTIVO
+
+### Cobro Mensual (`_renderCobroAnalisis`)
+- Selector de mes y cartera
+- Lista "Sin abono" (mora > 0, sin pago en el mes): último pago + historial de notas/visitas
+- Lista "Top mora" por monto
+- Botón 💬 para agregar nota que guarda en historial_clientes
+- Export PDF y CSV
+- Fuzzy name matching para cruzar cierre_proyeccion vs historial
 
 ### Chat IA (bot)
 - Pestaña "Chat" dentro del panel IA (burbuja flotante)
 - Registrar promesa, pago, visita, nota vía lenguaje natural
 - Confirma siempre: nombre completo + fecha + monto antes de guardar
-- Si hay múltiples clientes con el mismo nombre, lista todos y pide aclaración
-- Análisis de historial de cliente: "dime más sobre X", "cómo está X", "cuánto debe X"
-  - Responde con cuota mensual, saldo, estado de mora, veredicto del perfil
-- Preguntas de cartera: "¿quién no ha sido contactado?", "¿quién prometió y no pagó?", etc.
-- Chips de preguntas rápidas al abrir el chat (clickeables)
-- Acciones via chat guardan en HISTORIAL del cliente (dbSaveHist) + PROMESAS (dbSaveProm)
-- Modo "Todas las carteras" (solo rol gerente): consultas cruzadas entre todas las carteras
+- Análisis de historial de cliente
+- Modo "Todas las carteras" (solo rol gerente)
 
 ### Panel de Análisis IA
-- **Proyección hasta fin de mes**: semana por semana, total prometido vs meta, promesas vencidas en rojo
-- **Alerta extrema**: mora 120d+ con promesa incumplida
-- **Urgente**: mora 120d+ sin ningún contacto
-- **Cobrar hoy**: vencidos con gestión activa
-- **A punto de caer a mora 60d**: vencidos SIN ningún contacto este mes
-- **Sin gestión 60-90d**: mora media, nunca contactados
-- **Sin promesa 60-90d**: contactados (nota, no contesta) pero sin promesa activa ← nueva
-- **Mora 120d+ con gestión**: tienen contacto pero sin promesa
-- CONSEJO de Claude al final con números reales de la cartera
-
-### Comentario rápido (💬)
-- Enter guarda el comentario sin clic en botón
-- El comentario actualiza el estado del cliente en PROMESAS y en el dashboard
-- Se guarda en historial_clientes
-
-### UI responsive
-- Pantallas ≥1024px (Mac M2 Retina y similares): fuentes más grandes, panel IA más ancho
-- Body 16px, KPIs 30px, tablas 14px, panel IA 440px
-
-### Bugs corregidos
-- Burbuja IA desaparecía al cambiar de cartera → siempre visible al abrir una cartera
-- Modo "Todas las carteras" ahora solo visible para rol gerente
-- Clientes mora 120d+ con gestión parcial ya aparecen en el panel de análisis
-- Acciones del chat (promesa, pago, visita, nota) ahora guardan en historial del cliente
+- Proyección hasta fin de mes
+- Alertas: mora 120d+, urgentes, cobrar hoy, a punto de caer a 60d
+- CONSEJO de Claude con números reales
 
 ---
 
 ## Estructura de datos clave
 
-### PROMESAS[cartId::nombre]
+### cierre_proyeccion.datos[] (JSONB)
 ```js
-{ estado, fecha, monto, nota, mora_pendiente, adelantado, cero_prima, ts }
+{ nombre, saldo, cuota, cuotasTrans, saldoEsperado, diaAsesor, montoAsesor, mora, moraVal }
+// mora='INACTIVO' = cuenta pasiva (excluir de totales)
 ```
-Estados: `promesa` | `pago` | `no_contesta` | `visita_agenda` | `nota` | `negociacion`
 
 ### historial_clientes (Supabase)
 ```
@@ -89,13 +118,19 @@ Tipos: `promesa` | `pago` | `abono` | `nota` | `visita_agenda` | `visita_realiza
 { id, empresa, fecha_emision, clientes: [{nombre, saldo, cuota, tramo, dia_pago, ultimo_pago}], load_history }
 ```
 
+### ECG_DATA
+```js
+ECG_DATA[cartId_tramoId_idx] = { fecha, count, clientes, idx, cartId, tramoId, created_at }
+```
+
 ---
 
 ## Notas técnicas
 
-- La app es un único `index.html` (~5500 líneas), sin build ni bundler
+- La app es un único `index.html` (~6500 líneas), sin build ni bundler
 - Los PDFs de cartera se parsean client-side con pdf.js
 - Supabase se usa para persistencia de promesas, historial y snapshots
 - El bot usa Claude Haiku via Supabase Edge Functions (Deno/TypeScript)
-- Intents del bot detectados por Claude con bloques estructurados: `[ACCION:{...}]` y `[HISTORIAL:{...}]`
+- Deploy: `netlify deploy --prod --dir=.` (Netlify CLI vinculado a `laroca-cobranza-app`)
+- netlify.toml configurado con `Cache-Control: no-cache` para HTML — usuarios siempre ven versión nueva
 - Si una PC no carga la app: revisar DNS (cambiar a 8.8.8.8 / 8.8.4.4 resolvió en una ocasión)
