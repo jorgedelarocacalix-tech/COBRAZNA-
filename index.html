@@ -820,8 +820,17 @@ async function dbSaveHist(entry){
   if(!supa){console.warn('dbSaveHist: supa es null');return;}
   try{
     var r=await supa.from('historial_clientes').insert(entry);
-    if(r.error){console.error('dbSaveHist error:',r.error);alert('Error al guardar historial:\n'+r.error.message+'\n\nCódigo: '+r.error.code);}
-  }catch(e){console.error('saveHist:',e);alert('Error al guardar historial: '+e.message);}
+    if(r.error){console.error('dbSaveHist error:',r.error);showErr('Error al guardar historial: '+r.error.message);}
+  }catch(e){
+    console.error('saveHist:',e);
+    try{
+      var r2=await supa.from('historial_clientes').insert(entry);
+      if(r2.error){console.error('dbSaveHist retry error:',r2.error);showErr('Error al guardar historial: '+r2.error.message);}
+    }catch(e2){
+      console.error('saveHist retry:',e2);
+      showErr('Error de red al guardar historial (revisa tu conexión)');
+    }
+  }
 }
 
 // ══ FIX #1: dbSaveSnap excluye clientes que ya pagaron este mes ══
