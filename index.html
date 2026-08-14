@@ -631,6 +631,34 @@ var USUARIOS={
   '1111':{nombre:'Equipo Roca',rol:'cobrador',carteras:['ROCA_COMERCIAL','MOTORS','LIBERTAD','BARRIO']},
   '2222':{nombre:'Equipo Su Mueble',rol:'cobrador',carteras:['MUEBLE','MOTO','DANLI']}
 };
+// ══ LOGIN INDIVIDUAL VIA RRHH ══
+// Cada asociado entra con su propio PIN de RRHH; aquí se define qué carteras ve según su equipo.
+var RRHH_URL='https://upaenjotkocmdvfuobii.supabase.co';
+var RRHH_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwYWVuam90a29jbWR2ZnVvYmlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NjQzMzUsImV4cCI6MjA5NDQ0MDMzNX0.am0lcEwz4-HK0KvrPBtv1QB7joNYDpOuQNhbc1HjwZ8';
+var RRHH_CARTERAS={
+  roca:['ROCA_COMERCIAL','MOTORS','LIBERTAD','BARRIO'],
+  mueble:['MUEBLE','MOTO','DANLI']
+};
+var RRHH_EQUIPO={
+  'u1784044319284':'roca',   // Erick
+  'v_ale':'roca',            // Alejandra
+  'v_jor':'roca',            // Jorge
+  'u1779318896833':'roca',   // Ana Castro
+  'v_say':'mueble'           // Sayda
+};
+function loginRRHH(pin){
+  return fetch(RRHH_URL+'/rest/v1/rpc/rrhh_login_por_pin',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':RRHH_KEY,'Authorization':'Bearer '+RRHH_KEY},
+    body:JSON.stringify({p_pin:pin})
+  }).then(function(r){return r.ok?r.json():null;}).then(function(rrhh){
+    if(!rrhh) return null;
+    if(!rrhh.accesos_apps||!rrhh.accesos_apps.cobranza) return null;
+    var equipo=RRHH_EQUIPO[rrhh.codigo];
+    if(!equipo) return null;
+    return {nombre:rrhh.nombre,rol:'cobrador',carteras:RRHH_CARTERAS[equipo]};
+  }).catch(function(){return null;});
+}
 
 // ══ STATE ══
 var APP_VERSION='20260707-23';
@@ -700,8 +728,17 @@ function renderPin(){
 }
 function pinEnter(){
   var u=USUARIOS[PIN_VAL];
-  if(!u){document.getElementById('pin-err').textContent='Código incorrecto';PIN_VAL='';renderPin();return;}
-  USER=Object.assign({},u,{codigo:PIN_VAL});
+  if(u){ entrarConUsuario(Object.assign({},u,{codigo:PIN_VAL})); return; }
+  document.getElementById('pin-err').textContent='Verificando...';
+  var pin=PIN_VAL; PIN_VAL='';renderPin();
+  loginRRHH(pin).then(function(u2){
+    if(!u2){document.getElementById('pin-err').textContent='Código incorrecto';return;}
+    document.getElementById('pin-err').textContent='';
+    entrarConUsuario(Object.assign({},u2,{codigo:pin}));
+  });
+}
+function entrarConUsuario(u){
+  USER=u;
   document.getElementById('login-screen').style.display='none';
   document.getElementById('main-header').style.display='flex';
   document.getElementById('user-lbl').textContent='👤 '+u.nombre;
