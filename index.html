@@ -1151,16 +1151,15 @@ async function _renderGerentePanel(){
   var hoyStr=HOY.toISOString().split('T')[0];
   var lastDay=new Date(HOY.getFullYear(),HOY.getMonth()+1,0).getDate();
 
-  // Cargar proyecciones de todos los asesores
-  if(supa){
-    var rp=await supa.from('proyecciones').select('*');
-    if(!rp.error)(rp.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
-  }
-  // Cargar cierre_proyeccion (último por cartera) para columna Proyectado
+  // Cargar proyecciones de todos los asesores y cierre_proyeccion en paralelo (evita esperas en cadena)
   var cierreMap={};var totCierreGlobal=0;
   if(supa){
-    var rc=await supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').order('mes_key',{ascending:false});
-    if(!rc.error){var _vC={};(rc.data||[]).forEach(function(row){if(_vC[row.cartera_id])return;_vC[row.cartera_id]=true;var s=0;(row.datos||[]).forEach(function(c){if(c.mora!=='INACTIVO')s+=(c.montoAsesor||0);});cierreMap[row.cartera_id]=Math.round(s);});}
+    var _proyP=_withTimeout(supa.from('proyecciones').select('*'),8000).catch(function(e){console.error('_renderGerentePanel proyecciones:',e);return null;});
+    var _cierreP=_withTimeout(supa.from('cierre_proyeccion').select('cartera_id,mes_key,datos').order('mes_key',{ascending:false}),8000).catch(function(e){console.error('_renderGerentePanel cierre:',e);return null;});
+    var _res=await Promise.all([_proyP,_cierreP]);
+    var rp=_res[0],rc=_res[1];
+    if(rp&&!rp.error){(rp.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});_rebuildProyIndex();}
+    if(rc&&!rc.error){var _vC={};(rc.data||[]).forEach(function(row){if(_vC[row.cartera_id])return;_vC[row.cartera_id]=true;var s=0;(row.datos||[]).forEach(function(c){if(c.mora!=='INACTIVO')s+=(c.montoAsesor||0);});cierreMap[row.cartera_id]=Math.round(s);});}
   }
 
   // ── Agregados globales ──
@@ -1207,8 +1206,7 @@ async function _renderGerentePanel(){
       var pagado=(pagoEsteMes(x.ultimo_pago)||pagoM)&&!(p&&p.mora_pendiente);
       if(pagado)return;
       nPendientes++;
-      var best=null;
-      Object.keys(PROYECCIONES).forEach(function(k){if(k.startsWith(id+'::'+x.nombre+'::')){ var cand=PROYECCIONES[k];if(!best||(cand.updated_at||'')>(best.updated_at||''))best=cand;}});
+      var best=_getBestProy(id,x.nombre);
       var montoExp=best&&best.monto_proyectado?best.monto_proyectado:(p&&p.monto?p.monto:null);
       if(montoExp)nEditados++;
       totalSis+=x.cuota||0;
@@ -5610,6 +5608,12 @@ function showInforme(data,existing){
 function confirmarInforme(){document.getElementById('modal-informe').classList.remove('show');if(_informeResolve){_informeResolve(true);_informeResolve=null;}}
 function cancelarInforme(){document.getElementById('modal-informe').classList.remove('show');if(_informeResolve){_informeResolve(false);_informeResolve=null;}}
 function showErr(msg){var b=document.getElementById('err-box');b.style.display='block';b.textContent='⚠ '+msg;setTimeout(function(){b.style.display='none';},5000);}
+function _withTimeout(promise,ms){
+  return Promise.race([
+    promise,
+    new Promise(function(_,rej){setTimeout(function(){rej(new Error('timeout'));},ms);})
+  ]);
+}
 function setProg(pct,lbl){document.getElementById('prog-wrap').style.display='block';document.getElementById('prog-fill').style.width=pct+'%';document.getElementById('prog-lbl').textContent=lbl;}
 function copyMsg(id,btn){navigator.clipboard.writeText(document.getElementById(id).textContent).then(function(){btn.textContent='✓ copiado';setTimeout(function(){btn.textContent='⧉ copiar';},2000);});}
 function promBadge(p){var m={promesa:'<span class="b bp">📅 '+(p.fecha||'—')+'</span>',pago:'<span class="b bg">✅ Pago</span>','no-contesta':'<span class="b bx">📵 No contesta</span>','no_contesta':'<span class="b bx">📵 No contesta</span>','numero-mal':'<span class="b bx">❌ Num. mal</span>',negociacion:'<span class="b ba">🤝 Negocia</span>',visita:'<span class="b bb">🚗 Visita</span>'};return m[p.estado]||'';}
@@ -5621,6 +5625,16 @@ document.getElementById('modal-alerta').addEventListener('click',function(e){if(
 // ██  PROYECCIÓN SEMANAL  (pestaña dentro de cartera)
 // ══════════════════════════════════════════════════════
 var PROYECCIONES={};      // key: cartId+'::'+nombre+'::'+semanaInicio
+var _PROY_INDEX={};       // key: cartId+'::'+nombre -> mejor proyeccion (evita re-escanear PROYECCIONES completo por cliente)
+function _rebuildProyIndex(){
+  var idx={};
+  Object.keys(PROYECCIONES).forEach(function(k){
+    var c=PROYECCIONES[k];
+    var sk=c.cartera_id+'::'+c.cliente_nombre;
+    if(!idx[sk]||(c.updated_at||'')>(idx[sk].updated_at||''))idx[sk]=c;
+  });
+  _PROY_INDEX=idx;
+}
 var _PROY_ITEMS=[];       // lista plana del render actual (para ver notas por index)
 var _PROY_VIEW='todos';   // 'todos' | 'semana' | 'mes' | 'mora'
 var CIERRE_MES={};        // {cartId: {cartera_id,mes_key,cerrado_por,cerrado_at,datos}}
@@ -5656,6 +5670,7 @@ async function saveProyeccion(cartId,nombre,semanaStr,changes){
   var upd=Object.assign({},ex,changes,{cartera_id:cartId,cliente_nombre:nombre,semana_inicio:semanaStr,gestor:(USER&&USER.nombre)||'--',updated_at:new Date().toISOString()});
   delete upd.id;
   PROYECCIONES[k]=upd;
+  _rebuildProyIndex();
   if(!supa)return;
   var r=await supa.from('proyecciones').upsert(Object.assign({},upd),{onConflict:'cartera_id,cliente_nombre,semana_inicio'});
   if(r.error){console.error('saveProy:',r.error);alert('Error:\n'+r.error.message);}
@@ -5663,8 +5678,14 @@ async function saveProyeccion(cartId,nombre,semanaStr,changes){
 async function buildProyeccion(cartId,container){
   HOY=new Date();HOY.setHours(0,0,0,0);
   if(supa){
-    var r=await supa.from('proyecciones').select('*').eq('cartera_id',cartId);
-    if(!r.error)(r.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
+    try{
+      var r=await _withTimeout(supa.from('proyecciones').select('*').eq('cartera_id',cartId),8000);
+      if(!r.error){(r.data||[]).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});_rebuildProyIndex();}
+      else showErr('Error al cargar proyecciones: '+r.error.message);
+    }catch(e){
+      console.error('buildProyeccion:',e);
+      showErr('Error de red al cargar proyecciones (revisa tu conexión)');
+    }
   }
   container._proySemOffset=container._proySemOffset||0;
   _renderProyTab(cartId,container,container._proySemOffset);
@@ -5704,10 +5725,7 @@ function _renderProyTab(cartId,container,weekOff){
     var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManual)&&!(p&&p.mora_pendiente);
     var mora=calcMora(c.ultimo_pago,c.dia_pago,c.sin_ultimo_pago,c.fecha_factura);
     if(c.tramo==='INACTIVO')return;
-    var bestProy=null;
-    Object.keys(PROYECCIONES).forEach(function(k){
-      if(k.startsWith(cartId+'::'+c.nombre+'::')){var cand=PROYECCIONES[k];if(!bestProy||(cand.updated_at||'')>(bestProy.updated_at||''))bestProy=cand;}
-    });
+    var bestProy=_getBestProy(cartId,c.nombre);
     var fechaProy=bestProy&&bestProy.fecha_proyectada?bestProy.fecha_proyectada:(p&&(p.estado==='promesa'||p.estado==='abono')&&p.fecha?p.fecha:null);
     var montoProy=bestProy&&bestProy.monto_proyectado?bestProy.monto_proyectado:(p&&p.monto?p.monto:null);
     var comentario=bestProy&&bestProy.comentario?bestProy.comentario:'';
@@ -6038,9 +6056,7 @@ function _buildTodosView(cartId,cl,mesActualStr){
   return h;
 }
 function _getBestProy(cartId,nombre){
-  var best=null;
-  Object.keys(PROYECCIONES).forEach(function(k){if(k.startsWith(cartId+'::'+nombre+'::')){ var c=PROYECCIONES[k];if(!best||(c.updated_at||'')>(best.updated_at||''))best=c;}});
-  return best;
+  return _PROY_INDEX[cartId+'::'+nombre]||null;
 }
 function _buildMesView(cartId,cl,mesActualStr){
   var hoyStr=_d2s(HOY);
@@ -6270,14 +6286,28 @@ async function buildProySiguiente(cartId,container){
   if(!PROY_SIG_MES[cartId])PROY_SIG_MES[cartId]=_curMesKey();
   var mesKey=PROY_SIG_MES[cartId];
   var semKey='NEXT-'+mesKey;
-  if(supa){
-    var r=await supa.from('proyecciones').select('*').eq('cartera_id',cartId);
-    if(!r.error)(r.data||[]).filter(function(p){return p.semana_inicio&&p.semana_inicio.startsWith('NEXT-');}).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});
-  }
   var ck=cartId+'::'+mesKey;
-  if(supa&&CIERRE_MES[ck]===undefined){
-    var rc=await supa.from('cierre_proyeccion').select('*').eq('cartera_id',cartId).eq('mes_key',mesKey);
-    CIERRE_MES[ck]=(!rc.error&&rc.data&&rc.data.length)?rc.data[0]:null;
+  if(supa){
+    var _proyP=_withTimeout(supa.from('proyecciones').select('*').eq('cartera_id',cartId),8000)
+      .then(function(r){return {ok:true,r:r};})
+      .catch(function(e){return {ok:false,e:e};});
+    var _needCierre=CIERRE_MES[ck]===undefined;
+    var _cierreP=_needCierre?_withTimeout(supa.from('cierre_proyeccion').select('*').eq('cartera_id',cartId).eq('mes_key',mesKey),8000)
+      .then(function(r){return {ok:true,r:r};})
+      .catch(function(e){return {ok:false,e:e};}):null;
+    var _res=await Promise.all([_proyP,_cierreP]);
+    var pr=_res[0],cr=_res[1];
+    if(pr.ok){
+      if(!pr.r.error){(pr.r.data||[]).filter(function(p){return p.semana_inicio&&p.semana_inicio.startsWith('NEXT-');}).forEach(function(p){PROYECCIONES[p.cartera_id+'::'+p.cliente_nombre+'::'+p.semana_inicio]=p;});_rebuildProyIndex();}
+      else showErr('Error al cargar proyecciones: '+pr.r.error.message);
+    }else{
+      console.error('buildProySiguiente:',pr.e);
+      showErr('Error de red al cargar proyecciones (revisa tu conexión)');
+    }
+    if(_needCierre){
+      if(cr.ok)CIERRE_MES[ck]=(!cr.r.error&&cr.r.data&&cr.r.data.length)?cr.r.data[0]:null;
+      else{console.error('buildProySiguiente cierre:',cr.e);CIERRE_MES[ck]=null;}
+    }
   }
   _renderProySiguiente(cartId,container,mesKey,semKey);
 }
@@ -6517,9 +6547,16 @@ var PROY_PIN_UNLOCK={};  // {cartId: true} — acceso temporal por PIN esta sesi
 
 async function cerrarMes(cartId,mesKey,semKey){
   var nextNom=_mesKeyToNom(mesKey);
-  if(!confirm('¿Guardar la Proyección de '+nextNom+'?\n\nUna vez guardada quedará bloqueada.\nPuedes compartir la clave de acceso con asesores autorizados.'))return;
-  var pin=String(Math.floor(100000+Math.random()*900000));
   var items=PROY_SIG_ITEMS[cartId]||[];
+  var activos=items.filter(function(it){return !it.mora||it.mora.tramo!=='INACTIVO';});
+  var faltanDia=activos.filter(function(it){return !it.diaAsesor;}).length;
+  var faltanMonto=activos.filter(function(it){return !it.montoAsesor;}).length;
+  var avisoFaltantes='';
+  if(faltanDia>0||faltanMonto>0){
+    avisoFaltantes='\n\n⚠️ ATENCIÓN: '+faltanDia+' de '+activos.length+' clientes sin día proyectado, '+faltanMonto+' sin monto proyectado.\nEsos clientes NO van a aparecer en el reporte de Cobros CXC del mes.\n¿Cerrar de todas formas?';
+  }
+  if(!confirm('¿Guardar la Proyección de '+nextNom+'?'+avisoFaltantes+'\n\nUna vez guardada quedará bloqueada.\nPuedes compartir la clave de acceso con asesores autorizados.'))return;
+  var pin=String(Math.floor(100000+Math.random()*900000));
   var snap=items.map(function(it){return {nombre:it.c.nombre,saldo:it.c.saldo,cuota:it.c.cuota,cuotasTrans:it.cuotasTrans,saldoEsperado:it.saldoEsperado,diaAsesor:it.diaAsesor,montoAsesor:it.montoAsesor,mora:it.mora?it.mora.tramo:null,moraVal:it.moraVal};});
   if(supa){
     var r=await supa.from('cierre_proyeccion').upsert({cartera_id:cartId,mes_key:mesKey,cerrado_por:(USER&&USER.nombre)||'admin',cerrado_at:new Date().toISOString(),datos:snap,pin_editor:pin},{onConflict:'cartera_id,mes_key'});
