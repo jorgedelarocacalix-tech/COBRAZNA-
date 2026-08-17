@@ -5890,7 +5890,8 @@ function _renderProyTab(cartId,container,weekOff){
     items.forEach(function(it){
       var idx=_PROY_ITEMS.length;_PROY_ITEMS.push(it);
       var c=it.c,p=it.p,mora=it.mora;
-      var moraVal=mora&&mora.dias&&mora.dias>0?Math.min(Math.round(mora.dias*(c.cuota/30)),c.saldo):0;
+      var _mc=calcMoraCliente(c,it.cartId||cartId);
+      var moraVal=_mc&&_mc.diferencia>0?_mc.diferencia:0;
       var moraStr=moraVal>0?'<span style="color:var(--red);font-weight:600">L '+fmt(moraVal)+'</span>':'<span style="color:var(--text3)">--</span>';
       var promInfo='';
       if(p&&p.estado==='promesa'&&p.fecha)promInfo='<div style="font-family:var(--mono);font-size:9px;color:var(--purple);margin-top:1px">Promesa: '+p.fecha+(p.monto?' L '+fmt(p.monto):'')+'</div>';
@@ -6209,7 +6210,7 @@ function _buildMoraView(cartId,cl,mesActualStr){
     var totalSaldo=items.reduce(function(s,it){return s+(it.c.saldo||0);},0);
     var h2='<div class="sec-card" style="margin-bottom:14px;border-left:3px solid '+color+'">';
     h2+='<div class="sec-title" style="color:'+color+'">'+title+' ('+items.length+') &middot; Saldo global L '+fmt(totalSaldo)+'</div>';
-    if(!isPagaron)h2+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px">Mora estimada = dias atrasados × cuota / 30 &nbsp;|&nbsp; Saldo global = deuda total segun sistema</div>';
+    if(!isPagaron)h2+='<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px">Mora estimada = saldo real − saldo esperado segun cuotas transcurridas &nbsp;|&nbsp; Saldo global = deuda total segun sistema</div>';
     h2+='<div style="overflow-x:auto"><table class="proy-tbl"><thead><tr>';
     h2+='<th style="min-width:150px">Cliente</th>';
     h2+='<th>Tipo de mora</th>';
@@ -6220,7 +6221,8 @@ function _buildMoraView(cartId,cl,mesActualStr){
     h2+='</tr></thead><tbody>';
     items.forEach(function(it){
       var c=it.c,mora=it.mora,p=it.p;
-      var moraEstimada=mora.dias&&c.cuota?Math.round(mora.dias*c.cuota/30):0;
+      var _mc=calcMoraCliente(c,cartId);
+      var moraEstimada=_mc&&_mc.diferencia>0?_mc.diferencia:0;
       var estadoStr=p&&p.estado?promBadge(p):'<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">Sin gestion</span>';
       h2+='<tr>';
       h2+='<td><div style="font-weight:600;font-size:12px">'+esc2(c.nombre)+'</div></td>';
@@ -6404,7 +6406,8 @@ function _renderProySiguiente(cartId,container,mesKey,semKey){
     var isUltimaCuota=c.num_cuotas>0&&cuotasTrans!==null&&cuotasTrans>=c.num_cuotas-1&&c.saldo>0;
     var pagoEsperado=montoAsesor||(isUltimaCuota?c.saldo:c.cuota)||0;
     var saldoEsperado=Math.max(0,c.saldo-pagoEsperado);
-    var moraVal=isUltimaCuota&&mora&&mora.dias>0?c.saldo:mora&&mora.dias>0?Math.min(Math.round(mora.dias*(c.cuota/30)),c.saldo):0;
+    var _mc=calcMoraCliente(c,cartId);
+    var moraVal=_mc&&_mc.diferencia>0?_mc.diferencia:0;
     var esAdelantado=p&&p.adelantado===true;
     items.push({c:c,p:p,proy:proy,mora:mora,moraVal:moraVal,esAdelantado:esAdelantado,diaAsesor:diaAsesor,montoAsesor:montoAsesor,cuotasTrans:cuotasTrans,saldoEsperado:saldoEsperado,pagoEsperado:pagoEsperado});
   });
