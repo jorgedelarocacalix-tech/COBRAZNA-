@@ -1486,6 +1486,28 @@ async function delCart(id){
   renderHome();
 }
 
+function irAPestana(id){
+  var btn=document.querySelector('.grp-btn[data-grp="'+id+'"]');
+  if(btn)btn.click();
+}
+// Guarda la mora de hoy y compara contra el ultimo dia guardado anterior
+function actualizarTendenciaMora(cartId,moraTotal,nEnMora){
+  if(!supa)return;
+  var hoyStr=HOY.toISOString().slice(0,10);
+  supa.from('mora_historial').upsert({cartera_id:cartId,fecha:hoyStr,mora_total:moraTotal,n_en_mora:nEnMora},{onConflict:'cartera_id,fecha'});
+  supa.from('mora_historial').select('fecha,mora_total').eq('cartera_id',cartId).lt('fecha',hoyStr).order('fecha',{ascending:false}).limit(1)
+    .then(function(r){
+      var el=document.getElementById('mora-trend');
+      if(!el)return;
+      var prev=r.data&&r.data[0];
+      if(!prev){el.textContent='vs. ayer: sin dato previo';return;}
+      var dif=moraTotal-prev.mora_total;
+      if(Math.abs(dif)<1){el.textContent='vs. '+prev.fecha+': igual';return;}
+      var icon=dif>0?'🔺':'🔻';
+      var color=dif>0?'var(--red)':'var(--green)';
+      el.innerHTML='<span style="color:'+color+'">'+icon+' L '+fmt(Math.abs(dif))+'</span> vs. '+prev.fecha;
+    });
+}
 // ══ DASHBOARD ══
 function renderDash(id){
   HOY=new Date(); HOY.setHours(0,0,0,0);
@@ -1506,16 +1528,23 @@ function renderDash(id){
   var activos=cl.filter(function(c){return c.tramo!=='INACTIVO';});
   var sAct=activos.reduce(function(s,c){return s+(c.saldo||0);},0);
   var nProm=cl.filter(function(c){var p=PROMESAS[id+'::'+c.nombre];return p&&p.estado==='promesa';}).length;
+  var moraTotal=0,nEnMora=0;
+  activos.forEach(function(c){
+    var m=calcMoraCliente(c,id);
+    if(m&&m.diferencia>0){moraTotal+=m.diferencia;nEnMora++;}
+  });
   document.getElementById('kpi-row').innerHTML=[
     {l:'Clientes',v:cl.length,s:'Total',c:'color:var(--text)'},
     {l:'Saldo activo',v:'L '+fmt(sAct),s:'A cobrar',c:'color:var(--blue)'},
+    {l:'Mora total',v:'L '+fmt(moraTotal),s:nEnMora+' en mora · <span id="mora-trend">vs. ayer: —</span>',c:'color:var(--red)',click:"irAPestana('REPORTE')"},
     {l:'Vencidos hoy',v:G.VENCIDO.length,s:'Cobrar hoy',c:'color:var(--orange)'},
     {l:'Pagaron',v:G.PAGARON.length,s:'Este mes',c:'color:var(--green)'},
     {l:'Promesas',v:nProm,s:'Activas',c:'color:var(--purple)'},
     {l:'Mora 60-90d',v:G['60'].length+G['90'].length,s:'Llamar',c:'color:var(--amber)'},
     {l:'Mora 120-150d',v:G['120'].length+G['150'].length,s:'Visitar',c:'color:var(--red)'},
     {l:'Inactivos',v:G.INACTIVO.length,s:'+180 dias',c:'color:var(--text3)'},
-  ].map(function(k){return '<div class="kpi-card"><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
+  ].map(function(k){return '<div class="kpi-card"'+(k.click?' style="cursor:pointer" onclick="'+k.click+'"':'')+'><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
+  actualizarTendenciaMora(id,moraTotal,nEnMora);
   // ── Clasificar promesas: activas vs incumplidas ──
   var hoyStr=HOY.toISOString().split('T')[0];
   var mesActual=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
@@ -1762,17 +1791,24 @@ function refreshSoft(cartId){
     var p=PROMESAS[id+'::'+c.nombre];
     return p&&p.estado==='promesa'&&!pagoEsteMes(c.ultimo_pago);
   }).length;
+  var moraTotal=0,nEnMora=0;
+  activos.forEach(function(c){
+    var m=calcMoraCliente(c,id);
+    if(m&&m.diferencia>0){moraTotal+=m.diferencia;nEnMora++;}
+  });
   var kpiEl=document.getElementById('kpi-row');
   if(kpiEl) kpiEl.innerHTML=[
     {l:'Clientes',v:cl.length,s:'Total',c:'color:var(--text)'},
     {l:'Saldo activo',v:'L '+fmt(sAct),s:'A cobrar',c:'color:var(--blue)'},
+    {l:'Mora total',v:'L '+fmt(moraTotal),s:nEnMora+' en mora · <span id="mora-trend">vs. ayer: —</span>',c:'color:var(--red)',click:"irAPestana('REPORTE')"},
     {l:'Vencidos hoy',v:G.VENCIDO.length,s:'Cobrar hoy',c:'color:var(--orange)'},
     {l:'Pagaron',v:G.PAGARON.length,s:'Este mes',c:'color:var(--green)'},
     {l:'Promesas',v:nProm,s:'Activas',c:'color:var(--purple)'},
     {l:'Mora 60-90d',v:G['60'].length+G['90'].length,s:'Llamar',c:'color:var(--amber)'},
     {l:'Mora 120-150d',v:G['120'].length+G['150'].length,s:'Visitar',c:'color:var(--red)'},
     {l:'Inactivos',v:G.INACTIVO.length,s:'+180 dias',c:'color:var(--text3)'},
-  ].map(function(k){return '<div class="kpi-card"><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
+  ].map(function(k){return '<div class="kpi-card"'+(k.click?' style="cursor:pointer" onclick="'+k.click+'"':'')+'><div class="kpi-l">'+k.l+'</div><div class="kpi-v" style="'+k.c+'">'+k.v+'</div><div class="kpi-s">'+k.s+'</div></div>';}).join('');
+  actualizarTendenciaMora(id,moraTotal,nEnMora);
 
   // 2. Actualizar botones de grupos que tienen contador (MORA, GESTION, PAGARON)
   // Solo actualiza el label del botón activo sin reconstruir nada
