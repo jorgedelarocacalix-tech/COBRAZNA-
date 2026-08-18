@@ -744,8 +744,13 @@ function aplicarParamsURL(){
   var cart=params.get('cart');
   var tab=params.get('tab');
   if(cart&&CARTERAS[cart]){
-    if(tab)CURRENT_TAB=tab;
-    openCartera(cart);
+    openCartera(cart); // openCartera resetea CURRENT_TAB a null, por eso el cambio de tab va despues
+    if(tab){
+      setTimeout(function(){
+        var btn=document.querySelector('.grp-btn[data-grp="'+tab+'"]');
+        if(btn)btn.click();
+      },50);
+    }
     return true;
   }
   return false;
