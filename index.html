@@ -737,6 +737,19 @@ function pinEnter(){
     entrarConUsuario(Object.assign({},u2,{codigo:pin}));
   });
 }
+// Deep link desde otras apps (ej. Analisis por Equipo): ?cart=SU_MOTO_DANLI&tab=REPORTE
+// Abre directo en la cartera y pestaña indicadas — el login con PIN sigue siendo manual.
+function aplicarParamsURL(){
+  var params=new URLSearchParams(location.search);
+  var cart=params.get('cart');
+  var tab=params.get('tab');
+  if(cart&&CARTERAS[cart]){
+    if(tab)CURRENT_TAB=tab;
+    openCartera(cart);
+    return true;
+  }
+  return false;
+}
 function entrarConUsuario(u){
   USER=u;
   document.getElementById('login-screen').style.display='none';
@@ -744,7 +757,8 @@ function entrarConUsuario(u){
   document.getElementById('user-lbl').textContent='👤 '+u.nombre;
   if(USER.rol==='admin')document.getElementById('btn-alerta').style.display='';
   loadData().then(function(){
-    renderHome();startSync();
+    if(!aplicarParamsURL())renderHome();
+    startSync();
     if(USER.rol==='gerente'){
       // Abrir burbuja IA en modo global al entrar
       var bubble=document.getElementById('ai-bubble');
