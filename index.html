@@ -5642,7 +5642,7 @@ function parseBloqueCliente(nombre,lineas,clientes){
     grp.forEach(function(dl){
       var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
       var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
-      var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>0;});
+      var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>=0;});
       ns.forEach(function(n){allN.push(n);});
     });
     if(allD.length<1||allN.length<1)return;
