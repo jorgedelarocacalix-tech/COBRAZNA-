@@ -85,6 +85,21 @@ El PIN 7777 (gerente) al entrar abre automáticamente el chat IA en modo "Todas 
 - Export PDF y CSV
 - Fuzzy name matching para cruzar cierre_proyeccion vs historial
 
+### Inbox (`buildInbox` — pestaña 📥 Inbox, v20260822-25)
+- Feed cronológico de comentarios manuales del equipo (tipos: nota, visita_realizada, visita_agenda, no_contesta; excluye gestor='Sistema')
+- Cada tarjeta: texto del comentario, tipo, cliente, hora y chip ✍ con quién comentó
+- Filtros por usuario (chips 👤 con conteo), por tipo (📋) y búsqueda por cliente/texto
+- **Clic en cualquier tarjeta → abre el chat del cliente**; 💬 también abre chat, 🗑 borra (autor o gerente/admin)
+- Límite 400 registros más recientes por cartera
+
+### Chat de cliente (`quickComentario` — modal estilo WhatsApp, v20260822-25)
+- Se abre desde cualquier botón 💬 (Inicio, Reporte, Mora, Promesas, Historial) o clic en tarjeta del Inbox
+- Hilo de burbujas cronológico: mensajes propios a la derecha (verde), del equipo a la izquierda con nombre en color por tipo; eventos automáticos del Sistema centrados y discretos
+- Auto-scroll al último mensaje; separadores de día tipo chat
+- Barra de entrada fija abajo: textarea redondo + botón ➤ (Enter envía); al enviar refresca el hilo sin cerrar
+- 🗑 dentro de cada burbuja (autor, o gerente/admin); datos en vivo de Supabase → todo el equipo ve lo mismo
+- Últimos 100 registros del cliente
+
 ### Chat IA (bot)
 - Pestaña "Chat" dentro del panel IA (burbuja flotante)
 - Registrar promesa, pago, visita, nota vía lenguaje natural

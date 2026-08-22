@@ -661,7 +661,7 @@ function loginRRHH(pin){
 }
 
 // ══ STATE ══
-var APP_VERSION='20260707-23';
+var APP_VERSION='20260822-25';
 var HOY=new Date(); HOY.setHours(0,0,0,0);
 var USER=null, CARTERAS={}, PROMESAS={}, CURRENT=null, CURRENT_TAB=null;
 var supa=null, DB_OK=false, PDFJS_OK=false;
@@ -951,7 +951,7 @@ function parseCartera(lines){
   var nameSim=function(a,b){if(a===b)return true;var lo=a.length>=b.length?a:b,sh=a.length<b.length?a:b;if(sh.length<4)return false;if(lo.startsWith(sh))return true;if(a.length===b.length){var d=0;for(var k=0;k<a.length;k++)if(a[k]!==b[k])d++;return d<=2;}return false;};
   var pushCliente=function(nombre,allD,allN){
     if(allD.length<1||allN.length<1||nombre.length<3)return;
-    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
+    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago;if(sinP)uPago=null;
     var total=0,nCuotas=0,pagado=0,saldo=0,diaPago=0,cuota=0;
     var bI=allN.findIndex(function(n){return n>=100;});if(bI>=0)total=allN[bI];
     var nci=-1;for(var ni=bI+1;ni<allN.length;ni++){if(allN[ni]>=1&&allN[ni]<=36&&Number.isInteger(allN[ni])){nCuotas=Math.round(allN[ni]);nci=ni;break;}}
@@ -1605,6 +1605,9 @@ function renderDash(id){
       id:'HISTORIAL', lbl:'📋 Historial', direct:true
     },
     {
+      id:'INBOX', lbl:'📥 Inbox', direct:true
+    },
+    {
       id:'PROYECCION', lbl:'📊 Proyeccion', color:'var(--blue)', bgColor:'var(--bluebg)',
       subs:[
         {id:'PROYECCION',    lbl:'📅 Proyección actual', n:null, cls:''},
@@ -1683,6 +1686,7 @@ function renderDash(id){
     {id:'VISITAS',   build:function(d){d.innerHTML='<div class="empty">Cargando visitas...</div>';buildVisitas(id,d);}},
     {id:'SIN_PAGO_INT',build:function(d){d.innerHTML=buildSinPagoInt(id,cl);}},
     {id:'HISTORIAL', build:function(d){d.innerHTML='<div class="empty">Cargando historial...</div>';buildHistorial(id,d);}},
+    {id:'INBOX',     build:function(d){d.innerHTML='<div class="empty">Cargando inbox...</div>';buildInbox(id,d);}},
     {id:'PROYECCION',    build:function(d){d.innerHTML='<div class="empty">Cargando proyeccion...</div>';buildProyeccion(id,d);}},
     {id:'PROY_SIGUIENTE',build:function(d){d.innerHTML='<div class="empty">Cargando...</div>';buildProySiguiente(id,d);}},
     {id:'MORA_GLOBAL',build:function(d){d.innerHTML=buildMoraGlobal(id,cl);}},
@@ -1862,12 +1866,12 @@ function calcMoraCliente(c, cartId){
   var ov=MG_OVERRIDES&&MG_OVERRIDES[cartId+'::'+c.nombre]||{};
   var numCuotas = ov.num_cuotas_real || c.num_cuotas || 0;
   var totalCredito = ov.total_credito_real || ((c.pagado||0)+(c.saldo||0));
-  if(!totalCredito||!c.cuota||c.cuota<=0) return null;
+  if(!totalCredito||!c.cuota||c.cuota<=0||c.cuota>totalCredito) return null;
   var fFact=parseHNDate(c.fecha_factura);
   var cuotasTrans=0;
   if(fFact&&hoy>fFact){
     var meses=(hoy.getFullYear()-fFact.getFullYear())*12+(hoy.getMonth()-fFact.getMonth());
-    if(c.dia_pago>0&&hoy.getDate()>=c.dia_pago) meses+=1;
+    if(c.dia_pago>0&&hoy.getDate()<c.dia_pago) meses-=1;
     cuotasTrans=Math.max(0,Math.min(meses,numCuotas||999));
   }
   var esperado=Math.max(0,Math.round(totalCredito-cuotasTrans*c.cuota));
@@ -3106,6 +3110,105 @@ function histSetFiltro(btn, tipo){
     sec.style.display=(tipo==='todos'||s===tipo)?'':'none';
   });
 }
+
+// ══ INBOX — historial de comentarios del equipo ══
+var _IB={cart:null,data:[],gestor:null,tipo:null};
+function ibEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+async function buildInbox(cartId,container){
+  _IB.cart=cartId;_IB.gestor=null;_IB.tipo=null;_IB.data=[];
+  if(!supa){container.innerHTML='<div class="empty">Sin conexion.</div>';return;}
+  try{
+    var r=await supa.from('historial_clientes')
+      .select('*')
+      .eq('cartera_id',cartId)
+      .in('tipo',['nota','visita_realizada','visita_agenda','no_contesta','no_contesta_old'])
+      .order('created_at',{ascending:false})
+      .limit(400);
+    if(r.error)throw r.error;
+    // Solo comentarios manuales (excluir registros automáticos del Sistema)
+    _IB.data=(r.data||[]).filter(function(h){return h.gestor&&h.gestor!=='Sistema';});
+    container.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">'
+      +'<div style="font-size:15px;font-weight:600">📥 Inbox — Comentarios del equipo</div>'
+      +'<span class="cart-meta">'+_IB.data.length+' comentarios</span></div>'
+      +'<input class="tbl-search" id="S-INBOX" onkeyup="ibRender()" placeholder="Buscar cliente o comentario...">'
+      +'<div id="ib-chips"></div><div id="ib-feed"></div>';
+    ibRender();
+  }catch(e){container.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error('buildInbox:',e);}
+}
+function ibSetG(g){_IB.gestor=g||null;ibRender();}
+function ibSetT(t){_IB.tipo=t||null;ibRender();}
+function ibDel(el){
+  var id=el.getAttribute('data-id'),cartId=el.getAttribute('data-cart');
+  if(!id||!supa)return;
+  if(!confirm('¿Borrar este comentario del historial?'))return;
+  supa.from('historial_clientes').delete().eq('id',id).then(function(){
+    _IB.data=_IB.data.filter(function(h){return h.id!=id;});
+    ibRender();refreshSoft(cartId);
+    setConn(true,'🗑 Comentario borrado');setTimeout(function(){setConn(true,'Conectado');},2000);
+  });
+}
+function ibChip(lbl,on,fn){return '<button class="rep-filter-btn'+(on?' on':'')+'" onclick="'+fn+'">'+lbl+'</button>';}
+function ibRender(){
+  var chipsEl=document.getElementById('ib-chips'),feedEl=document.getElementById('ib-feed');
+  if(!chipsEl||!feedEl)return;
+  var tipos={nota:'💬 Notas',visita_realizada:'🚗 Visitas realizadas',visita_agenda:'🗓 Visitas agendadas',no_contesta:'📵 No contesta',no_contesta_old:'📵 No contesta'};
+  // ── Chips: filtro por usuario y por tipo ──
+  var porG={};
+  _IB.data.forEach(function(h){porG[h.gestor]=(porG[h.gestor]||0)+1;});
+  var ch='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">';
+  ch+=ibChip('👥 Todos ('+_IB.data.length+')',!_IB.gestor,'ibSetG(null)');
+  Object.keys(porG).sort().forEach(function(g){
+    ch+=ibChip('👤 '+ibEsc(g)+' ('+porG[g]+')',_IB.gestor===g,'ibSetG(\''+esc(g)+'\')');
+  });
+  ch+='</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">';
+  ch+=ibChip('📋 Todos los tipos',!_IB.tipo,'ibSetT(null)');
+  Object.keys(tipos).forEach(function(t){
+    var n=_IB.data.filter(function(h){return h.tipo===t;}).length;
+    if(n)ch+=ibChip(tipos[t]+' ('+n+')',_IB.tipo===t,'ibSetT(\''+t+'\')');
+  });
+  ch+='</div>';
+  chipsEl.innerHTML=ch;
+
+  // ── Feed filtrado ──
+  var q=((document.getElementById('S-INBOX')||{}).value||'').toLowerCase();
+  var rows=_IB.data.filter(function(h){
+    if(_IB.gestor&&h.gestor!==_IB.gestor)return false;
+    if(_IB.tipo&&h.tipo!==_IB.tipo)return false;
+    if(q&&((h.cliente_nombre||'')+' '+(h.nota||'')).toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+  if(!rows.length){feedEl.innerHTML='<div class="empty" style="padding:20px 0">Sin comentarios que coincidan.</div>';return;}
+
+  var icons={nota:'💬',visita_realizada:'🚗',visita_agenda:'🗓',no_contesta:'📵',no_contesta_old:'📵'};
+  var tLbl={nota:'Nota',visita_realizada:'Visita realizada',visita_agenda:'Visita agendada',no_contesta:'No contesta',no_contesta_old:'No contesta'};
+  var tCol={nota:'var(--blue)',visita_realizada:'var(--green)',visita_agenda:'var(--amber)',no_contesta:'var(--red)',no_contesta_old:'var(--red)'};
+  function puedeBorrar(h){return !!USER&&(h.gestor===USER.nombre||USER.rol==='gerente'||USER.rol==='admin');}
+  var html='',lastDay='';
+  rows.forEach(function(h){
+    var d=new Date(h.created_at),ok=!isNaN(d.getTime());
+    var dia=ok?d.toLocaleDateString('es-HN',{weekday:'short',day:'numeric',month:'short'}):String(h.created_at||'').substring(0,10);
+    var hora=ok?d.toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'}):'';
+    if(dia!==lastDay){
+      lastDay=dia;
+      html+='<div style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;padding:8px 0 4px;text-align:center">— '+ibEsc(dia)+' —</div>';
+    }
+    var txt=String(h.nota||'').replace(/^💬\s*/,'');
+    html+='<div class="vis-card" style="cursor:pointer;margin-bottom:4px"'
+      +' onclick="quickComentario(\''+h.cartera_id+'\',\''+esc(h.cliente_nombre||'')+'\')">'
+      +'<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:'+tCol[h.tipo]+'22;color:'+tCol[h.tipo]+'">'+icons[h.tipo]+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12.5px;line-height:1.35">'+ibEsc(txt||'(sin texto)')+'</div>'
+      +'<div class="cart-meta" style="margin-top:3px"><span style="color:'+tCol[h.tipo]+';font-weight:600">'+tLbl[h.tipo]+'</span> · 👤 '+ibEsc(h.cliente_nombre)+' · '+hora+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+      +'<span class="b" style="background:var(--bg3);color:var(--text2);font-size:9.5px;padding:2px 8px">✍ '+ibEsc(h.gestor)+'</span>'
+      +'<span class="add-p" style="background:var(--bluebg);color:var(--blue);border-style:solid" onclick="event.stopPropagation();quickComentario(\''+h.cartera_id+'\',\''+esc(h.cliente_nombre||'')+'\')">💬</span>'
+      +(puedeBorrar(h)?'<span class="add-p" style="background:transparent;color:var(--red)" onclick="event.stopPropagation();ibDel(this)" data-id="'+h.id+'" data-cart="'+(h.cartera_id||'')+'">🗑</span>':'')
+      +'</div></div>';
+  });
+  feedEl.innerHTML=html;
+}
 async function loadClientHist(cartId,nombre,cuota,saldo){
   var detEl=document.getElementById('hist-detail');if(!detEl)return;
   if(!supa){detEl.innerHTML='<div class="empty">Sin conexion.</div>';return;}
@@ -3286,27 +3389,24 @@ async function marcarVisitaRealizada(cartId,nombre){
 }
 
 function quickComentario(cartId,nombre){
+  var cl=(CARTERAS[cartId]||{}).clientes||[];
+  var c=cl.find(function(x){return x.nombre===nombre;})||{cuota:0,saldo:0};
   var old=document.getElementById('qcom-overlay');if(old)old.remove();
-  var hoyStr=new Date().toISOString().split('T')[0];
   var div=document.createElement('div');
   div.id='qcom-overlay';
   div.className='overlay show';
+  // ── Layout de chat: header + hilo de mensajes + barra de entrada fija abajo ──
   div.innerHTML=
-    '<div class="modal-card" style="max-width:400px">'
+    '<div class="modal-card" style="max-width:460px;width:100%;height:min(640px,88vh);padding:0;display:flex;flex-direction:column;overflow:hidden">'
     +'<button class="modal-x" onclick="document.getElementById(\'qcom-overlay\').remove()">×</button>'
-    +'<div class="modal-title" style="color:var(--blue)">💬 Comentario</div>'
-    +'<div class="modal-sub" style="margin-bottom:14px">'+nombre+'</div>'
-    +'<div class="form-row">'
-    +'<label class="form-lbl">Fecha</label>'
-    +'<input type="date" class="form-inp" id="qcom-fecha" value="'+hoyStr+'">'
+    +'<div style="padding:14px 46px 10px 20px;border-bottom:1px solid var(--border);flex-shrink:0">'
+    +'<div style="font-size:15px;font-weight:700">💬 '+ibEsc(nombre)+'</div>'
+    +'<div class="cart-meta" style="margin-top:2px">Cuota: L '+fmt(c.cuota||0)+' · Saldo: L '+fmt(c.saldo||0)+'</div>'
     +'</div>'
-    +'<div class="form-row">'
-    +'<label class="form-lbl">Comentario <span style="color:var(--text3);font-size:10px">(Enter para guardar)</span></label>'
-    +'<textarea class="form-inp" id="qcom-texto" rows="3" style="resize:vertical;font-family:var(--mono);font-size:12px" placeholder="Ej: no contesta · prometió llamar mañana · visita pendiente..."></textarea>'
-    +'</div>'
-    +'<div class="form-actions">'
-    +'<button class="btn btn-ghost" onclick="document.getElementById(\'qcom-overlay\').remove()">Cancelar</button>'
-    +'<button class="btn btn-g" onclick="quickComentarioGuardar(\''+cartId+'\',\''+esc(nombre)+'\')">💾 Guardar</button>'
+    +'<div id="qcom-hist" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:5px"><div class="cart-meta" style="text-align:center">Cargando historial...</div></div>'
+    +'<div style="border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;flex-shrink:0">'
+    +'<textarea class="form-inp" id="qcom-texto" rows="1" placeholder="Escribe un comentario para el equipo..." style="flex:1;resize:none;font-size:12.5px;line-height:1.3;padding:9px 13px;border-radius:18px"></textarea>'
+    +'<button class="btn btn-g" title="Enviar" style="width:38px;height:38px;padding:0;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px" onclick="quickComentarioGuardar(\''+cartId+'\',\''+esc(nombre)+'\')">➤</button>'
     +'</div>'
     +'</div>';
   document.body.appendChild(div);
@@ -3319,29 +3419,89 @@ function quickComentario(cartId,nombre){
       };
     }
   },60);
+  quickComentarioHist(cartId,nombre);
+}
+
+var _QC_ICON={promesa:'📅',posponer:'⏭',pago:'✅',abono:'💰',visita_agenda:'🗓',visita_realizada:'🚗',no_contesta:'📵',no_contesta_old:'📵',nota:'',promesa_cumplida:'🤝',promesa_incumplida:'🚨',arreglo_pago:'🤝',cero_prima:'🆕',extension_plazo:'📅'};
+var _QC_COL={promesa:'var(--purple)',posponer:'var(--purple)',pago:'var(--green)',abono:'var(--orange)',visita_agenda:'var(--amber)',visita_realizada:'var(--green)',no_contesta:'var(--red)',no_contesta_old:'var(--red)',nota:'var(--blue)',promesa_cumplida:'var(--green)',promesa_incumplida:'var(--red)',arreglo_pago:'var(--green)',cero_prima:'var(--purple)',extension_plazo:'var(--blue)'};
+
+async function quickComentarioHist(cartId,nombre){
+  var el=document.getElementById('qcom-hist');if(!el)return;
+  if(!supa){el.innerHTML='<div class="empty">Sin conexion.</div>';return;}
+  try{
+    var r=await supa.from('historial_clientes').select('*').eq('cartera_id',cartId).eq('cliente_nombre',nombre).order('created_at',{ascending:true}).limit(100);
+    if(r.error)throw r.error;
+    var rows=r.data||[];
+    if(!rows.length){el.innerHTML='<div class="empty">Sin comentarios aún — escribe el primero abajo.</div>';return;}
+    function puedeBorrar(h){return !!USER&&(h.gestor===USER.nombre||USER.rol==='gerente'||USER.rol==='admin');}
+    var html='',lastDay='';
+    rows.forEach(function(h){
+      var d=new Date(h.created_at),ok=!isNaN(d.getTime());
+      var dia=ok?d.toLocaleDateString('es-HN',{weekday:'short',day:'numeric',month:'short'}):String(h.created_at||'').substring(0,10);
+      var hora=ok?d.toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'}):'';
+      if(dia!==lastDay){
+        lastDay=dia;
+        html+='<div style="align-self:center;background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:3px 10px;border-radius:10px;margin:4px 0">'+ibEsc(dia)+'</div>';
+      }
+      var txt=String(h.nota||'(sin texto)').replace(/^💬\s*/,'');
+      var ic=_QC_ICON[h.tipo];
+      if(ic)txt=ic+' '+txt;
+      var col=_QC_COL[h.tipo]||'var(--text3)';
+      var sistema=h.gestor==='Sistema';
+      if(sistema){
+        // Eventos automáticos: línea centrada discreta
+        html+='<div style="align-self:center;max-width:85%;text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--text3);padding:2px 10px;line-height:1.4">'+ibEsc(txt)+' · '+ibEsc(dia)+(hora?' '+hora:'')+'</div>';
+        return;
+      }
+      var mine=!!USER&&h.gestor===USER.nombre;
+      html+='<div style="display:flex;justify-content:'+(mine?'flex-end':'flex-start')+';padding:1px 0">'
+        +'<div style="max-width:80%;background:'+(mine?'var(--greenbg)':'var(--bg3)')+';border:1px solid '+(mine?'rgba(34,160,80,.25)':'var(--border)')+';border-radius:14px;'+(mine?'border-bottom-right-radius:4px':'border-bottom-left-radius:4px')+';padding:7px 11px">'
+        +(mine?'':'<div style="font-size:9.5px;font-weight:700;color:'+col+';margin-bottom:2px">'+ibEsc(h.gestor)+'</div>')
+        +'<div style="font-size:12.5px;line-height:1.35;white-space:pre-wrap">'+ibEsc(txt)+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px">'
+        +'<span style="font-family:var(--mono);font-size:9px;color:var(--text3)">'+hora+(h.monto?' · L '+fmt(h.monto):'')+'</span>'
+        +(puedeBorrar(h)?'<span style="cursor:pointer;font-size:9px;opacity:.45" onclick="qcomDel(this)" data-id="'+h.id+'" data-cart="'+(h.cartera_id||'')+'" data-nom="'+ibEsc(nombre)+'">🗑</span>':'')
+        +'</div>'
+        +'</div></div>';
+    });
+    el.innerHTML=html;
+    el.scrollTop=el.scrollHeight;   // chat siempre muestra lo último
+  }catch(e){el.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error('quickComentarioHist:',e);}
+}
+function qcomDel(el){
+  var id=el.getAttribute('data-id'),cartId=el.getAttribute('data-cart'),nombre=el.getAttribute('data-nom');
+  if(!id||!supa)return;
+  if(!confirm('¿Borrar este registro del historial?'))return;
+  supa.from('historial_clientes').delete().eq('id',id).then(function(){
+    quickComentarioHist(cartId,nombre);refreshSoft(cartId);
+  });
 }
 
 async function quickComentarioGuardar(cartId,nombre){
   var texto=(document.getElementById('qcom-texto')||{}).value||'';
-  var fecha=(document.getElementById('qcom-fecha')||{}).value||new Date().toISOString().split('T')[0];
-  var ov=document.getElementById('qcom-overlay');if(ov)ov.remove();
   if(!texto.trim())return;
   if(!supa){setConn(false,'Sin conexión — comentario no guardado');return;}
   // Guardar en historial
   await dbSaveHist({
     cartera_id:cartId, cliente_nombre:nombre, tipo:'nota',
     nota:'💬 '+texto.trim(),
-    monto:null, fecha_accion:fecha, fecha_visita:null,
+    monto:null, fecha_accion:new Date().toISOString().split('T')[0], fecha_visita:null,
     gestor:(USER&&USER.nombre)||'—', created_at:new Date().toISOString()
   });
+  // Limpiar y recargar historial dentro del mismo modal
+  var t=document.getElementById('qcom-texto');
+  if(t){t.value='';t.focus();}
   // Actualizar estado en PROMESAS para que aparezca en el dashboard
   var key=cartId+'::'+nombre;
   PROMESAS[key]=Object.assign({},PROMESAS[key]||{},{estado:'nota',nota:texto.trim(),ts:new Date().toISOString()});
   await dbSaveProm(cartId,nombre);
   setConn(true,'💬 Comentario guardado ✓');
   setTimeout(function(){setConn(true,'Conectado');},2500);
+  quickComentarioHist(cartId,nombre);
   if(CURRENT&&CARTERAS[CURRENT])refreshSoft(CURRENT);
 }
+
+// ══ ECG ══
 
 // ══ ECG ══
 function descargarExcelSnapshots(cartId,tramoId){
@@ -5646,7 +5806,7 @@ function parseBloqueCliente(nombre,lineas,clientes){
       ns.forEach(function(n){allN.push(n);});
     });
     if(allD.length<1||allN.length<1)return;
-    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago||uPago===fFact;if(sinP)uPago=null;
+    var fFact=allD[0],uPago=allD[1]||null;var sinP=!uPago;if(sinP)uPago=null;
     var bI=allN.findIndex(function(n){return n>=100;});var total=bI>=0?allN[bI]:0;
     var nci=-1,nCuotas=0;for(var ni=bI+1;ni<allN.length;ni++){if(allN[ni]>=1&&allN[ni]<=36&&Number.isInteger(allN[ni])){nCuotas=Math.round(allN[ni]);nci=ni;break;}}
     var pi=-1,pagado=0;for(var ni2=Math.max(nci,bI)+1;ni2<allN.length;ni2++){if(allN[ni2]>=0){pagado=allN[ni2];pi=ni2;break;}}
