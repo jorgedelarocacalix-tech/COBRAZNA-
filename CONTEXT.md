@@ -1,12 +1,14 @@
 # Cobranza App — Contexto del proyecto
 
 Repo: https://github.com/jorgedelarocacalix-tech/COBRAZNA-  
-**Netlify (producción):** https://laroca-cobranza-app.netlify.app  
+**Railway vía Suite (producción):** https://laroca-suite-production.up.railway.app/cobranza/  
 GitHub Pages (secundario): https://jorgedelarocacalix-tech.github.io/COBRAZNA-/  
+Netlify: DESACTIVADO — bloqueado por falta de créditos ("Account credit usage exceeded")  
 Stack: Vanilla JS · HTML único (index.html ~6500 líneas) · Supabase · Claude Haiku (Anthropic)  
 Supabase project ID: `ixskgawbpwwxdjnkiixt`
 
-Deploy: `netlify deploy --prod --dir=.` desde `/Users/jorgecalix/cobranza-app`
+Deploy principal: copiar `index.html` a `/Users/jorgecalix/laroca-suite/cobranza/` y desde ahí `railway up` (la suite sirve esta app en la ruta `/cobranza/`). Luego commit + push en ambos repos.
+Deploy secundario GH Pages: commit + push a `main`; GitHub Pages sirve la raíz del repo.
 
 ---
 
@@ -146,6 +148,6 @@ ECG_DATA[cartId_tramoId_idx] = { fecha, count, clientes, idx, cartId, tramoId, c
 - Los PDFs de cartera se parsean client-side con pdf.js
 - Supabase se usa para persistencia de promesas, historial y snapshots
 - El bot usa Claude Haiku via Supabase Edge Functions (Deno/TypeScript)
-- Deploy: `netlify deploy --prod --dir=.` (Netlify CLI vinculado a `laroca-cobranza-app`)
-- netlify.toml configurado con `Cache-Control: no-cache` para HTML — usuarios siempre ven versión nueva
+- Deploy: Railway vía suite (`laroca-suite/cobranza/` + `railway up`) — Netlify bloqueado por créditos
+- nginx de la suite sirve HTML con `Cache-Control: no-cache` — usuarios siempre ven versión nueva
 - Si una PC no carga la app: revisar DNS (cambiar a 8.8.8.8 / 8.8.4.4 resolvió en una ocasión)
