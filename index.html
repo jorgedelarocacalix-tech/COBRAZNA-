@@ -1157,17 +1157,21 @@ async function cruzarPrimasConArqueos(cartId,clientes){
     var mesStr=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1);
     var desde=mesStr+'-01';
     var hasta=HOY.getFullYear()+'-'+(HOY.getMonth()<9?'0':'')+(HOY.getMonth()+1)+'-'+(HOY.getDate()<10?'0':'')+HOY.getDate();
+    console.log('[PRIMA] Consultando arqueos desde',desde,'hasta',hasta,'para cartera',cartId);
     var r=await supa.from('arqueos').select('sucursal,fecha,analisis_json').gte('fecha',desde).lte('fecha',hasta);
-    if(r.error||!r.data)return;
+    if(r.error){console.log('[PRIMA] Error arqueos:',r.error);return;}
+    if(!r.data||!r.data.length){console.log('[PRIMA] Sin arqueos este mes');return;}
+    console.log('[PRIMA] Arqueos encontrados:',r.data.length);
     // Mapear sucursal → cartera_id
     var sucMap={'R1':'LA_ROCA_COMERCIAL_1','R2':'LA_ROCA_MOTORS_BARRIO_ARRIBA_1','R3':'LA_ROCA_MOTORS_LA_LIBERTAD_2','R4':'SU_MUEBLE','R5':'SU_MOTO_DANLI'};
     var sucCart={};Object.keys(sucMap).forEach(function(s){sucCart[sucMap[s]]=s;});
-    var miSuc=sucCart[cartId];if(!miSuc)return;
+    var miSuc=sucCart[cartId];if(!miSuc){console.log('[PRIMA] No mapeo para cartera',cartId);return;}
+    console.log('[PRIMA] Sucursal mapeada:',miSuc);
     // Recopilar cobros PRIMA de esta sucursal
     var primas={};
     (r.data||[]).forEach(function(a){
       if(a.sucursal!==miSuc)return;
-      var aj=a.analisis_json||{};
+      var aj=typeof a.analisis_json==='string'?JSON.parse(a.analisis_json):(a.analisis_json||{});
       (aj.cobros||[]).forEach(function(c){
         if((c.tipo||'').toUpperCase()==='PRIMA'&&c.cliente){
           var nombre=c.cliente.trim().toUpperCase();
@@ -1175,25 +1179,29 @@ async function cruzarPrimasConArqueos(cartId,clientes){
         }
       });
     });
+    console.log('[PRIMA] Primas encontradas:',Object.keys(primas).length,primas);
     if(!Object.keys(primas).length)return;
     // Fecha HN del arqueo
     function isoToHN(iso){var p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+    // Clientes sin ultimo_pago
+    var sinPago=clientes.filter(function(c){return c.sin_ultimo_pago&&!c.ultimo_pago;});
+    console.log('[PRIMA] Clientes sin ultimo_pago:',sinPago.length,sinPago.map(function(c){return c.nombre;}));
     // Matchear clientes sin ultimo_pago con primas
     clientes.forEach(function(c){
       if(!c.sin_ultimo_pago||c.ultimo_pago)return;
       var nombreUp=c.nombre.trim().toUpperCase();
       // Match exacto
-      if(primas[nombreUp]){c.ultimo_pago=isoToHN(primas[nombreUp]);c.sin_ultimo_pago=false;return;}
+      if(primas[nombreUp]){c.ultimo_pago=isoToHN(primas[nombreUp]);c.sin_ultimo_pago=false;console.log('[PRIMA] MATCH exacto:',c.nombre,'→',c.ultimo_pago);return;}
       // Match parcial: nombre del cliente contenido en la prima o viceversa
       var keys=Object.keys(primas);
       for(var i=0;i<keys.length;i++){
         var k=keys[i];
         if(k.length>=4&&nombreUp.length>=4&&(k.indexOf(nombreUp)>=0||nombreUp.indexOf(k)>=0)){
-          c.ultimo_pago=isoToHN(primas[k]);c.sin_ultimo_pago=false;return;
+          c.ultimo_pago=isoToHN(primas[k]);c.sin_ultimo_pago=false;console.log('[PRIMA] MATCH parcial:',c.nombre,'con',k,'→',c.ultimo_pago);return;
         }
       }
     });
-  }catch(e){console.error('cruzarPrimasConArqueos:',e);}
+  }catch(e){console.error('[PRIMA] Error:',e);}
 }
 
 // ══ FILE HANDLING ══
