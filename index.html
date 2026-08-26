@@ -1693,6 +1693,16 @@ function renderDash(id){
     return !pagoMesAnterior(c.ultimo_pago)&&!pagoEsteMes(c.ultimo_pago);
   }).length;
 
+  // ── Proyección hoy → cierre: clientes con mora real (aunque hayan pagado este mes) o que no han pagado este mes ──
+  var cierreHoyList=activos.filter(function(c){
+    var p=PROMESAS[id+'::'+c.nombre];
+    var pagoManualEsteMes=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
+    var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManualEsteMes)&&!(p&&p.mora_pendiente);
+    var m=calcMoraCliente(c,id);
+    var tieneMora=m&&m.diferencia>0;
+    return tieneMora||!pagado;
+  });
+
   // ── Estructura de grupos con subpestañas ──
   var GRUPOS=[
     {
@@ -1758,6 +1768,13 @@ function renderDash(id){
       ]
     },
   ];
+  // Pestaña "Hoy → Cierre": solo visible para admin, al comienzo
+  if(USER&&USER.rol==='admin'){
+    GRUPOS.unshift({
+      id:'CIERRE_HOY', lbl:'🏁 Hoy → Cierre', direct:true,
+      badge: cierreHoyList.length>0?cierreHoyList.length:null, badgeColor:'var(--red)'
+    });
+  }
 
   // Determinar grupo y sub activos desde CURRENT_TAB
   var activeGrupoId=null, activeSubId=null;
@@ -1797,6 +1814,7 @@ function renderDash(id){
 
   // Todos los panes de contenido (todos los sub IDs posibles)
   var allPanes=[
+    {id:'CIERRE_HOY',build:function(d){d.innerHTML=buildCierreHoy(id,cierreHoyList);}},
     {id:'HOY',       build:function(d){d.innerHTML=buildHoy(id,cl,G);}},
     {id:'REPORTE',   build:function(d){d.innerHTML=buildReporte(id,cl,G);}},
     {id:'VENCIDO',   build:function(d){d.innerHTML=buildTbl(id,G.VENCIDO||[],'bo','');}},
@@ -2666,6 +2684,76 @@ function exportTramoExcel(){
     XLSX.writeFile(wb,'mora_'+tramoLabel+'_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx',{cellStyles:true});
   }
   if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=_do;document.head.appendChild(s);}else{_do();}
+}
+
+// ══ PROYECCION HOY → CIERRE (solo admin) ══
+function exportCierreExcel(){
+  var d=window._cierreExcelData;
+  if(!d||!d.rows||!d.rows.length){alert('Sin datos para exportar.');return;}
+  function _do(){
+    var header=['#','Cliente','Saldo (L)','Cuota (L)','Mora (L)','Ultimo pago','Tramo','Ultima gestion'];
+    var wsData=[header];
+    var totalCuota=0,totalMora=0;
+    d.rows.forEach(function(r,i){
+      var m=calcMoraCliente(r,d.cartId);
+      var mora=m&&m.diferencia>0?m.diferencia:0;
+      totalCuota+=r.cuota||0;totalMora+=mora;
+      var tl=r.tramo==='INACTIVO'?'+180d':r.tramo==='MES'?'Al dia':r.tramo==='VENCIDO'?'Este mes':(r.tramo||'')+'d';
+      var p=PROMESAS[d.cartId+'::'+r.nombre]||{};
+      var gest=p.estado?({promesa:'Promesa',pago:'Pago',visita:'Visita',visita_agenda:'Visita agendada','no-contesta':'No contesta',no_contesta:'No contesta',nota:'Nota',posponer:'Posponer'}[p.estado]||p.estado):'Sin gestion';
+      wsData.push([i+1,r.nombre,r.saldo||0,r.cuota||0,mora,r.ultimo_pago||'',tl,gest]);
+    });
+    wsData.push(['','TOTAL ('+d.rows.length+' clientes)','',totalCuota,totalMora,'','','']);
+    var wb=XLSX.utils.book_new();
+    var ws=XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols']=[{wch:4},{wch:32},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:16}];
+    header.forEach(function(_,ci){var a=XLSX.utils.encode_cell({r:0,c:ci});if(ws[a])ws[a].s={font:{bold:true}};});
+    var tr=wsData.length-1;
+    [0,1,3,4].forEach(function(ci){var a=XLSX.utils.encode_cell({r:tr,c:ci});if(ws[a])ws[a].s={font:{bold:true}};});
+    var empresa=(CARTERAS[d.cartId]||{}).empresa||d.cartId;
+    XLSX.utils.book_append_sheet(wb,ws,'Hoy a cierre');
+    XLSX.writeFile(wb,'hoy_cierre_'+empresa.replace(/[^a-zA-Z0-9]/g,'_')+'_'+HOY.toISOString().split('T')[0]+'.xlsx',{cellStyles:true});
+  }
+  if(typeof XLSX==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=_do;document.head.appendChild(s);}else{_do();}
+}
+function buildCierreHoy(cartId,rows){
+  if(!rows.length)return '<div class="empty">🎉 Todos al día — nadie con mora ni pagos pendientes este mes.</div>';
+  var withMora=rows.map(function(r){var m=calcMoraCliente(r,cartId);return {r:r,mora:m&&m.diferencia>0?m.diferencia:0};});
+  withMora.sort(function(a,b){return b.mora-a.mora||(b.r.saldo||0)-(a.r.saldo||0);});
+  var totalCuota=rows.reduce(function(s,r){return s+(r.cuota||0);},0);
+  var totalMora=withMora.reduce(function(s,x){return s+x.mora;},0);
+  window._cierreExcelData={cartId:cartId,rows:withMora.map(function(x){return x.r;})};
+  var uid='CH'+Math.random().toString(36).slice(2,6);
+  var html='<div class="tbl-note">Clientes con mora real (aunque hayan pagado su cuota de este mes) o que aún no han pagado nada este mes. Usalo para llamar a los equipos y confirmar con cuánto se espera cerrar el mes.</div>'
+    +'<div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
+      +'<div class="kpi-card" style="flex:1;min-width:140px"><div class="kpi-l">Clientes</div><div class="kpi-v">'+rows.length+'</div></div>'
+      +'<div class="kpi-card" style="flex:1;min-width:140px"><div class="kpi-l">Total cuota</div><div class="kpi-v" style="color:var(--blue)">L '+fmt(totalCuota)+'</div></div>'
+      +'<div class="kpi-card" style="flex:1;min-width:140px"><div class="kpi-l">Total mora</div><div class="kpi-v" style="color:var(--red)">L '+fmt(totalMora)+'</div></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button onclick="exportCierreExcel()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(26,122,60,.4);background:var(--greenbg);color:var(--green);cursor:pointer;font-family:var(--mono);font-weight:600">📗 Excel</button></div>'
+    +'<input class="tbl-search" id="S'+uid+'" onkeyup="flt(\''+uid+'\',\'S'+uid+'\')" placeholder="Buscar...">'
+    +'<div class="tbl-wrap"><table id="'+uid+'"><thead><tr>'
+    +'<th>#</th><th>Cliente</th><th>Saldo</th><th>Cuota</th><th>Mora</th><th>Último pago</th><th>Tramo</th><th>Acción</th>'
+    +'</tr></thead><tbody>';
+  withMora.forEach(function(x,i){
+    var r=x.r;
+    var tl=r.tramo==='INACTIVO'?'+180d':r.tramo==='MES'?'Al dia':r.tramo==='VENCIDO'?'Este mes':(r.tramo||'—')+'d';
+    var moraHtml=x.mora>0?'<span style="font-family:var(--mono);font-size:11px;color:var(--red);font-weight:700">L '+fmt(x.mora)+'</span>':'<span style="color:var(--text3);font-family:var(--mono);font-size:10px">—</span>';
+    var upStr=r.ultimo_pago||'—';
+    var upColor=pagoEsteMes(r.ultimo_pago)?'color:var(--green);font-weight:600':'color:var(--text2)';
+    html+='<tr>'
+      +'<td class="mono">'+(i+1)+'</td>'
+      +'<td class="td-name nombre-link" onclick="irAHistorialCliente(\''+cartId+'\',\''+esc(r.nombre)+'\','+r.cuota+','+r.saldo+')">'+r.nombre+'</td>'
+      +'<td class="mono" style="font-weight:600">L '+fmt(r.saldo||0)+'</td>'
+      +'<td class="mono">L '+fmt(r.cuota||0)+'</td>'
+      +'<td>'+moraHtml+'</td>'
+      +'<td class="mono" style="'+upColor+'">'+upStr+'</td>'
+      +'<td><span class="b '+(r.tramo==='INACTIVO'?'bx':r.tramo==='MES'?'':r.tramo==='VENCIDO'?'bo':'br')+'">'+tl+'</span></td>'
+      +'<td><span class="add-p" onclick="quickComentario(\''+cartId+'\',\''+esc(r.nombre)+'\')" style="background:var(--bluebg);color:var(--blue)">💬 Comentar / historial</span></td>'
+      +'</tr>';
+  });
+  html+='<tr class="total-row"><td colspan="2">TOTAL · '+rows.length+'</td><td class="mono"></td><td class="mono">L '+fmt(totalCuota)+'</td><td class="mono">L '+fmt(totalMora)+'</td><td colspan="3"></td></tr></tbody></table></div>';
+  return html;
 }
 
 function buildTbl(cartId,rows,cls,note){
