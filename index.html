@@ -1060,7 +1060,7 @@ function parseCartera(lines){
         segments.forEach(function(grpLines){
           var allD=[],allN=[];
           grpLines.forEach(function(dl){
-            var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
+            var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){allD.push(d);});
             var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
             var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>=0;});
             ns.forEach(function(n){allN.push(n);});
@@ -1768,8 +1768,8 @@ function renderDash(id){
       ]
     },
   ];
-  // Pestaña "Hoy → Cierre": solo visible para admin, al comienzo
-  if(USER&&USER.rol==='admin'){
+  // Pestaña "Hoy → Cierre": visible para admin y gerente, al comienzo
+  if(USER&&(USER.rol==='admin'||USER.rol==='gerente')){
     GRUPOS.unshift({
       id:'CIERRE_HOY', lbl:'🏁 Hoy → Cierre', direct:true,
       badge: cierreHoyList.length>0?cierreHoyList.length:null, badgeColor:'var(--red)'
@@ -6036,7 +6036,7 @@ function parseBloqueCliente(nombre,lineas,clientes){
   segments.forEach(function(grp){
     var allD=[],allN=[];
     grp.forEach(function(dl){
-      var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){if(!allD.includes(d))allD.push(d);});
+      var dd=dl.match(/\b(\d{2}\/\d{2}\/\d{4})\b/g)||[];dd.forEach(function(d){allD.push(d);});
       var st=dl.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g,'');
       var ns=(st.match(/[\d,]+\.?\d*/g)||[]).map(function(s){return parseFloat(s.replace(/,/g,''));}).filter(function(n){return !isNaN(n)&&n>=0;});
       ns.forEach(function(n){allN.push(n);});
