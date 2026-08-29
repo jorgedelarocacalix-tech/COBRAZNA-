@@ -1429,11 +1429,14 @@ async function _renderGerentePanel(){
       var p=PROMESAS[id+'::'+x.nombre];
       var pagoM=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
       var pagado=(pagoEsteMes(x.ultimo_pago)||pagoM)&&!(p&&p.mora_pendiente);
+      // Cliente facturado este mes: sigue en su mes de gracia, no cuenta como pendiente del
+      // ciclo normal salvo que el gestor le haya registrado una promesa (queda en totalAcordado).
+      var enGracia=compraEsteMes(x);
       // Acordado en "Hoy → Cierre": mismo criterio que esa pestaña (tiene mora real, o no ha pagado este mes)
       var m=calcMoraCliente(x,id);
       var tieneMora=m&&m.diferencia>0;
       if((tieneMora||!pagado)&&p&&p.monto)totalAcordado+=p.monto;
-      if(pagado)return;
+      if(pagado||enGracia)return;
       nPendientes++;
       var best=_getBestProy(id,x.nombre);
       var montoExp=best&&best.monto_proyectado?best.monto_proyectado:(p&&p.monto?p.monto:null);
