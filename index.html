@@ -1119,10 +1119,13 @@ function calcMora(up,dp,sinP,fFact){
   var hD=HOY.getDate();
   if(sinP){
     var diasDesdeFactura=daysSince(fFact);
+    var fd=parseHNDate(fFact);
+    // Cliente facturado este mismo mes: aun esta en su mes de gracia, la primera
+    // cuota vence hasta el dia_pago del MES SIGUIENTE. Nunca VENCIDO en el mes de compra.
+    var compraEsteMes=fd&&fd.getMonth()===HOY.getMonth()&&fd.getFullYear()===HOY.getFullYear();
     if(diasDesdeFactura!==null&&diasDesdeFactura<=45){
-      if(dp>0&&dp<hD){
+      if(!compraEsteMes&&dp>0&&dp<hD){
         var fp=new Date(HOY.getFullYear(),HOY.getMonth(),dp);fp.setHours(0,0,0,0);
-        var fd=parseHNDate(fFact);
         if(fd&&HOY>fp&&fd<fp)return{dias:Math.floor((HOY-fp)/86400000),tramo:'VENCIDO'};
       }
       return{dias:null,tramo:'MES'};
