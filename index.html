@@ -1750,6 +1750,9 @@ function renderDash(id){
   // ── Proyección hoy → cierre: clientes con mora real (aunque hayan pagado este mes) o que no han pagado este mes ──
   var cierreHoyList=activos.filter(function(c){
     var p=PROMESAS[id+'::'+c.nombre];
+    // Facturado este mismo mes y sin acuerdo registrado por el gestor: sigue en su mes de
+    // gracia, no tiene fecha ni monto acordado, no pertenece a Hoy -> Cierre todavia.
+    if(compraEsteMes(c)&&!(p&&p.estado==='promesa'&&p.monto))return false;
     var pagoManualEsteMes=p&&p.estado==='pago'&&p.fecha&&p.fecha.substring(0,7)===mesActualStr;
     var pagado=(pagoEsteMes(c.ultimo_pago)||pagoManualEsteMes)&&!(p&&p.mora_pendiente);
     var m=calcMoraCliente(c,id);
