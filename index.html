@@ -1170,6 +1170,9 @@ function parseHNDate(s){if(!s)return null;var p=s.split('/');if(p.length!==3)ret
 function daysSince(s){var d=parseHNDate(s);if(!d)return null;return Math.max(0,Math.floor((HOY-d)/86400000));}
 function pagoEsteMes(s){var d=parseHNDate(s);if(!d)return false;return d.getMonth()===HOY.getMonth()&&d.getFullYear()===HOY.getFullYear();}
 function pagoMesAnterior(s){var d=parseHNDate(s);if(!d)return false;var am=new Date(HOY.getFullYear(),HOY.getMonth()-1,1);return d.getFullYear()===am.getFullYear()&&d.getMonth()===am.getMonth();}
+// Cliente facturado este mismo mes y sin pago aun: esta en su mes de gracia,
+// su primera cuota vence hasta el dia_pago del MES SIGUIENTE.
+function compraEsteMes(c){if(!c||!c.sin_ultimo_pago)return false;var fd=parseHNDate(c.fecha_factura);return !!(fd&&fd.getMonth()===HOY.getMonth()&&fd.getFullYear()===HOY.getFullYear());}
 
 // ══ CRUCE CON ARQUEOS: detectar primas pagadas ══
 async function cruzarPrimasConArqueos(cartId,clientes){
@@ -2082,9 +2085,9 @@ function moraBadge(c, cartId){
 function buildHoy(cartId,cl,G){
   var hD=HOY.getDate();var todStr=HOY.toISOString().split('T')[0];
   var yPO=function(c){return pagoEsteMes(c.ultimo_pago)&&!(PROMESAS[cartId+'::'+c.nombre]||{}).mora_pendiente;};
-  var paganHoy=cl.filter(function(c){if(c.tramo==='INACTIVO')return false;if(c.dia_pago!==hD)return false;return !yPO(c);});
+  var paganHoy=cl.filter(function(c){if(c.tramo==='INACTIVO')return false;if(compraEsteMes(c))return false;if(c.dia_pago!==hD)return false;return !yPO(c);});
   var acum=cl.filter(function(c){
-    if(c.tramo==='INACTIVO')return false;if(yPO(c))return false;if(c.dia_pago===hD)return false;
+    if(c.tramo==='INACTIVO')return false;if(compraEsteMes(c))return false;if(yPO(c))return false;if(c.dia_pago===hD)return false;
     if(c.dia_pago>0&&c.dia_pago<hD)return true;
     if(c.tramo==='VENCIDO')return true;
     if(['60','90','120','150'].includes(c.tramo))return true;
