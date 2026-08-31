@@ -1249,7 +1249,7 @@ dropEl.addEventListener('dragleave',function(){dropEl.classList.remove('over');}
 dropEl.addEventListener('drop',function(e){e.preventDefault();dropEl.classList.remove('over');if(!canUpload())return;processFiles(Array.from(e.dataTransfer.files).filter(function(f){return f.type==='application/pdf';}));});
 fileEl.addEventListener('change',function(e){processFiles(Array.from(e.target.files));e.target.value='';});
 function dropClick(){if(!canUpload()){alert('Solo el administrador puede subir carteras.');return;}if(!PDFJS_OK){showErr('PDF.js no cargo. Recarga la pagina.');return;}fileEl.click();}
-function canUpload(){return USER&&USER.rol==='admin';}
+function canUpload(){return USER&&(USER.rol==='admin'||USER.rol==='gerente');}
 async function processFiles(files){
   if(!files.length)return;setProg(5,'Iniciando...');
   for(var i=0;i<files.length;i++){setProg(10+(i/files.length)*80,'Leyendo '+files[i].name+'...');await processPDF(files[i]);}
