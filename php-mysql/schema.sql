@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 INSERT INTO usuarios (pin, nombre, rol, carteras) VALUES
   ('12345', 'Administrador', 'admin', JSON_ARRAY()),
+  ('2660',  'Administrador', 'admin', JSON_ARRAY()),
   ('7777',  'Jorge',          'gerente', JSON_ARRAY()),
   ('1111',  'Equipo Roca',    'cobrador', JSON_ARRAY('ROCA_COMERCIAL','MOTORS','LIBERTAD','BARRIO')),
   ('2222',  'Equipo Su Mueble','cobrador', JSON_ARRAY('MUEBLE','MOTO','DANLI'))
