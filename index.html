@@ -208,7 +208,7 @@ tr:hover td{background:#f5f8ff}
 .alert-container{position:fixed;bottom:20px;right:20px;max-width:340px;z-index:999;display:flex;flex-direction:column;gap:8px}
 .alert-banner{background:#fff;border:1px solid var(--border2);border-radius:var(--r);box-shadow:var(--shadow2);padding:14px 16px;animation:slideIn .3s ease}
 @keyframes slideIn{from{transform:translateX(120%)}to{transform:translateX(0)}}
-.alert-banner.info{border-left:4px solid var(--blue)}.alert-banner.urgente{border-left:4px solid var(--red)}.alert-banner.animo{border-left:4px solid #22a050}
+.alert-banner.info{border-left:4px solid var(--blue)}.alert-banner.urgente{border-left:4px solid var(--red)}.alert-banner.animo{border-left:4px solid #22a050}.alert-banner.consulta{border-left:4px solid var(--purple,#7c3aed)}
 .alert-title{font-weight:600;font-size:13px;margin-bottom:4px}
 .alert-msg{font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.4}
 .alert-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px}
@@ -714,6 +714,7 @@ function pagoArqueoMes(cartId,nombre){
 var supa=null, DB_OK=false, PDFJS_OK=false;
 var PIN_VAL='', CAL_Y=HOY.getFullYear(), CAL_M=HOY.getMonth();
 var MODAL_AC=null, ECG_DATA={}, SHOWN_ALERTS={}, SYNC_T=null, VERCHECK_T=null;
+var CONSULTAS_PROG=[], _CONS_LAST_FETCH=0, CONS_FIRED_TODAY={};
 var LAST_ALERT_CHECK=new Date(Date.now()-24*60*60*1000).toISOString();
 var REP_SORT={col:'dia_pago',dir:1};
 var _AUTOR={};   // 'cartId::cliente' -> gestor del último comentario humano
@@ -919,6 +920,7 @@ async function loadData(){
     if(!r3.error)(r3.data||[]).forEach(function(cs){CARTERA_SUCURSAL[cs.cartera_id]=cs.sucursal;});
     await loadAutores();
     await loadChatEstado();
+    await loadConsultas();
     DB_OK=true;setConn(true,'Conectado');
   }catch(e){DB_OK=false;setConn(false,'Sin conexión');console.error('loadData:',e);}
 }
@@ -982,6 +984,17 @@ async function loadAutores(){
     });
   }catch(e){console.error('loadAutores:',e);}
 }
+// Cache de consultas programadas (clientes con hora fija de seguimiento) para las carteras visibles al usuario
+async function loadConsultas(){
+  if(!supa||!USER){CONSULTAS_PROG=[];return;}
+  try{
+    var vis=getVisibles();
+    if(!vis.length){CONSULTAS_PROG=[];return;}
+    var r=await supa.from('consultas_programadas').select('*').in('cartera_id',vis).eq('activo',true);
+    if(!r.error)CONSULTAS_PROG=r.data||[];
+    _CONS_LAST_FETCH=Date.now();
+  }catch(e){console.error('loadConsultas:',e);}
+}
 async function syncNow(){
   setConn(null,'Sincronizando...');
   try{
@@ -1024,6 +1037,7 @@ function startSync(){
       });
       if(changed&&CURRENT&&CARTERAS[CURRENT])renderDash(CURRENT);
       checkAlertas();
+      checkConsultas();
     }catch(e){}
   },3000);
   // Chequeo automático de versión: la app no se actualiza sola en PWAs/pestañas
@@ -2077,6 +2091,10 @@ function renderDash(id){
       id:'INBOX', lbl:'📥 Inbox', direct:true
     },
     {
+      id:'CONSULTAS', lbl:'🔔 Consultas', direct:true,
+      badge: CONSULTAS_PROG.filter(function(c){return c.cartera_id===id;}).length||null, badgeColor:'var(--purple)'
+    },
+    {
       id:'PROYECCION', lbl:'📊 Proyeccion', color:'var(--blue)', bgColor:'var(--bluebg)',
       subs:[
         {id:'PROYECCION',    lbl:'📅 Proyección actual', n:null, cls:''},
@@ -2164,6 +2182,7 @@ function renderDash(id){
     {id:'SIN_PAGO_INT',build:function(d){d.innerHTML=buildSinPagoInt(id,cl);}},
     {id:'HISTORIAL', build:function(d){d.innerHTML='<div class="empty">Cargando historial...</div>';buildHistorial(id,d);}},
     {id:'INBOX',     build:function(d){d.innerHTML='<div class="empty">Cargando inbox...</div>';buildInbox(id,d);}},
+    {id:'CONSULTAS', build:function(d){d.innerHTML='<div class="empty">Cargando consultas...</div>';buildConsultas(id,d);}},
     {id:'PROYECCION',    build:function(d){d.innerHTML='<div class="empty">Cargando proyeccion...</div>';buildProyeccion(id,d);}},
     {id:'PROY_SIGUIENTE',build:function(d){d.innerHTML='<div class="empty">Cargando...</div>';buildProySiguiente(id,d);}},
     {id:'MORA_GLOBAL',build:function(d){d.innerHTML=buildMoraGlobal(id,cl);}},
@@ -3828,6 +3847,150 @@ function ibRender(){
   });
   feedEl.innerHTML=html;
 }
+
+// ══ CONSULTAS PROGRAMADAS ══
+// Agenda de clientes puntuales sobre los que hay que platicar/preguntar a una hora fija del día.
+// Al llegar esa hora (checkConsultas, llamado desde el loop de sync) se dispara una alerta
+// para todo el equipo vía la tabla `alertas` ya existente (mismo banner que usa checkAlertas).
+var _CP={cart:null,data:[],soloPend:true,selected:null};
+async function buildConsultas(cartId,container){
+  _CP.cart=cartId;_CP.data=[];_CP.selected=null;
+  if(!supa){container.innerHTML='<div class="empty">Sin conexion.</div>';return;}
+  try{
+    var r=await supa.from('consultas_programadas').select('*').eq('cartera_id',cartId).order('hora',{ascending:true});
+    if(r.error)throw r.error;
+    _CP.data=r.data||[];
+    container.innerHTML=
+      '<div style="font-size:15px;font-weight:600;margin-bottom:4px">🔔 Consultas programadas</div>'
+      +'<div class="cart-meta" style="margin-bottom:12px">Agrega clientes puntuales y una hora fija — a esa hora el equipo recibe una alerta para platicar sobre ellos. Los comentarios quedan guardados en el chat de cada cliente.</div>'
+      +'<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:14px;position:relative">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">'
+      +'<div style="position:relative;flex:1;min-width:180px">'
+      +'<input class="tbl-search" id="cp-search" style="margin:0" placeholder="Buscar cliente..." autocomplete="off" oninput="cpBuscar(\''+cartId+'\')" onfocus="cpBuscar(\''+cartId+'\')">'
+      +'<div id="cp-search-results" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);max-height:220px;overflow:auto;box-shadow:0 4px 14px rgba(0,0,0,.12)"></div>'
+      +'</div>'
+      +'<input type="time" id="cp-hora" style="font-family:var(--mono);font-size:12px;padding:8px;border:1px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text)">'
+      +'<button class="btn btn-g btn-sm" onclick="cpAgregar(\''+cartId+'\')">+ Agregar</button>'
+      +'</div>'
+      +'<input class="tbl-search" id="cp-nota" style="margin:8px 0 0" placeholder="Nota (opcional): ¿qué hay que preguntarle?">'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
+      +ibChip('⏳ Pendientes',_CP.soloPend,'cpSetFiltro(true)')
+      +ibChip('📋 Todas',!_CP.soloPend,'cpSetFiltro(false)')
+      +'</div>'
+      +'<div id="cp-list"></div>';
+    cpRender();
+  }catch(e){container.innerHTML='<div class="empty">Error: '+e.message+'</div>';console.error('buildConsultas:',e);}
+}
+function cpSetFiltro(soloPend){_CP.soloPend=soloPend;cpRender();}
+function cpBuscar(cartId){
+  var q=(document.getElementById('cp-search').value||'').trim().toLowerCase();
+  var box=document.getElementById('cp-search-results');
+  _CP.selected=null;
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  var cl=(CARTERAS[cartId]||{}).clientes||[];
+  var matches=cl.filter(function(c){return c.nombre.toLowerCase().indexOf(q)>=0;}).slice(0,15);
+  if(!matches.length){box.style.display='block';box.innerHTML='<div style="padding:8px 10px;font-size:12px;color:var(--text3)">Sin coincidencias</div>';return;}
+  box.style.display='block';
+  box.innerHTML=matches.map(function(c){
+    return '<div style="padding:8px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)" '
+      +'onmousedown="cpElegir(\''+esc(c.nombre)+'\')">'+ibEsc(c.nombre)+' <span style="color:var(--text3);font-size:10.5px">· L '+fmt(c.saldo)+'</span></div>';
+  }).join('');
+}
+function cpElegir(nombre){
+  _CP.selected=nombre;
+  document.getElementById('cp-search').value=nombre;
+  var box=document.getElementById('cp-search-results');box.style.display='none';box.innerHTML='';
+}
+async function cpAgregar(cartId){
+  var nombre=_CP.selected||(document.getElementById('cp-search').value||'').trim();
+  var hora=document.getElementById('cp-hora').value;
+  var nota=(document.getElementById('cp-nota').value||'').trim();
+  if(!nombre){alert('Buscá y elegí un cliente de la lista.');return;}
+  var existe=((CARTERAS[cartId]||{}).clientes||[]).some(function(c){return c.nombre===nombre;});
+  if(!existe){alert('Ese cliente no está en esta cartera. Elegilo de la lista de sugerencias.');return;}
+  if(!hora){alert('Elegí una hora.');return;}
+  if(!supa)return;
+  try{
+    await supa.from('consultas_programadas').insert({cartera_id:cartId,cliente_nombre:nombre,hora:hora,nota:nota||null,activo:true,creado_por:(USER&&USER.nombre)||'—'});
+    document.getElementById('cp-search').value='';document.getElementById('cp-hora').value='';document.getElementById('cp-nota').value='';
+    _CP.selected=null;
+    await loadConsultas();
+    var pane=document.getElementById('tp-CONSULTAS');
+    if(pane)buildConsultas(cartId,pane);
+  }catch(e){alert('Error: '+e.message);}
+}
+async function cpToggle(id,activo){
+  if(!supa)return;
+  try{
+    await supa.from('consultas_programadas').update({activo:activo}).eq('id',id);
+    var row=_CP.data.find(function(c){return c.id==id;});if(row)row.activo=activo;
+    await loadConsultas();cpRender();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function cpDel(id){
+  if(!confirm('¿Quitar esta consulta programada?'))return;
+  if(!supa)return;
+  try{
+    await supa.from('consultas_programadas').delete().eq('id',id);
+    _CP.data=_CP.data.filter(function(c){return c.id!=id;});
+    await loadConsultas();cpRender();
+  }catch(e){alert('Error: '+e.message);}
+}
+function cpRender(){
+  var listEl=document.getElementById('cp-list');if(!listEl)return;
+  var rows=_CP.data.filter(function(c){return _CP.soloPend?c.activo:true;});
+  if(!rows.length){listEl.innerHTML='<div class="empty" style="padding:20px 0">'+(_CP.soloPend?'Sin consultas pendientes.':'Sin consultas registradas.')+'</div>';return;}
+  function puedeBorrar(c){return !!USER&&(c.creado_por===nombreComentaristaActual()||USER.rol==='gerente'||USER.rol==='admin');}
+  var html=rows.map(function(c){
+    return '<div class="vis-card" style="margin-bottom:4px'+(c.activo?'':';opacity:.55')+'">'
+      +'<div style="width:44px;flex-shrink:0;text-align:center;font-family:var(--mono);font-weight:700;font-size:12px;color:var(--purple)">'+ibEsc(c.hora)+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:13px;font-weight:600">'+ibEsc(c.cliente_nombre)+'</div>'
+      +(c.nota?'<div style="font-size:12px;color:var(--text2);margin-top:2px">'+ibEsc(c.nota)+'</div>':'')
+      +'<div class="cart-meta" style="margin-top:3px">'+(c.activo?'⏳ Pendiente':'✓ Atendida')+' · agregado por '+ibEsc(c.creado_por||'—')+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+      +'<span class="add-p" style="background:var(--bluebg);color:var(--blue);border-style:solid" onclick="quickComentario(\''+c.cartera_id+'\',\''+esc(c.cliente_nombre||'')+'\')">💬</span>'
+      +(c.activo?'<span class="add-p" style="background:var(--greenbg);color:var(--green);border-style:solid" onclick="cpToggle('+c.id+',false)" title="Marcar atendida">✓</span>'
+                :'<span class="add-p" style="background:var(--bg3);color:var(--text2)" onclick="cpToggle('+c.id+',true)" title="Reactivar">↺</span>')
+      +(puedeBorrar(c)?'<span class="add-p" style="background:transparent;color:var(--red)" onclick="cpDel('+c.id+')">🗑</span>':'')
+      +'</div></div>';
+  }).join('');
+  listEl.innerHTML=html;
+}
+// Chequea si alguna consulta programada llegó a su hora y dispara una alerta para todo el equipo.
+// Usa la misma tabla `alertas` que ya pollean todas las sesiones cada 3s, evitando duplicados
+// si varias sesiones están abiertas al mismo tiempo (revisa si ya se creó la alerta hoy).
+async function checkConsultas(){
+  if(!USER||!supa)return;
+  if(Date.now()-_CONS_LAST_FETCH>55000) await loadConsultas();
+  if(!CONSULTAS_PROG.length)return;
+  var now=new Date();
+  var hhmm=(now.getHours()<10?'0':'')+now.getHours()+':'+(now.getMinutes()<10?'0':'')+now.getMinutes();
+  var hoyStr=now.toISOString().split('T')[0];
+  var candidatos=CONSULTAS_PROG.filter(function(c){return c.activo&&c.hora===hhmm;});
+  for(var i=0;i<candidatos.length;i++){
+    var c=candidatos[i];
+    var fk='cp'+c.id+'_'+hoyStr;
+    if(CONS_FIRED_TODAY[fk])continue;
+    CONS_FIRED_TODAY[fk]=true;
+    try{
+      var chk=await supa.from('alertas').select('id').eq('tipo','consulta').eq('cliente',c.cliente_nombre).gte('created_at',hoyStr+'T00:00:00');
+      if(chk.error||(chk.data&&chk.data.length))continue;
+      await supa.from('alertas').insert({
+        tipo:'consulta',
+        titulo:'🔔 Hora de consulta ('+c.hora+')',
+        mensaje:(c.nota?c.nota:'Toca platicar sobre este cliente.')+' — '+((CARTERAS[c.cartera_id]||{}).empresa||c.cartera_id),
+        cliente:c.cliente_nombre,
+        cartera_id:c.cartera_id,
+        autor:c.creado_por||'Sistema',
+        created_at:new Date().toISOString()
+      });
+    }catch(e){console.error('checkConsultas fire:',e);}
+  }
+}
+
 async function loadClientHist(cartId,nombre,cuota,saldo){
   var detEl=document.getElementById('hist-detail');if(!detEl)return;
   if(!supa){detEl.innerHTML='<div class="empty">Sin conexion.</div>';return;}
@@ -6385,7 +6548,9 @@ async function checkAlertas(){
 function showAlertBanner(a){
   var cont=document.getElementById('alert-container');var div=document.createElement('div');
   div.className='alert-banner '+(a.tipo||'info');
-  div.innerHTML='<div class="alert-title">'+(a.tipo==='animo'?'💪':a.tipo==='urgente'?'🚨':'📋')+' '+esc2(a.titulo||'')+'</div><div class="alert-msg">'+esc2(a.mensaje||'')+'</div>'+(a.cliente?'<div class="alert-meta">👤 '+esc2(a.cliente)+'</div>':'')+'<div class="alert-meta">De: '+(a.autor||'Admin')+' · '+new Date(a.created_at).toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'})+'</div><button class="alert-ok" onclick="confirmAlerta('+a.id+',this.parentNode)">✓ Visto</button>';
+  var icon=a.tipo==='animo'?'💪':a.tipo==='urgente'?'🚨':a.tipo==='consulta'?'🔔':'📋';
+  var chatBtn=(a.tipo==='consulta'&&a.cartera_id&&a.cliente)?'<button class="alert-ok" style="background:var(--blue)" onclick="event.stopPropagation();quickComentario(\''+esc(a.cartera_id)+'\',\''+esc(a.cliente)+'\')">💬 Abrir chat</button>':'';
+  div.innerHTML='<div class="alert-title">'+icon+' '+esc2(a.titulo||'')+'</div><div class="alert-msg">'+esc2(a.mensaje||'')+'</div>'+(a.cliente?'<div class="alert-meta">👤 '+esc2(a.cliente)+'</div>':'')+'<div class="alert-meta">De: '+(a.autor||'Admin')+' · '+new Date(a.created_at).toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'})+'</div>'+chatBtn+'<button class="alert-ok" onclick="confirmAlerta('+a.id+',this.parentNode)">✓ Visto</button>';
   cont.appendChild(div);
   setTimeout(function(){if(div.parentNode)div.parentNode.removeChild(div);},30000);
 }
