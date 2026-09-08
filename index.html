@@ -686,10 +686,11 @@ function loginRRHH(pin){
   }).then(function(r){return r.ok?r.json():null;}).then(function(rrhh){
     if(!rrhh) return null;
     if(!rrhh.accesos_apps||!rrhh.accesos_apps.cobranza) return null;
-    if(RRHH_GERENTES[rrhh.codigo]) return {nombre:rrhh.nombre,rol:'gerente',carteras:[]};
+    var sucursales=(rrhh.accesos_apps&&rrhh.accesos_apps.sucursales)||null;
+    if(RRHH_GERENTES[rrhh.codigo]) return {nombre:rrhh.nombre,rol:'gerente',carteras:[],codigo:rrhh.codigo,sucursales:sucursales};
     var equipo=RRHH_EQUIPO[rrhh.codigo];
     if(!equipo) return null;
-    return {nombre:rrhh.nombre,rol:'cobrador',carteras:RRHH_CARTERAS[equipo]};
+    return {nombre:rrhh.nombre,rol:'cobrador',carteras:RRHH_CARTERAS[equipo],codigo:rrhh.codigo,sucursales:sucursales};
   }).catch(function(){return null;});
 }
 
