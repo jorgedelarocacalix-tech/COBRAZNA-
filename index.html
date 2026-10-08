@@ -705,6 +705,11 @@ var GERENTE_SUCURSAL_EXENTO={'v_jor':1,'ADMIN':1};
 // a un cliente que ya vino a pagar en caja aunque el PDF de cartera todavia no lo refleje.
 var ARQUEO_MES={};
 var ARQUEO_FECHA={}; // sucursal::nombre_normalizado -> fecha (YYYY-MM-DD) del ultimo recibo del mes
+// cartera::cliente -> fecha local (YYYY-MM-DD) de la ultima promesa registrada este mes en historial_clientes.
+// Se usa en vez de promesas.updated_at porque esa fecha cambia con cualquier guardado (subida de PDF, mora, etc.).
+var PROMESA_HIST_MES={};
+function _fechaLocal(ts){var d=new Date(ts);if(isNaN(d))return '';return d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1)+'-'+(d.getDate()<10?'0':'')+d.getDate();}
+function _marcarPromesaHist(cartId,nombre,ts){var k=cartId+'::'+nombre,f=_fechaLocal(ts);if(f&&(!PROMESA_HIST_MES[k]||f>PROMESA_HIST_MES[k]))PROMESA_HIST_MES[k]=f;}
 function normNombreArqueo(s){
   return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s*\(?\d+\)?\s*$/,'').trim();
 }
@@ -738,6 +743,8 @@ async function loadArqueoMes(){
     });
   });
   ARQUEO_MES=mes2;ARQUEO_FECHA=fec;
+  var rp=await _withTimeout(supa.from('historial_clientes').select('cartera_id,cliente_nombre,created_at').eq('tipo','promesa').gte('created_at',mes+'-01'),8000).catch(function(e){console.error('loadArqueoMes promesas:',e);return null;});
+  if(rp&&!rp.error){PROMESA_HIST_MES={};(rp.data||[]).forEach(function(h){_marcarPromesaHist(h.cartera_id,h.cliente_nombre,h.created_at);});}
 }
 // Fecha (YYYY-MM-DD) en que el cliente vino a pagar este mes: PDF (ultimo_pago), pago manual o recibo de caja.
 // '' si no ha venido. mora_pendiente=true fuerza "no ha venido" (pago incompleto marcado por el gestor).
@@ -759,14 +766,14 @@ function promesaVigente(p){
   return p.fecha?p.fecha.substring(0,7)>=mes:(p.ts||'').substring(0,7)===mes;
 }
 // Hoy -> Cierre: clientes que NO han venido a pagar este mes. Si ya vinieron salen de la lista,
-// salvo que tengan un acuerdo vigente registrado DESPUES de venir (quedo debiendo el resto).
+// salvo que tengan un acuerdo vigente registrado DESPUES de venir (quedo debiendo el resto) o mora_pendiente.
 function enCierreHoy(c,cartId){
   if(c.tramo==='INACTIVO')return false;
   var p=PROMESAS[cartId+'::'+c.nombre];
   if(enGraciaSinPrima(c,p))return false;
   var vino=fechaVinoMes(c,cartId,p);
   if(!vino)return true;
-  return promesaVigente(p)&&(p.ts||'').substring(0,10)>vino;
+  return promesaVigente(p)&&(PROMESA_HIST_MES[cartId+'::'+c.nombre]||'')>vino;
 }
 var supa=null, DB_OK=false, PDFJS_OK=false;
 var PIN_VAL='', CAL_Y=HOY.getFullYear(), CAL_M=HOY.getMonth();
@@ -1186,6 +1193,7 @@ async function dbSaveHist(entry){
   if(!supa){console.warn('dbSaveHist: supa es null');return;}
   try{
     var r=await supa.from('historial_clientes').insert(entry);
+    if(!r.error&&entry.tipo==='promesa')_marcarPromesaHist(entry.cartera_id,entry.cliente_nombre,entry.created_at||new Date().toISOString());
     if(r.error){console.error('dbSaveHist error:',r.error);showErr('Error al guardar historial: '+r.error.message);}
   }catch(e){
     console.error('saveHist:',e);
